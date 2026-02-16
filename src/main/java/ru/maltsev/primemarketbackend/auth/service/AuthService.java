@@ -2,11 +2,14 @@ package ru.maltsev.primemarketbackend.auth.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import ru.maltsev.primemarketbackend.auth.api.dto.LoginRequest;
 import ru.maltsev.primemarketbackend.auth.api.dto.RegisterRequest;
@@ -22,12 +25,16 @@ import java.util.Locale;
 @Service
 @RequiredArgsConstructor
 public class AuthService {
+    private static final String CONSTRAINT_USERS_EMAIL = "ux_users_email";
+    private static final String CONSTRAINT_USERS_USERNAME = "ux_users_display_name";
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
 
+    @Transactional
     public AuthTokens register(RegisterRequest request) {
         String username = normalizeUsername(request.username());
         String email = normalizeEmail(request.email());
@@ -41,7 +48,18 @@ public class AuthService {
         }
 
         User user = new User(username, email, passwordEncoder.encode(password));
-        userRepository.save(user);
+        try {
+            userRepository.saveAndFlush(user);
+        } catch (DataIntegrityViolationException ex) {
+            String constraint = findConstraintName(ex);
+            if (CONSTRAINT_USERS_EMAIL.equals(constraint)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already in use");
+            }
+            if (CONSTRAINT_USERS_USERNAME.equals(constraint)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Username already in use");
+            }
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Conflict");
+        }
 
         String accessToken = jwtService.generateToken(new UserPrincipal(user));
         String refreshToken = refreshTokenService.issueToken(user);
@@ -94,5 +112,13 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fieldName + " is required");
         }
         return value;
+    }
+
+    private String findConstraintName(DataIntegrityViolationException ex) {
+        Throwable mostSpecific = ex.getMostSpecificCause();
+        if (mostSpecific instanceof ConstraintViolationException constraintViolation) {
+            return constraintViolation.getConstraintName();
+        }
+        return null;
     }
 }
