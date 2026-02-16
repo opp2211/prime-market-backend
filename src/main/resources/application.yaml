@@ -1,6 +1,8 @@
 spring:
   application:
     name: prime-market-backend
+  aop:
+    proxy-target-class: true
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/prime-market-db}
     username: ${DB_USERNAME:postgres}
@@ -25,3 +27,6 @@ security:
     refresh-token-cookie-path: /auth
     refresh-token-cookie-same-site: Lax
     refresh-token-cookie-secure: false
+logging:
+  level:
+    ru.maltsev.primemarketbackend: INFO
