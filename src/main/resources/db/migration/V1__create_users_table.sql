@@ -9,8 +9,8 @@ create table if not exists users
     created_at    timestamptz  not null default now(),
     updated_at    timestamptz  not null default now(),
 
-    constraint display_name_length check (char_length(username) >= 3)
+    constraint username_length check (char_length(username) >= 3)
 );
 
 create unique index if not exists ux_users_email on users (lower(email));
-create unique index if not exists ux_users_display_name on users (lower(username));
+create unique index if not exists ux_users_username on users (lower(username));

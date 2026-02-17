@@ -26,7 +26,8 @@ import java.util.Locale;
 @RequiredArgsConstructor
 public class AuthService {
     private static final String CONSTRAINT_USERS_EMAIL = "ux_users_email";
-    private static final String CONSTRAINT_USERS_USERNAME = "ux_users_display_name";
+    private static final String CONSTRAINT_USERS_USERNAME = "ux_users_username";
+    private static final String CONSTRAINT_USERS_USERNAME_LENGTH = "username_length";
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -57,6 +58,9 @@ public class AuthService {
             }
             if (CONSTRAINT_USERS_USERNAME.equals(constraint)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Username already in use");
+            }
+            if (CONSTRAINT_USERS_USERNAME_LENGTH.equals(constraint)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Username length must be at least 3");
             }
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Conflict");
         }
