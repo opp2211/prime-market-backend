@@ -2,6 +2,7 @@ package ru.maltsev.primemarketbackend.auth.api;
 
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import java.util.Arrays;
 
 import lombok.RequiredArgsConstructor;
@@ -15,25 +16,27 @@ import org.springframework.web.bind.annotation.RestController;
 import ru.maltsev.primemarketbackend.auth.api.dto.AuthResponse;
 import ru.maltsev.primemarketbackend.auth.api.dto.LoginRequest;
 import ru.maltsev.primemarketbackend.auth.api.dto.RegisterRequest;
+import ru.maltsev.primemarketbackend.auth.api.dto.ResendVerificationRequest;
+import ru.maltsev.primemarketbackend.auth.api.dto.StatusResponse;
+import ru.maltsev.primemarketbackend.auth.api.dto.VerifyEmailRequest;
 import ru.maltsev.primemarketbackend.auth.service.AuthTokens;
 import ru.maltsev.primemarketbackend.auth.service.AuthService;
 import ru.maltsev.primemarketbackend.security.jwt.JwtProperties;
 
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
     private final AuthService authService;
     private final JwtProperties jwtProperties;
 
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> register(@RequestBody RegisterRequest request) {
-        AuthTokens tokens = authService.register(request);
-        return buildResponse(tokens);
+    public ResponseEntity<StatusResponse> register(@Valid @RequestBody RegisterRequest request) {
+        return authService.register(request);
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         AuthTokens tokens = authService.login(request);
         return buildResponse(tokens);
     }
@@ -53,6 +56,18 @@ public class AuthController {
         return ResponseEntity.noContent()
             .header(HttpHeaders.SET_COOKIE, clearedCookie.toString())
             .build();
+    }
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<AuthResponse> verify(@Valid @RequestBody VerifyEmailRequest request) {
+        AuthTokens tokens = authService.verifyEmail(request.token());
+        return buildResponse(tokens);
+    }
+
+    @PostMapping("/resend-verification")
+    public ResponseEntity<StatusResponse> resend(@Valid @RequestBody ResendVerificationRequest request) {
+        authService.resendVerification(request.email());
+        return ResponseEntity.accepted().body(StatusResponse.sent());
     }
 
     private ResponseEntity<AuthResponse> buildResponse(AuthTokens tokens) {
