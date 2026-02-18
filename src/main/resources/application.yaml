@@ -26,9 +26,10 @@ spring:
     protocol: smtp
     properties:
       mail.smtp.auth: ${MAIL_SMTP_AUTH:false}
-      mail.smtp.starttls.enable: ${MAIL_SMTP_STARTTLS:true}
-      mail.smtp.starttls.required: ${MAIL_SMTP_STARTTLS:true}
+      mail.smtp.starttls.enable: true
+      mail.smtp.starttls.required: true
       mail.smtp.ssl.enable: ${MAIL_SMTP_SSL:false}
+      mail.debug: ${MAIL_DEBUG:false}
 security:
   jwt:
     secret: ${JWT_SECRET}
@@ -40,7 +41,7 @@ security:
     refresh-token-cookie-secure: false
 app:
   email:
-    from: ${MAIL_FROM:no-reply@maltsev.fun}
+    from: ${MAIL_FROM:noreply@primemarket.com}
     from-name: ${MAIL_FROM_NAME:Prime Market}
     verification-base-url: ${APP_VERIFY_BASE_URL:http://localhost:5173/verify-email}
     verification-ttl: 24h
