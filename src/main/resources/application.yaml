@@ -46,6 +46,10 @@ app:
     verification-base-url: ${APP_VERIFY_BASE_URL:http://localhost:5173/verify-email}
     verification-ttl: 24h
     verification-required: ${APP_EMAIL_VERIFICATION_REQUIRED:true}
+    change-email-base-url: ${APP_CHANGE_EMAIL_BASE_URL:http://localhost:5173/confirm-email-change}
+    change-email-ttl: 24h
+    change-password-base-url: ${APP_CHANGE_PASSWORD_BASE_URL:http://localhost:5173/confirm-password-change}
+    change-password-ttl: 24h
 logging:
   level:
     ru.maltsev.primemarketbackend: INFO
