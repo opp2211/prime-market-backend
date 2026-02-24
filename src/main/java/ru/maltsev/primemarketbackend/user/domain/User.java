@@ -42,9 +42,6 @@ public class User {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt;
-
     public User(String username, String email, String passwordHash) {
         this.username = username;
         this.email = email;
@@ -57,13 +54,10 @@ public class User {
         if (createdAt == null) {
             createdAt = now;
         }
-        if (updatedAt == null) {
-            updatedAt = now;
-        }
     }
 
-    @PreUpdate
-    private void onUpdate() {
-        updatedAt = Instant.now();
-    }
+//    @PreUpdate
+//    private void onUpdate() {
+//        updatedAt = Instant.now();
+//    }
 }

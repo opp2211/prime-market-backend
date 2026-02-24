@@ -13,6 +13,10 @@ public record EmailProperties(
     String fromName,
     @NotBlank String verificationBaseUrl,
     @NotNull Duration verificationTtl,
-    boolean verificationRequired
+    boolean verificationRequired,
+    @NotBlank String changeEmailBaseUrl,
+    @NotNull Duration changeEmailTtl,
+    @NotBlank String changePasswordBaseUrl,
+    @NotNull Duration changePasswordTtl
 ) {
 }
