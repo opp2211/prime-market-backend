@@ -36,7 +36,7 @@ public class UserAccountController {
         }
 
         Long userId = principal.getUser().getId();
-        Map<String, UserAccountResponse> responseMap = userAccountService.getUserAccounts(userId);
+        Map<String, UserAccountResponse> responseMap = userAccountService.getUserAccountsWithPositiveBalance(userId);
         return ResponseEntity.ok(responseMap);
     }
 

@@ -1,5 +1,6 @@
 package ru.maltsev.primemarketbackend.account.service;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -20,8 +21,9 @@ public class UserAccountService {
     private final UserAccountRepository userAccountRepository;
     private final UserAccountTxRepository userAccountTxRepository;
 
-    public Map<String, UserAccountResponse> getUserAccounts(Long userId) {
-        List<UserAccount> accounts = userAccountRepository.findAllByUserId(userId);
+    public Map<String, UserAccountResponse> getUserAccountsWithPositiveBalance(Long userId) {
+        List<UserAccount> accounts = userAccountRepository
+                .findAllByUserIdAndBalanceGreaterThan(userId, BigDecimal.ZERO);
 
         Map<String, UserAccountResponse> response = new LinkedHashMap<>();
         for (UserAccount account : accounts) {
