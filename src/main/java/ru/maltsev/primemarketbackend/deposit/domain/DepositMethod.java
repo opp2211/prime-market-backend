@@ -1,6 +1,5 @@
 package ru.maltsev.primemarketbackend.deposit.domain;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -10,8 +9,6 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -29,8 +26,7 @@ public class DepositMethod {
     private String currencyCode;
 
     @Column(name = "payment_details")
-    @JdbcTypeCode(SqlTypes.JSON)
-    private JsonNode paymentDetails;
+    private String paymentDetails;
 
     @Column(name = "auto_confirmation")
     private boolean autoConfirmation = false;

@@ -40,9 +40,13 @@ public class SecurityConfig {
                     "/api/auth/**",
                     "/api/users/email-change/confirm",
                     "/api/users/password-change/confirm",
+                    "/v3/api-docs/**",
+                    "/swagger-ui/**",
+                    "/swagger-ui.html",
                     "/test/public",
                     "/error"
                 ).permitAll()
+                .requestMatchers("/api/admin/**").hasRole("OPERATOR")
                 .anyRequest().authenticated()
             )
             .exceptionHandling(ex -> ex
