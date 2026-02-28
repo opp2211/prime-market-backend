@@ -39,6 +39,7 @@ public class DepositRequest {
     private DepositRequestStatus status = DepositRequestStatus.PENDING_DETAILS;
 
     @Column(name = "payment_details")
+    @JdbcTypeCode(SqlTypes.JSON)
     private String paymentDetails;
 
     @Column(name = "created_at", nullable = false, updatable = false)

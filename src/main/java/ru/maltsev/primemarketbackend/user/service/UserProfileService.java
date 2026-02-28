@@ -44,6 +44,16 @@ public class UserProfileService {
     private final PasswordChangeTokenRepository passwordChangeTokenRepository;
     private final SecureRandom secureRandom = new SecureRandom();
 
+    @Transactional(readOnly = true)
+    public User getProfile(Long userId) {
+        return userRepository.findWithRolesById(userId)
+            .orElseThrow(() -> new ApiProblemException(
+                HttpStatus.NOT_FOUND,
+                "USER_NOT_FOUND",
+                "User not found"
+            ));
+    }
+
     @Transactional
     public void requestEmailChange(User user, String rawNewEmail, String rawCurrentPassword) {
         String newEmail = normalizeEmail(rawNewEmail);

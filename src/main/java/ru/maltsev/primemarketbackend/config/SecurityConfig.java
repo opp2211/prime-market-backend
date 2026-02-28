@@ -46,7 +46,6 @@ public class SecurityConfig {
                     "/test/public",
                     "/error"
                 ).permitAll()
-                .requestMatchers("/api/admin/**").hasRole("OPERATOR")
                 .anyRequest().authenticated()
             )
             .exceptionHandling(ex -> ex

@@ -5,8 +5,13 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.Generated;
+import org.hibernate.generator.EventType;
 
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -33,12 +38,19 @@ public class User {
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
 
-    @Setter
-    @Enumerated(EnumType.STRING)
-    @Column(name = "role", nullable = false, length = 16)
-    private UserRole role = UserRole.USER;
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "user_roles",
+        joinColumns = @JoinColumn(name = "user_id", nullable = false),
+        inverseJoinColumns = @JoinColumn(name = "role_id", nullable = false)
+    )
+    private Set<Role> roles = new HashSet<>();
+
+    @Transient
+    private Set<Permission> permissions = new HashSet<>();
 
     @Column(name = "created_at", nullable = false, updatable = false)
+    @Generated(event = EventType.INSERT)
     private Instant createdAt;
 
     public User(String username, String email, String passwordHash) {
@@ -47,16 +59,14 @@ public class User {
         this.passwordHash = passwordHash;
     }
 
-    @PrePersist
-    private void onCreate() {
-        Instant now = Instant.now();
-        if (createdAt == null) {
-            createdAt = now;
+    public Set<Permission> getPermissions() {
+        if (roles.isEmpty()) {
+            permissions = Set.of();
+            return permissions;
         }
+        permissions = roles.stream()
+            .flatMap(role -> role.getPermissions().stream())
+            .collect(Collectors.toUnmodifiableSet());
+        return permissions;
     }
-
-//    @PreUpdate
-//    private void onUpdate() {
-//        updatedAt = Instant.now();
-//    }
 }

@@ -1,7 +1,8 @@
 package ru.maltsev.primemarketbackend.security.user;
 
 import java.util.Collection;
-import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
@@ -19,8 +20,14 @@ public class UserPrincipal implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        String role = user.getRole() == null ? "USER" : user.getRole().name();
-        return List.of(new SimpleGrantedAuthority("ROLE_" + role));
+        Set<String> authorities = new LinkedHashSet<>();
+        if (user.getRoles().isEmpty()) {
+            authorities.add("ROLE_USER");
+        } else {
+            user.getRoles().forEach(role -> authorities.add("ROLE_" + role.getCode()));
+        }
+        user.getPermissions().forEach(permission -> authorities.add(permission.getCode()));
+        return authorities.stream().map(SimpleGrantedAuthority::new).toList();
     }
 
     @Override
