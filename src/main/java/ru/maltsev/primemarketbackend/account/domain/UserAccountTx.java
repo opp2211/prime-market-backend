@@ -48,8 +48,19 @@ public class UserAccountTx {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    public UserAccountTx(UserAccount userAccount, BigDecimal amount, String txType, String refType, Long refId) {
+        this.userAccount = userAccount;
+        this.amount = amount;
+        this.txType = txType;
+        this.refType = refType;
+        this.refId = refId;
+    }
+
     @PrePersist
     private void onCreate() {
+        if (publicId == null) {
+            publicId = UUID.randomUUID();
+        }
         if (createdAt == null) {
             createdAt = Instant.now();
         }

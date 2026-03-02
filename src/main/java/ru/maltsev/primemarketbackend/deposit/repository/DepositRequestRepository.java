@@ -5,12 +5,20 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
 import ru.maltsev.primemarketbackend.deposit.domain.DepositRequest;
 import ru.maltsev.primemarketbackend.deposit.domain.DepositRequestStatus;
 
 public interface DepositRequestRepository extends JpaRepository<DepositRequest, Long> {
     Optional<DepositRequest> findByPublicId(UUID publicId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select dr from DepositRequest dr where dr.publicId = :publicId")
+    Optional<DepositRequest> findByPublicIdForUpdate(@Param("publicId") UUID publicId);
 
     Optional<DepositRequest> findByPublicIdAndUserId(UUID publicId, Long userId);
 

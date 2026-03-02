@@ -1,11 +1,16 @@
 package ru.maltsev.primemarketbackend.deposit.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.maltsev.primemarketbackend.account.domain.UserAccount;
+import ru.maltsev.primemarketbackend.account.domain.UserAccountTx;
+import ru.maltsev.primemarketbackend.account.repository.UserAccountRepository;
+import ru.maltsev.primemarketbackend.account.repository.UserAccountTxRepository;
 import ru.maltsev.primemarketbackend.deposit.api.dto.CreateDepositRequest;
 import ru.maltsev.primemarketbackend.deposit.domain.DepositMethod;
 import ru.maltsev.primemarketbackend.deposit.domain.DepositRequest;
@@ -13,6 +18,8 @@ import ru.maltsev.primemarketbackend.deposit.domain.DepositRequestStatus;
 import ru.maltsev.primemarketbackend.deposit.repository.DepositMethodRepository;
 import ru.maltsev.primemarketbackend.deposit.repository.DepositRequestRepository;
 import ru.maltsev.primemarketbackend.exception.ApiProblemException;
+import ru.maltsev.primemarketbackend.user.domain.User;
+import ru.maltsev.primemarketbackend.user.repository.UserRepository;
 
 import java.util.EnumSet;
 import java.util.List;
@@ -22,6 +29,9 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class DepositRequestService {
+    private static final String TX_TYPE_DEPOSIT = "DEPOSIT";
+    private static final String REF_TYPE_DEPOSIT_REQUEST = "DEPOSIT_REQUEST";
+
     private static final Set<DepositRequestStatus> USER_CANCELLABLE_STATUSES = EnumSet.of(
         DepositRequestStatus.PENDING_DETAILS,
         DepositRequestStatus.WAITING_PAYMENT
@@ -29,6 +39,9 @@ public class DepositRequestService {
 
     private final DepositRequestRepository depositRequestRepository;
     private final DepositMethodRepository depositMethodRepository;
+    private final UserAccountRepository userAccountRepository;
+    private final UserAccountTxRepository userAccountTxRepository;
+    private final UserRepository userRepository;
 
     @Transactional
     public DepositRequest create(Long userId, CreateDepositRequest request) {
@@ -114,8 +127,21 @@ public class DepositRequestService {
 
     @Transactional
     public DepositRequest confirm(UUID publicId) {
-        DepositRequest request = getByPublicId(publicId);
+        DepositRequest request = getByPublicIdForUpdate(publicId);
+        if (request.getStatus() == DepositRequestStatus.CONFIRMED) {
+            return request;
+        }
         requireStatus(request, DepositRequestStatus.PAYMENT_VERIFICATION, "confirm payment");
+
+        UserAccount account = getUserAccountForDeposit(request);
+        UserAccountTx tx = new UserAccountTx(
+            account,
+            request.getAmount(),
+            TX_TYPE_DEPOSIT,
+            REF_TYPE_DEPOSIT_REQUEST,
+            request.getId()
+        );
+        userAccountTxRepository.save(tx);
         request.confirm();
         return depositRequestRepository.save(request);
     }
@@ -139,6 +165,32 @@ public class DepositRequestService {
                 "DEPOSIT_REQUEST_NOT_FOUND",
                 "Deposit request not found"
             ));
+    }
+
+    private DepositRequest getByPublicIdForUpdate(UUID publicId) {
+        return depositRequestRepository.findByPublicIdForUpdate(publicId)
+            .orElseThrow(() -> new ApiProblemException(
+                HttpStatus.NOT_FOUND,
+                "DEPOSIT_REQUEST_NOT_FOUND",
+                "Deposit request not found"
+            ));
+    }
+
+    private UserAccount getUserAccountForDeposit(DepositRequest request) {
+        String currencyCode = request.getDepositMethod().getCurrencyCode();
+        return userAccountRepository.findByUserIdAndCurrencyCode(request.getUserId(), currencyCode)
+            .orElseGet(() -> createUserAccount(request.getUserId(), currencyCode));
+    }
+
+    private UserAccount createUserAccount(Long userId, String currencyCode) {
+        User user = userRepository.getReferenceById(userId);
+        UserAccount account = new UserAccount(user, currencyCode);
+        try {
+            return userAccountRepository.saveAndFlush(account);
+        } catch (DataIntegrityViolationException ex) {
+            return userAccountRepository.findByUserIdAndCurrencyCode(userId, currencyCode)
+                .orElseThrow(() -> ex);
+        }
     }
 
     private void requireStatus(DepositRequest request, DepositRequestStatus status, String action) {

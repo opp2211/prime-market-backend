@@ -37,6 +37,13 @@ public class UserAccount {
     @Column(name = "reserved", nullable = false, precision = 13, scale = 4)
     private BigDecimal reserved;
 
+    public UserAccount(User user, String currencyCode) {
+        this.user = user;
+        this.currencyCode = currencyCode;
+        this.balance = BigDecimal.ZERO;
+        this.reserved = BigDecimal.ZERO;
+    }
+
     public BigDecimal available() {
         return balance.subtract(reserved);
     }
