@@ -15,6 +15,7 @@ import ru.maltsev.primemarketbackend.deposit.repository.DepositRequestRepository
 import ru.maltsev.primemarketbackend.exception.ApiProblemException;
 
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -66,22 +67,12 @@ public class DepositRequestService {
         return depositRequestRepository.findAllByUserIdAndStatusOrderByCreatedAtDesc(userId, parsedStatus, pageable);
     }
 
-    public Page<DepositRequest> listForAdmin(String status, Long userId, Pageable pageable) {
-        DepositRequestStatus parsedStatus = parseStatus(status);
-        if (userId != null) {
-            if (parsedStatus == null) {
-                return depositRequestRepository.findAllByUserIdOrderByCreatedAtDesc(userId, pageable);
-            }
-            return depositRequestRepository.findAllByUserIdAndStatusOrderByCreatedAtDesc(
-                userId,
-                parsedStatus,
-                pageable
-            );
-        }
-        if (parsedStatus == null) {
+    public Page<DepositRequest> listForAdmin(List<String> statuses, Pageable pageable) {
+        Set<DepositRequestStatus> parsedStatuses = parseStatuses(statuses);
+        if (parsedStatuses == null || parsedStatuses.isEmpty()) {
             return depositRequestRepository.findAllByOrderByCreatedAtDesc(pageable);
         }
-        return depositRequestRepository.findAllByStatusOrderByCreatedAtDesc(parsedStatus, pageable);
+        return depositRequestRepository.findAllByStatusInOrderByCreatedAtDesc(parsedStatuses, pageable);
     }
 
     @Transactional
@@ -173,5 +164,34 @@ public class DepositRequestService {
                 "Unknown status " + status
             );
         }
+    }
+
+    private Set<DepositRequestStatus> parseStatuses(List<String> statuses) {
+        if (statuses == null || statuses.isEmpty()) {
+            return null;
+        }
+
+        Set<DepositRequestStatus> parsed = EnumSet.noneOf(DepositRequestStatus.class);
+        for (String raw : statuses) {
+            if (raw == null || raw.isBlank()) {
+                continue;
+            }
+            for (String token : raw.split(",")) {
+                String trimmed = token.trim();
+                if (trimmed.isEmpty()) {
+                    continue;
+                }
+                try {
+                    parsed.add(DepositRequestStatus.valueOf(trimmed.toUpperCase()));
+                } catch (IllegalArgumentException ex) {
+                    throw new ApiProblemException(
+                        HttpStatus.BAD_REQUEST,
+                        "INVALID_STATUS",
+                        "Unknown status " + trimmed
+                    );
+                }
+            }
+        }
+        return parsed;
     }
 }

@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Generated;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.generator.EventType;
 import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
@@ -43,9 +45,11 @@ public class DepositRequest {
     private String paymentDetails;
 
     @Column(name = "created_at", nullable = false, updatable = false)
+    @Generated(event = EventType.INSERT)
     private Instant createdAt;
 
     @Column(name = "updated_at", nullable = false)
+    @Generated(event = {EventType.INSERT, EventType.UPDATE})
     private Instant updatedAt;
 
     @Column(name = "details_issued_at")

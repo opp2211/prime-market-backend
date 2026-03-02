@@ -1,6 +1,7 @@
 package ru.maltsev.primemarketbackend.deposit.repository;
 
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,6 +23,11 @@ public interface DepositRequestRepository extends JpaRepository<DepositRequest, 
     );
 
     Page<DepositRequest> findAllByStatusOrderByCreatedAtDesc(DepositRequestStatus status, Pageable pageable);
+
+    Page<DepositRequest> findAllByStatusInOrderByCreatedAtDesc(
+        Set<DepositRequestStatus> statuses,
+        Pageable pageable
+    );
 
     Page<DepositRequest> findAllByOrderByCreatedAtDesc(Pageable pageable);
 }
