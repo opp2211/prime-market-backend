@@ -14,11 +14,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import ru.maltsev.primemarketbackend.account.api.dto.UserAccountResponse;
-import ru.maltsev.primemarketbackend.account.api.dto.UserAccountTxResponse;
+import ru.maltsev.primemarketbackend.account.api.dto.UserAccountTxShortResponse;
 import ru.maltsev.primemarketbackend.account.service.UserAccountService;
 import ru.maltsev.primemarketbackend.security.user.UserPrincipal;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -41,10 +42,10 @@ public class UserAccountController {
     }
 
     @GetMapping("/me/txs")
-    public ResponseEntity<Page<UserAccountTxResponse>> getMyTransactions(
+    public ResponseEntity<Page<UserAccountTxShortResponse>> getMyTransactions(
             @AuthenticationPrincipal UserPrincipal principal,
-            @RequestParam(required = false) String currency,
-            @RequestParam(required = false) String type,
+            @RequestParam(required = false) List<String> currency,
+            @RequestParam(required = false) List<String> type,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
@@ -54,7 +55,7 @@ public class UserAccountController {
         }
 
         Long userId = principal.getUser().getId();
-        Page<UserAccountTxResponse> response = userAccountService.getUserAccountTxs(
+        Page<UserAccountTxShortResponse> response = userAccountService.getUserAccountTxs(
                 userId,
                 currency,
                 type,

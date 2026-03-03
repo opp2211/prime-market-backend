@@ -10,16 +10,16 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import ru.maltsev.primemarketbackend.account.api.dto.UserAccountResponse;
-import ru.maltsev.primemarketbackend.account.api.dto.UserAccountTxResponse;
+import ru.maltsev.primemarketbackend.account.api.dto.UserAccountTxShortResponse;
 import ru.maltsev.primemarketbackend.account.domain.UserAccount;
 import ru.maltsev.primemarketbackend.account.repository.UserAccountRepository;
-import ru.maltsev.primemarketbackend.account.repository.UserAccountTxRepository;
+import ru.maltsev.primemarketbackend.account.repository.UserAccountTxCriteriaRepository;
 
 @Service
 @RequiredArgsConstructor
 public class UserAccountService {
     private final UserAccountRepository userAccountRepository;
-    private final UserAccountTxRepository userAccountTxRepository;
+    private final UserAccountTxCriteriaRepository userAccountTxCriteriaRepository;
 
     public Map<String, UserAccountResponse> getUserAccountsWithPositiveBalance(Long userId) {
         List<UserAccount> accounts = userAccountRepository
@@ -32,14 +32,21 @@ public class UserAccountService {
         return response;
     }
 
-    public Page<UserAccountTxResponse> getUserAccountTxs(
+    public Page<UserAccountTxShortResponse> getUserAccountTxs(
             Long userId,
-            String currency,
-            String type,
+            List<String> currency,
+            List<String> type,
             Instant from,
             Instant to,
             Pageable pageable
     ) {
-        return userAccountTxRepository.findUserAccountTxs(userId, currency, type, from, to, pageable);
+        return userAccountTxCriteriaRepository.findUserAccountTxs(
+                userId,
+                currency,
+                type,
+                from,
+                to,
+                pageable
+        );
     }
 }
