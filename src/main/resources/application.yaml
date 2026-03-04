@@ -53,3 +53,8 @@ app:
 logging:
   level:
     ru.maltsev.primemarketbackend: INFO
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

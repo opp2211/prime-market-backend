@@ -30,7 +30,9 @@ public class UserProfileController {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        return ResponseEntity.ok(UserProfileResponse.from(principal.getUser()));
+        return ResponseEntity.ok(
+            UserProfileResponse.from(userProfileService.getProfile(principal.getUser().getId()))
+        );
     }
 
     @PostMapping("/me/email-change")
