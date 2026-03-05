@@ -50,6 +50,8 @@ app:
     change-email-ttl: 24h
     change-password-base-url: ${APP_CHANGE_PASSWORD_BASE_URL:http://localhost:5173/confirm-password-change}
     change-password-ttl: 24h
+  assets:
+    base-url: ${APP_ASSETS_BASE_URL:http://localhost:8080}
 logging:
   level:
     ru.maltsev.primemarketbackend: INFO
