@@ -1,4 +1,4 @@
-truncate users;
+truncate users cascade;
 insert into users(username, email, password_hash)
 values ('user1',
         'user1@123.123',

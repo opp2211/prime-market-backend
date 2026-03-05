@@ -16,7 +16,7 @@ create table orders
 
     offer_id            bigint not null references offers(id),
 
-    buyer_id            bigint not null references users(id), -- todo: public_id?
+    buyer_id            bigint not null references users(id),
     seller_id           bigint not null references users(id),
 
     quantity            bigint not null,

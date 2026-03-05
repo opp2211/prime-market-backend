@@ -1,5 +1,5 @@
-create type offer_side as enum ('sell', 'buy');
-create type offer_status as enum ('active', 'paused', 'closed');
+create type offer_side as enum ('SELL', 'BUY');
+create type offer_status as enum ('ACTIVE', 'PAUSED', 'CLOSED');
 
 create table offers
 (
@@ -20,7 +20,7 @@ create table offers
     min_quantity  bigint         not null default 1,                    -- минималка в одной сделке
     multiplicity  bigint         not null default 1,                    -- кратность
 
-    status        offer_status   not null default 'active',
+    status        offer_status   not null default 'ACTIVE',
 
     details       jsonb          not null default '{}'::jsonb,          -- например ник/персонаж, условия услуги и т.п.
 
