@@ -18,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 
 @Slf4j
 @RestControllerAdvice
@@ -108,6 +109,18 @@ public class ApiExceptionHandler {
             "MALFORMED_JSON",
             "Malformed JSON",
             "Malformed JSON"
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(problem);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ProblemDetail> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        log.warn("Handled DataIntegrityViolationException", ex);
+        ProblemDetail problem = buildProblem(
+            HttpStatus.BAD_REQUEST,
+            "DATA_INTEGRITY_VIOLATION",
+            "Request violates data constraints",
+            "Invalid request"
         );
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(problem);
     }
