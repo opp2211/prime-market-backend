@@ -38,6 +38,7 @@ public class OfferSchemaService {
                 categoryTradeFieldConfigService.getByCategory(gameSlug, categorySlug);
         List<OfferSchemaDeliveryMethodResponse> deliveryMethods =
                 deliveryMethodService.getActiveByCategory(gameSlug, categorySlug);
+
         return new OfferSchemaResponse(contexts, attributes, tradeFields, deliveryMethods);
     }
 }

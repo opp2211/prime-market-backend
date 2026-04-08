@@ -390,3 +390,28 @@ where not exists (
     where ctfc.category_id = c.id
       and lower(ctfc.field_slug) = lower(v.field_slug)
 );
+
+insert into currency_rates (from_currency_code, to_currency_code, rate, source, note)
+select v.from_currency_code, v.to_currency_code, v.rate, v.source, v.note
+from (values
+          ('USD', 'RUB', 92.50000000, 'system', 'dev seed'),
+          ('RUB', 'USD', 0.01050000, 'system', 'dev seed'),
+
+          ('USD', 'KZT', 475.00000000, 'system', 'dev seed'),
+          ('KZT', 'USD', 0.00205000, 'system', 'dev seed'),
+
+          ('USD', 'UAH', 39.50000000, 'system', 'dev seed'),
+          ('UAH', 'USD', 0.02480000, 'system', 'dev seed'),
+
+          ('USD', 'GEL', 2.70000000, 'system', 'dev seed'),
+          ('GEL', 'USD', 0.36000000, 'system', 'dev seed'),
+
+          ('USD', 'BYN', 3.25000000, 'system', 'dev seed'),
+          ('BYN', 'USD', 0.30500000, 'system', 'dev seed')
+     ) as v(from_currency_code, to_currency_code, rate, source, note)
+where not exists (
+    select 1
+    from currency_rates cr
+    where cr.from_currency_code = v.from_currency_code
+      and cr.to_currency_code = v.to_currency_code
+);

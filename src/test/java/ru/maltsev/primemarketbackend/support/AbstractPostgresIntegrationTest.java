@@ -5,7 +5,6 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.UUID;
-import org.junit.jupiter.api.AfterAll;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
@@ -17,6 +16,9 @@ public abstract class AbstractPostgresIntegrationTest {
 
     static {
         execute("create schema if not exists " + SCHEMA);
+        Runtime.getRuntime().addShutdownHook(new Thread(() ->
+            execute("drop schema if exists " + SCHEMA + " cascade")
+        ));
     }
 
     @DynamicPropertySource
@@ -34,11 +36,6 @@ public abstract class AbstractPostgresIntegrationTest {
             () -> "test-secret-key-test-secret-key-test-secret-key-test-secret-key"
         );
         registry.add("app.email.verification-required", () -> "false");
-    }
-
-    @AfterAll
-    static void dropSchema() {
-        execute("drop schema if exists " + SCHEMA + " cascade");
     }
 
     private static void execute(String sql) {

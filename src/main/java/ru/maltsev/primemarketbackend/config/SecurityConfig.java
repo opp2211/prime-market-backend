@@ -54,7 +54,10 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET,
                     "/api/games",
                     "/api/games/**",
-                    "/api/currencies"
+                    "/api/currencies",
+                    "/api/currency-rates",
+                    "/api/market/offers",
+                    "/api/market/offers/**"
                 ).permitAll()
                 .requestMatchers(
                     "/v3/api-docs/**",
