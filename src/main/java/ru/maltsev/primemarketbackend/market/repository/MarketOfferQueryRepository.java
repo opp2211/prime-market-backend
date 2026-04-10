@@ -32,6 +32,18 @@ public class MarketOfferQueryRepository {
         join users u
           on u.id = o.user_id
          and u.is_active = true
+        join lateral (
+            select greatest(
+                o.quantity - coalesce((
+                    select sum(r.quantity)
+                    from offer_reservations r
+                    where r.offer_id = o.id
+                      and r.status = 'active'
+                ), 0),
+                0
+            ) as available_quantity
+        ) aq
+          on true
         left join currency_rates cr
           on %s
         where o.status = 'active'
@@ -41,6 +53,9 @@ public class MarketOfferQueryRepository {
           and o.side = :offerSide
           and o.price_amount is not null
           and o.price_currency_code is not null
+          and o.quantity is not null
+          and aq.available_quantity > 0
+          and (o.min_trade_quantity is null or aq.available_quantity >= o.min_trade_quantity)
           and (o.price_currency_code = :viewerCurrencyCode or cr.id is not null)
         """;
     private static final String BUY_RATE_JOIN = """
@@ -83,6 +98,18 @@ public class MarketOfferQueryRepository {
         join users u
           on u.id = o.user_id
          and u.is_active = true
+        join lateral (
+            select greatest(
+                o.quantity - coalesce((
+                    select sum(r.quantity)
+                    from offer_reservations r
+                    where r.offer_id = o.id
+                      and r.status = 'active'
+                ), 0),
+                0
+            ) as available_quantity
+        ) aq
+          on true
         left join currency_rates cr
           on %s
         where o.id = :offerId
@@ -91,11 +118,16 @@ public class MarketOfferQueryRepository {
           and o.side = :offerSide
           and o.price_amount is not null
           and o.price_currency_code is not null
+          and o.quantity is not null
+          and aq.available_quantity > 0
+          and (o.min_trade_quantity is null or aq.available_quantity >= o.min_trade_quantity)
           and (o.price_currency_code = :viewerCurrencyCode or cr.id is not null)
         """;
     private static final RowMapper<MarketOfferRow> MARKET_OFFER_ROW_MAPPER = (rs, rowNum) -> new MarketOfferRow(
         rs.getLong("id"),
+        rs.getLong("offer_version"),
         rs.getString("side"),
+        rs.getLong("owner_user_id"),
         rs.getLong("game_id"),
         rs.getString("game_slug"),
         rs.getString("game_title"),
@@ -106,6 +138,8 @@ public class MarketOfferQueryRepository {
         rs.getString("title"),
         rs.getString("description"),
         rs.getString("trade_terms"),
+        rs.getString("price_currency_code"),
+        rs.getBigDecimal("price_amount"),
         rs.getBigDecimal("display_price_amount"),
         rs.getBigDecimal("rate"),
         rs.getBigDecimal("quantity"),
@@ -197,7 +231,9 @@ public class MarketOfferQueryRepository {
         return """
             select
                 o.id,
+                o.version as offer_version,
                 o.side,
+                o.user_id as owner_user_id,
                 g.id as game_id,
                 g.slug as game_slug,
                 g.title as game_title,
@@ -208,11 +244,16 @@ public class MarketOfferQueryRepository {
                 o.title,
                 o.description,
                 o.trade_terms,
+                o.price_currency_code,
+                o.price_amount,
                 %s as display_price_amount,
                 %s as rate,
-                o.quantity,
+                aq.available_quantity as quantity,
                 o.min_trade_quantity,
-                o.max_trade_quantity,
+                case
+                    when o.max_trade_quantity is null then null
+                    else least(o.max_trade_quantity, aq.available_quantity)
+                end as max_trade_quantity,
                 o.quantity_step,
                 o.published_at
             %s
@@ -322,7 +363,9 @@ public class MarketOfferQueryRepository {
         return rows.stream()
             .map(row -> new MarketOfferRecord(
                 row.id(),
+                row.offerVersion(),
                 row.side(),
+                row.ownerUserId(),
                 row.gameId(),
                 row.gameSlug(),
                 row.gameTitle(),
@@ -333,6 +376,8 @@ public class MarketOfferQueryRepository {
                 row.title(),
                 row.description(),
                 row.tradeTerms(),
+                row.priceCurrencyCode(),
+                row.priceAmount(),
                 row.displayPriceAmount(),
                 viewerCurrencyCode,
                 row.rate(),
@@ -452,7 +497,9 @@ public class MarketOfferQueryRepository {
 
     private record MarketOfferRow(
         Long id,
+        Long offerVersion,
         String side,
+        Long ownerUserId,
         Long gameId,
         String gameSlug,
         String gameTitle,
@@ -463,6 +510,8 @@ public class MarketOfferQueryRepository {
         String title,
         String description,
         String tradeTerms,
+        String priceCurrencyCode,
+        BigDecimal priceAmount,
         BigDecimal displayPriceAmount,
         BigDecimal rate,
         BigDecimal quantity,
@@ -481,7 +530,9 @@ public class MarketOfferQueryRepository {
 
     public record MarketOfferRecord(
         Long id,
+        Long offerVersion,
         String side,
+        Long ownerUserId,
         Long gameId,
         String gameSlug,
         String gameTitle,
@@ -492,6 +543,8 @@ public class MarketOfferQueryRepository {
         String title,
         String description,
         String tradeTerms,
+        String priceCurrencyCode,
+        BigDecimal priceAmount,
         BigDecimal displayPriceAmount,
         String viewerCurrencyCode,
         BigDecimal rate,

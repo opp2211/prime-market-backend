@@ -59,6 +59,10 @@ public class SecurityConfig {
                     "/api/market/offers",
                     "/api/market/offers/**"
                 ).permitAll()
+                .requestMatchers(HttpMethod.POST,
+                    "/api/market/offers/*/quote",
+                    "/api/order-quotes/*/refresh"
+                ).permitAll()
                 .requestMatchers(
                     "/v3/api-docs/**",
                     "/swagger-ui/**",

@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +24,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
+import ru.maltsev.primemarketbackend.account.domain.UserAccount;
+import ru.maltsev.primemarketbackend.account.service.UserAccountService;
 import ru.maltsev.primemarketbackend.category.domain.Category;
 import ru.maltsev.primemarketbackend.category.repository.CategoryRepository;
 import ru.maltsev.primemarketbackend.offer.domain.Offer;
@@ -54,9 +57,30 @@ class MarketOfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
     @Autowired
     private OfferRepository offerRepository;
 
+    @Autowired
+    private UserAccountService userAccountService;
+
+    private final AtomicLong testRefIdSequence = new AtomicLong(1L);
+
     @BeforeEach
     void resetState() {
-        jdbcTemplate.execute("truncate table offer_delivery_methods, offer_attribute_values, offer_context_values, offers restart identity cascade");
+        jdbcTemplate.execute("""
+            truncate table
+                platform_account_txs,
+                platform_accounts,
+                user_account_hold_allocations,
+                user_account_holds,
+                offer_reservations,
+                orders,
+                order_quotes,
+                user_account_txs,
+                user_accounts,
+                offer_delivery_methods,
+                offer_attribute_values,
+                offer_context_values,
+                offers
+            restart identity cascade
+            """);
         jdbcTemplate.update("delete from users where email like ?", "%.market.example.test");
     }
 
@@ -72,6 +96,7 @@ class MarketOfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
                 .queryParam("viewerCurrencyCode", "RUB"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.items.length()").value(1))
+            .andExpect(jsonPath("$.items[0].offerVersion").value(1))
             .andExpect(jsonPath("$.items[0].side").value("sell"))
             .andExpect(jsonPath("$.items[0].action").value("buy"))
             .andExpect(jsonPath("$.items[0].price.currencyCode").value("RUB"))
@@ -327,6 +352,9 @@ class MarketOfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
         String currencyType,
         String title
     ) throws Exception {
+        if ("buy".equals(side)) {
+            fundWallet(owner, currencyCode, "1000.0000");
+        }
         Category category = requireCategory("path-of-exile", "currency");
         MvcResult result = mockMvc.perform(post("/api/offers")
                 .with(auth(owner))
@@ -343,6 +371,21 @@ class MarketOfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
             .andExpect(status().isCreated())
             .andReturn();
         return readBody(result).path("id").asLong();
+    }
+
+    private void fundWallet(User user, String currencyCode, String amount) {
+        UserAccount account = userAccountService.getOrCreateAccount(user.getId(), currencyCode);
+        jdbcTemplate.update(
+            """
+                insert into user_account_txs (user_account_id, amount, type, ref_type, ref_id)
+                values (?, ?, ?, ?, ?)
+                """,
+            account.getId(),
+            new BigDecimal(amount),
+            "TEST_TOP_UP",
+            "TEST",
+            testRefIdSequence.getAndIncrement()
+        );
     }
 
     private String activeOfferRequest(

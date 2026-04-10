@@ -11,22 +11,28 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
+import ru.maltsev.primemarketbackend.account.domain.UserAccount;
+import ru.maltsev.primemarketbackend.account.repository.UserAccountRepository;
+import ru.maltsev.primemarketbackend.account.service.UserAccountService;
 import ru.maltsev.primemarketbackend.category.domain.Category;
 import ru.maltsev.primemarketbackend.category.repository.CategoryRepository;
 import ru.maltsev.primemarketbackend.offer.domain.Offer;
 import ru.maltsev.primemarketbackend.offer.repository.OfferRepository;
+import ru.maltsev.primemarketbackend.order.domain.UserAccountHold;
+import ru.maltsev.primemarketbackend.order.repository.UserAccountHoldRepository;
 import ru.maltsev.primemarketbackend.security.user.UserPrincipal;
 import ru.maltsev.primemarketbackend.support.AbstractPostgresIntegrationTest;
 import ru.maltsev.primemarketbackend.user.domain.User;
@@ -54,9 +60,36 @@ class OfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
     @Autowired
     private CategoryRepository categoryRepository;
 
+    @Autowired
+    private UserAccountRepository userAccountRepository;
+
+    @Autowired
+    private UserAccountService userAccountService;
+
+    @Autowired
+    private UserAccountHoldRepository userAccountHoldRepository;
+
+    private final AtomicLong testRefIdSequence = new AtomicLong(1L);
+
     @BeforeEach
     void resetState() {
-        jdbcTemplate.execute("truncate table offer_delivery_methods, offer_attribute_values, offer_context_values, offers restart identity cascade");
+        jdbcTemplate.execute("""
+            truncate table
+                platform_account_txs,
+                platform_accounts,
+                user_account_hold_allocations,
+                user_account_holds,
+                offer_reservations,
+                orders,
+                order_quotes,
+                user_account_txs,
+                user_accounts,
+                offer_delivery_methods,
+                offer_attribute_values,
+                offer_context_values,
+                offers
+            restart identity cascade
+            """);
         jdbcTemplate.update("delete from users where email like ?", "%.example.test");
     }
 
@@ -97,7 +130,7 @@ class OfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
         MvcResult result = mockMvc.perform(post("/api/offers")
                 .with(auth(owner))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(activeOfferRequest(category.getGame().getId(), category.getId(), "USD", "2.50")))
+                .content(activeOfferRequest(category.getGame().getId(), category.getId(), "sell", "USD", "2.50")))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.status").value("active"))
             .andExpect(jsonPath("$.game.id").value(category.getGame().getId()))
@@ -147,10 +180,41 @@ class OfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
+    void createActiveBuyOfferRequiresFunding() throws Exception {
+        User owner = createUser("buy-owner-no-funds");
+        Category category = requireCategory("path-of-exile", "currency");
+
+        mockMvc.perform(post("/api/offers")
+                .with(auth(owner))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(activeOfferRequest(category.getGame().getId(), category.getId(), "buy", "USD", "2.50")))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("INSUFFICIENT_FUNDS_FOR_BUY_OFFER"));
+    }
+
+    @Test
+    void createActiveBuyOfferCreatesOfferLevelFundingHold() throws Exception {
+        User owner = createUser("buy-owner-funded");
+        Category category = requireCategory("path-of-exile", "currency");
+        fundWallet(owner, "USD", "500.0000");
+
+        JsonNode created = createActiveOffer(owner, category, "buy", "USD", "2.50");
+
+        UserAccountHold hold = userAccountHoldRepository.findByRef("offer", created.path("id").asLong(), "buy_offer_funds_hold")
+            .orElseThrow();
+        UserAccount wallet = userAccountRepository.findByUserIdAndCurrencyCode(owner.getId(), "USD").orElseThrow();
+        assertThat(hold.getStatus()).isEqualTo("active");
+        assertThat(hold.getAmount()).isEqualByComparingTo("250.0000");
+        assertThat(hold.getRefType()).isEqualTo("offer");
+        assertThat(hold.getRefId()).isEqualTo(created.path("id").asLong());
+        assertThat(wallet.getReserved()).isEqualByComparingTo("250.0000");
+    }
+
+    @Test
     void patchCanPauseActiveOffer() throws Exception {
         User owner = createUser("owner");
         Category category = requireCategory("path-of-exile", "currency");
-        long offerId = createActiveOffer(owner, category, "USD", "2.50").path("id").asLong();
+        long offerId = createActiveOffer(owner, category, "sell", "USD", "2.50").path("id").asLong();
 
         mockMvc.perform(patch("/api/offers/{offerId}", offerId)
                 .with(auth(owner))
@@ -169,7 +233,7 @@ class OfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
     void patchCanRepublishPausedOfferWhenStateIsStillValid() throws Exception {
         User owner = createUser("owner");
         Category category = requireCategory("path-of-exile", "currency");
-        JsonNode created = createActiveOffer(owner, category, "USD", "2.50");
+        JsonNode created = createActiveOffer(owner, category, "sell", "USD", "2.50");
         long offerId = created.path("id").asLong();
         String firstPublishedAt = created.path("publishedAt").asText();
 
@@ -205,7 +269,7 @@ class OfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
     void patchRejectsRepublishWhenOfferBecomesInvalid() throws Exception {
         User owner = createUser("owner");
         Category category = requireCategory("path-of-exile", "currency");
-        long offerId = createActiveOffer(owner, category, "USD", "2.50").path("id").asLong();
+        long offerId = createActiveOffer(owner, category, "sell", "USD", "2.50").path("id").asLong();
 
         mockMvc.perform(patch("/api/offers/{offerId}", offerId)
                 .with(auth(owner))
@@ -228,6 +292,80 @@ class OfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
                     """))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("PRICE_AMOUNT_REQUIRED"));
+    }
+
+    @Test
+    void patchActiveBuyOfferRecalculatesFundingHold() throws Exception {
+        User owner = createUser("buy-owner-reprice");
+        Category category = requireCategory("path-of-exile", "currency");
+        fundWallet(owner, "USD", "1000.0000");
+        long offerId = createActiveOffer(owner, category, "buy", "USD", "2.50").path("id").asLong();
+
+        mockMvc.perform(patch("/api/offers/{offerId}", offerId)
+                .with(auth(owner))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "priceAmount": 3.00,
+                      "quantity": 120
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.priceAmount").value(3.00))
+            .andExpect(jsonPath("$.quantity").value(120));
+
+        UserAccountHold hold = userAccountHoldRepository.findByRef("offer", offerId, "buy_offer_funds_hold").orElseThrow();
+        UserAccount wallet = userAccountRepository.findByUserIdAndCurrencyCode(owner.getId(), "USD").orElseThrow();
+        assertThat(hold.getAmount()).isEqualByComparingTo("360.0000");
+        assertThat(wallet.getReserved()).isEqualByComparingTo("360.0000");
+    }
+
+    @Test
+    void patchActiveBuyOfferRejectsIncreaseWhenFundingIsInsufficient() throws Exception {
+        User owner = createUser("buy-owner-insufficient");
+        Category category = requireCategory("path-of-exile", "currency");
+        fundWallet(owner, "USD", "300.0000");
+        long offerId = createActiveOffer(owner, category, "buy", "USD", "2.50").path("id").asLong();
+
+        mockMvc.perform(patch("/api/offers/{offerId}", offerId)
+                .with(auth(owner))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "quantity": 150
+                    }
+                    """))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("INSUFFICIENT_FUNDS_FOR_BUY_OFFER"));
+
+        UserAccountHold hold = userAccountHoldRepository.findByRef("offer", offerId, "buy_offer_funds_hold").orElseThrow();
+        UserAccount wallet = userAccountRepository.findByUserIdAndCurrencyCode(owner.getId(), "USD").orElseThrow();
+        assertThat(hold.getAmount()).isEqualByComparingTo("250.0000");
+        assertThat(wallet.getReserved()).isEqualByComparingTo("250.0000");
+    }
+
+    @Test
+    void patchPausesActiveBuyOfferAndReleasesUnallocatedFunding() throws Exception {
+        User owner = createUser("buy-owner-pause");
+        Category category = requireCategory("path-of-exile", "currency");
+        fundWallet(owner, "USD", "500.0000");
+        long offerId = createActiveOffer(owner, category, "buy", "USD", "2.50").path("id").asLong();
+
+        mockMvc.perform(patch("/api/offers/{offerId}", offerId)
+                .with(auth(owner))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "status": "paused"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("paused"));
+
+        UserAccountHold hold = userAccountHoldRepository.findByRef("offer", offerId, "buy_offer_funds_hold").orElseThrow();
+        UserAccount wallet = userAccountRepository.findByUserIdAndCurrencyCode(owner.getId(), "USD").orElseThrow();
+        assertThat(hold.getStatus()).isEqualTo("released");
+        assertThat(wallet.getReserved()).isEqualByComparingTo("0.0000");
     }
 
     @Test
@@ -325,22 +463,49 @@ class OfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
         ));
     }
 
-    private JsonNode createActiveOffer(User owner, Category category, String currencyCode, String priceAmount) throws Exception {
+    private JsonNode createActiveOffer(
+        User owner,
+        Category category,
+        String side,
+        String currencyCode,
+        String priceAmount
+    ) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/offers")
                 .with(auth(owner))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(activeOfferRequest(category.getGame().getId(), category.getId(), currencyCode, priceAmount)))
+                .content(activeOfferRequest(category.getGame().getId(), category.getId(), side, currencyCode, priceAmount)))
             .andExpect(status().isCreated())
             .andReturn();
         return readBody(result);
     }
 
-    private String activeOfferRequest(Long gameId, Long categoryId, String currencyCode, String priceAmount) {
+    private void fundWallet(User user, String currencyCode, String amount) {
+        UserAccount account = userAccountService.getOrCreateAccount(user.getId(), currencyCode);
+        jdbcTemplate.update(
+            """
+                insert into user_account_txs (user_account_id, amount, type, ref_type, ref_id)
+                values (?, ?, ?, ?, ?)
+                """,
+            account.getId(),
+            new BigDecimal(amount),
+            "TEST_TOP_UP",
+            "TEST",
+            testRefIdSequence.getAndIncrement()
+        );
+    }
+
+    private String activeOfferRequest(
+        Long gameId,
+        Long categoryId,
+        String side,
+        String currencyCode,
+        String priceAmount
+    ) {
         return """
             {
               "gameId": %d,
               "categoryId": %d,
-              "side": "sell",
+              "side": "%s",
               "title": "Divine Orbs bulk",
               "description": "Fast trade",
               "tradeTerms": "Whisper in game",
@@ -362,7 +527,7 @@ class OfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
               ],
               "deliveryMethods": ["f2f", "poe-trade-link"]
             }
-            """.formatted(gameId, categoryId, currencyCode, priceAmount);
+            """.formatted(gameId, categoryId, side, currencyCode, priceAmount);
     }
 
     private JsonNode readBody(MvcResult result) throws Exception {

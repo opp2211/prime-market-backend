@@ -6,20 +6,25 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import ru.maltsev.primemarketbackend.account.api.dto.UserAccountResponse;
 import ru.maltsev.primemarketbackend.account.api.dto.UserAccountTxShortResponse;
 import ru.maltsev.primemarketbackend.account.domain.UserAccount;
 import ru.maltsev.primemarketbackend.account.repository.UserAccountRepository;
 import ru.maltsev.primemarketbackend.account.repository.UserAccountTxCriteriaRepository;
+import ru.maltsev.primemarketbackend.user.domain.User;
+import ru.maltsev.primemarketbackend.user.repository.UserRepository;
 
 @Service
 @RequiredArgsConstructor
 public class UserAccountService {
     private final UserAccountRepository userAccountRepository;
     private final UserAccountTxCriteriaRepository userAccountTxCriteriaRepository;
+    private final UserRepository userRepository;
 
     public Map<String, UserAccountResponse> getUserAccountsWithPositiveBalance(Long userId) {
         List<UserAccount> accounts = userAccountRepository
@@ -48,5 +53,28 @@ public class UserAccountService {
                 to,
                 pageable
         );
+    }
+
+    @Transactional
+    public UserAccount getOrCreateAccount(Long userId, String currencyCode) {
+        return userAccountRepository.findByUserIdAndCurrencyCode(userId, currencyCode)
+            .orElseGet(() -> createAccount(userId, currencyCode));
+    }
+
+    @Transactional
+    public UserAccount getOrCreateAccountForUpdate(Long userId, String currencyCode) {
+        return userAccountRepository.findByUserIdAndCurrencyCodeIgnoreCase(userId, currencyCode)
+            .orElseGet(() -> createAccount(userId, currencyCode));
+    }
+
+    private UserAccount createAccount(Long userId, String currencyCode) {
+        User user = userRepository.getReferenceById(userId);
+        UserAccount account = new UserAccount(user, currencyCode);
+        try {
+            return userAccountRepository.saveAndFlush(account);
+        } catch (DataIntegrityViolationException ex) {
+            return userAccountRepository.findByUserIdAndCurrencyCodeIgnoreCase(userId, currencyCode)
+                .orElseThrow(() -> ex);
+        }
     }
 }

@@ -98,6 +98,7 @@ public class MarketOfferService {
 
         return new MarketOfferDetailsResponse(
             offer.id(),
+            offer.offerVersion(),
             offer.side(),
             intent.action(),
             toGame(offer),
@@ -121,6 +122,7 @@ public class MarketOfferService {
     private MarketOfferListResponse.Item toResponseItem(MarketOfferRecord item, MarketIntent intent) {
         return new MarketOfferListResponse.Item(
             item.id(),
+            item.offerVersion(),
             item.side(),
             intent.action(),
             toGame(item),

@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -40,6 +41,7 @@ import ru.maltsev.primemarketbackend.offer.repository.OfferContextValueRepositor
 import ru.maltsev.primemarketbackend.offer.repository.OfferDeliveryMethodRepository;
 import ru.maltsev.primemarketbackend.offer.repository.OfferRepository;
 import ru.maltsev.primemarketbackend.offer.repository.OfferView;
+import ru.maltsev.primemarketbackend.order.service.FundsHoldService;
 import ru.maltsev.primemarketbackend.tradefield.domain.CategoryTradeFieldConfig;
 import ru.maltsev.primemarketbackend.tradefield.repository.CategoryTradeFieldConfigRepository;
 
@@ -75,6 +77,7 @@ public class OfferService {
     private final OfferDeliveryMethodRepository offerDeliveryMethodRepository;
     private final CategoryTradeFieldConfigRepository categoryTradeFieldConfigRepository;
     private final CurrencyRepository currencyRepository;
+    private final FundsHoldService fundsHoldService;
 
     @Transactional
     public Offer create(Long userId, OfferCreateRequest request) {
@@ -108,6 +111,7 @@ public class OfferService {
         replaceContexts(saved, request.contexts(), strict);
         replaceAttributes(saved, request.attributes(), strict);
         replaceDeliveryMethods(saved, request.deliveryMethods());
+        fundsHoldService.syncBuyOfferFunding(saved);
         return saved;
     }
 
@@ -135,7 +139,12 @@ public class OfferService {
 
     @Transactional
     public Offer update(Long offerId, Long userId, OfferUpdateRequest request) {
-        Offer offer = getForUser(offerId, userId);
+        Offer offer = offerRepository.findByIdAndUserIdForUpdate(offerId, userId)
+            .orElseThrow(() -> new ApiProblemException(
+                HttpStatus.NOT_FOUND,
+                "OFFER_NOT_FOUND",
+                "Offer not found"
+            ));
         validatePatchRequest(request);
 
         String previousStatus = offer.getStatus();
@@ -147,8 +156,6 @@ public class OfferService {
             targetGameId = request.gameIdPresent() ? request.gameId() : offer.getGameId();
             targetCategoryId = request.categoryIdPresent() ? request.categoryId() : offer.getCategoryId();
             requireActiveCategory(targetGameId, targetCategoryId);
-            offer.setGameId(targetGameId);
-            offer.setCategoryId(targetCategoryId);
             if (!request.contextsPresent()) {
                 throw new ApiProblemException(
                     HttpStatus.BAD_REQUEST,
@@ -170,6 +177,28 @@ public class OfferService {
                     "Delivery methods are required when changing game or category"
                 );
             }
+        }
+
+        boolean quoteAffectingChange = hasQuoteAffectingOfferChanges(
+            offer,
+            request,
+            targetGameId,
+            targetCategoryId,
+            previousStatus
+        );
+        if (request.contextsPresent() && hasContextChanges(offerId, request.contexts())) {
+            quoteAffectingChange = true;
+        }
+        if (request.attributesPresent() && hasAttributeChanges(offerId, request.attributes())) {
+            quoteAffectingChange = true;
+        }
+        if (request.deliveryMethodsPresent() && hasDeliveryMethodChanges(offerId, request.deliveryMethods())) {
+            quoteAffectingChange = true;
+        }
+
+        if (categoryChanged) {
+            offer.setGameId(targetGameId);
+            offer.setCategoryId(targetCategoryId);
         }
 
         if (request.sidePresent()) {
@@ -227,6 +256,10 @@ public class OfferService {
 
         applyPublishedAtTransition(offer, previousStatus, targetStatus);
 
+        if (quoteAffectingChange) {
+            offer.incrementVersion();
+        }
+
         Offer saved = offerRepository.save(offer);
         if (request.contextsPresent()) {
             replaceContexts(saved, request.contexts(), strict);
@@ -237,6 +270,7 @@ public class OfferService {
         if (request.deliveryMethodsPresent()) {
             replaceDeliveryMethods(saved, request.deliveryMethods());
         }
+        fundsHoldService.syncBuyOfferFunding(saved);
         return saved;
     }
 
@@ -380,6 +414,119 @@ public class OfferService {
                 "Offers in " + currentStatus + " status cannot be edited"
             );
         }
+    }
+
+    private boolean hasQuoteAffectingOfferChanges(
+        Offer offer,
+        OfferUpdateRequest request,
+        Long targetGameId,
+        Long targetCategoryId,
+        String previousStatus
+    ) {
+        if (!Objects.equals(offer.getGameId(), targetGameId) || !Objects.equals(offer.getCategoryId(), targetCategoryId)) {
+            return true;
+        }
+        if (request.sidePresent() && !Objects.equals(offer.getSide(), normalizeSide(request.side()))) {
+            return true;
+        }
+        if (request.statusPresent() && !Objects.equals(previousStatus, normalizeStatus(request.status()))) {
+            return true;
+        }
+        if (request.titlePresent() && !Objects.equals(offer.getTitle(), normalizeNullableText(request.title()))) {
+            return true;
+        }
+        if (request.descriptionPresent() && !Objects.equals(offer.getDescription(), normalizeNullableText(request.description()))) {
+            return true;
+        }
+        if (request.tradeTermsPresent() && !Objects.equals(offer.getTradeTerms(), normalizeNullableText(request.tradeTerms()))) {
+            return true;
+        }
+        if (request.priceCurrencyCodePresent()
+            && !Objects.equals(offer.getPriceCurrencyCode(), normalizeCurrencyCode(request.priceCurrencyCode()))) {
+            return true;
+        }
+        if (request.priceAmountPresent() && !numbersEqual(offer.getPriceAmount(), request.priceAmount())) {
+            return true;
+        }
+        if (request.quantityPresent() && !numbersEqual(offer.getQuantity(), request.quantity())) {
+            return true;
+        }
+        if (request.minTradeQuantityPresent()
+            && !numbersEqual(offer.getMinTradeQuantity(), request.minTradeQuantity())) {
+            return true;
+        }
+        if (request.maxTradeQuantityPresent()
+            && !numbersEqual(offer.getMaxTradeQuantity(), request.maxTradeQuantity())) {
+            return true;
+        }
+        return request.quantityStepPresent() && !numbersEqual(offer.getQuantityStep(), request.quantityStep());
+    }
+
+    private boolean hasContextChanges(Long offerId, List<OfferContextRequest> rawContexts) {
+        List<OfferContextRequest> requested = normalizeContexts(rawContexts);
+        List<OfferContextValue> existing = offerContextValueRepository.findAllByOfferId(offerId);
+        if (requested.size() != existing.size()) {
+            return true;
+        }
+
+        Map<String, String> existingByDimension = new HashMap<>();
+        for (OfferContextValue value : existing) {
+            existingByDimension.put(
+                value.getContextDimension().getSlug().toLowerCase(Locale.ROOT),
+                value.getContextDimensionValue().getSlug().toLowerCase(Locale.ROOT)
+            );
+        }
+
+        for (OfferContextRequest request : requested) {
+            if (!Objects.equals(existingByDimension.get(request.dimensionSlug()), request.valueSlug())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasAttributeChanges(Long offerId, List<OfferAttributeRequest> rawAttributes) {
+        List<OfferAttributeRequest> requested = normalizeAttributes(rawAttributes);
+        List<OfferAttributeValue> existing = offerAttributeValueRepository.findAllByOfferId(offerId);
+        if (requested.size() != existing.size()) {
+            return true;
+        }
+
+        Map<String, AttributeSnapshot> existingBySlug = new HashMap<>();
+        for (OfferAttributeValue value : existing) {
+            existingBySlug.put(
+                value.getCategoryAttribute().getSlug().toLowerCase(Locale.ROOT),
+                new AttributeSnapshot(
+                    value.getCategoryAttributeOption() == null
+                        ? null
+                        : value.getCategoryAttributeOption().getSlug().toLowerCase(Locale.ROOT),
+                    value.getValueText(),
+                    value.getValueNumber(),
+                    value.getValueBoolean()
+                )
+            );
+        }
+
+        for (OfferAttributeRequest request : requested) {
+            AttributeSnapshot expected = new AttributeSnapshot(
+                request.optionSlug(),
+                request.valueText(),
+                request.valueNumber(),
+                request.valueBoolean()
+            );
+            if (!expected.equals(existingBySlug.get(request.attributeSlug()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasDeliveryMethodChanges(Long offerId, List<String> rawMethods) {
+        List<String> requested = normalizeDeliveryMethods(rawMethods);
+        Set<String> existing = offerDeliveryMethodRepository.findAllByOfferId(offerId).stream()
+            .map(method -> method.getDeliveryMethod().getSlug().toLowerCase(Locale.ROOT))
+            .collect(java.util.stream.Collectors.toSet());
+        return !existing.equals(Set.copyOf(requested));
     }
 
     private void replaceContexts(Offer offer, List<OfferContextRequest> rawContexts, boolean requireRequired) {
@@ -1077,5 +1224,20 @@ public class OfferService {
             );
         }
         return slug.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private boolean numbersEqual(BigDecimal left, BigDecimal right) {
+        if (left == null || right == null) {
+            return left == null && right == null;
+        }
+        return left.compareTo(right) == 0;
+    }
+
+    private record AttributeSnapshot(
+        String optionSlug,
+        String valueText,
+        BigDecimal valueNumber,
+        Boolean valueBoolean
+    ) {
     }
 }

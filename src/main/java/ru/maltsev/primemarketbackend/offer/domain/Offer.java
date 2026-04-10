@@ -62,6 +62,9 @@ public class Offer {
     @Column(name = "quantity_step", precision = 18, scale = 8)
     private BigDecimal quantityStep;
 
+    @Column(nullable = false)
+    private Long version = 1L;
+
     @Column(nullable = false, length = 16)
     private String status = "draft";
 
@@ -138,5 +141,9 @@ public class Offer {
 
     public void setPublishedAt(Instant publishedAt) {
         this.publishedAt = publishedAt;
+    }
+
+    public void incrementVersion() {
+        this.version = version == null ? 1L : version + 1L;
     }
 }

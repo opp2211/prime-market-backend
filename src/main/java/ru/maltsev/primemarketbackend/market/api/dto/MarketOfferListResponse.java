@@ -12,6 +12,7 @@ public record MarketOfferListResponse(
 ) {
     public record Item(
         Long id,
+        Long offerVersion,
         String side,
         String action,
         Game game,

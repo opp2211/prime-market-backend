@@ -25,11 +25,19 @@ public enum MarketIntent {
     }
 
     public static MarketIntent from(String rawIntent) {
+        return from(rawIntent, "Query parameter 'intent' is required");
+    }
+
+    public static MarketIntent fromBody(String rawIntent) {
+        return from(rawIntent, "Field 'intent' is required");
+    }
+
+    private static MarketIntent from(String rawIntent, String missingMessage) {
         if (rawIntent == null || rawIntent.isBlank()) {
             throw new ApiProblemException(
                 HttpStatus.BAD_REQUEST,
                 "VALIDATION_ERROR",
-                "Query parameter 'intent' is required"
+                missingMessage
             );
         }
 
