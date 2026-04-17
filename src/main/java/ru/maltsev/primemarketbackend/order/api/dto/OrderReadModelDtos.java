@@ -1,6 +1,8 @@
 package ru.maltsev.primemarketbackend.order.api.dto;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.UUID;
 
 public final class OrderReadModelDtos {
     private OrderReadModelDtos() {
@@ -53,9 +55,23 @@ public final class OrderReadModelDtos {
     public record AvailableActions(
         boolean canConfirmReady,
         boolean canCancel,
+        boolean canRequestCancel,
+        boolean canRequestAmendQuantity,
         boolean canMarkPartiallyDelivered,
         boolean canMarkDelivered,
         boolean canConfirmReceived
+    ) {
+    }
+
+    public record PendingRequest(
+        UUID publicId,
+        String requestType,
+        Long requestedByUserId,
+        String requestedByRole,
+        BigDecimal requestedQuantity,
+        Instant createdAt,
+        boolean canApprove,
+        boolean canReject
     ) {
     }
 }

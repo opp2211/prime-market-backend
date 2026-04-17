@@ -148,6 +148,59 @@ public class FundsHoldService {
 
     @Transactional
     public void syncBuyOfferFunding(Offer offer) {
+        syncBuyOfferFunding(offer, "INSUFFICIENT_FUNDS_FOR_BUY_OFFER");
+    }
+
+    @Transactional
+    public void syncBuyOfferFundingForAmend(Offer offer) {
+        syncBuyOfferFunding(offer, "INSUFFICIENT_FUNDS_FOR_AMEND");
+    }
+
+    @Transactional
+    public void rebalanceOrderFundsHoldForAmend(Long orderId, BigDecimal amount) {
+        UserAccountHold hold = userAccountHoldRepository.findByRefForUpdate(
+                REF_TYPE_ORDER,
+                orderId,
+                HOLD_REASON_ORDER_FUNDS_HOLD
+            )
+            .orElseThrow(() -> invalidHoldAllocation("Order funds hold not found"));
+        if (!hold.isActive()) {
+            throw invalidHoldAllocation("Order funds hold is not active");
+        }
+
+        UserAccount account = lockAccount(hold.getUserAccountId());
+        BigDecimal targetAmount = scaleAccountMoney(amount);
+        ensureAvailableDelta(account, hold.getAmount(), targetAmount, "INSUFFICIENT_FUNDS_FOR_AMEND");
+        applyReservedDelta(account, hold.getAmount(), targetAmount);
+        hold.changeAmount(targetAmount);
+    }
+
+    @Transactional
+    public void changeBuyOfferAllocationAmountForAmend(Offer offer, Long orderId, BigDecimal amount) {
+        UserAccountHoldAllocation allocation = userAccountHoldAllocationRepository.findByOrderIdForUpdate(orderId)
+            .orElseThrow(() -> buyOfferParentHoldInconsistent("Buy offer allocation not found"));
+        if (!allocation.isActive()) {
+            throw buyOfferParentHoldInconsistent("Buy offer allocation is not active");
+        }
+
+        UserAccountHold hold = userAccountHoldRepository.findByRefForUpdate(
+            REF_TYPE_OFFER,
+            offer.getId(),
+            HOLD_REASON_BUY_OFFER_FUNDS_HOLD
+        ).orElseThrow(() -> buyOfferParentHoldInconsistent("Buy offer parent hold not found"));
+        if (!hold.isActive()) {
+            throw buyOfferParentHoldInconsistent("Buy offer parent hold is not active");
+        }
+        if (!allocation.getUserAccountHoldId().equals(hold.getId())) {
+            throw buyOfferParentHoldInconsistent("Buy offer allocation references a different parent hold");
+        }
+
+        UserAccount holdAccount = lockAccount(hold.getUserAccountId());
+        ensureHoldOwnerAndCurrency(holdAccount, offer.getUserId(), offer.getPriceCurrencyCode());
+        allocation.changeAmount(scaleAccountMoney(amount));
+    }
+
+    private void syncBuyOfferFunding(Offer offer, String insufficientFundsCode) {
         UserAccountHold hold = userAccountHoldRepository.findByRefForUpdate(
             REF_TYPE_OFFER,
             offer.getId(),
@@ -163,12 +216,8 @@ public class FundsHoldService {
         }
 
         BigDecimal activeAllocationAmount = activeAllocationAmount(hold);
-        if (hold != null && hold.getAmount().compareTo(activeAllocationAmount) < 0) {
-            throw invalidHoldAllocation("Funds hold cannot be lower than active allocations");
-        }
-
         if (!requiresBuyOfferBacking(offer)) {
-            reconcileInactiveOrNonBuyOfferHold(hold, activeAllocationAmount);
+            reconcileInactiveOrNonBuyOfferHold(hold, activeAllocationAmount, insufficientFundsCode);
             return;
         }
 
@@ -176,29 +225,34 @@ public class FundsHoldService {
         BigDecimal targetAmount = activeAllocationAmount.add(
             scaleAccountMoney(offer.getPriceAmount().multiply(unreservedQuantity))
         );
-        reconcileActiveBuyOfferHold(offer, hold, activeAllocationAmount, targetAmount);
+        reconcileActiveBuyOfferHold(offer, hold, activeAllocationAmount, targetAmount, insufficientFundsCode);
     }
 
-    private void reconcileInactiveOrNonBuyOfferHold(UserAccountHold hold, BigDecimal activeAllocationAmount) {
+    private void reconcileInactiveOrNonBuyOfferHold(
+        UserAccountHold hold,
+        BigDecimal activeAllocationAmount,
+        String insufficientFundsCode
+    ) {
         if (hold == null) {
             return;
         }
 
         UserAccount currentAccount = lockAccount(hold.getUserAccountId());
-        reconcileHoldOnCurrentAccount(hold, currentAccount, activeAllocationAmount);
+        reconcileHoldOnCurrentAccount(hold, currentAccount, activeAllocationAmount, insufficientFundsCode);
     }
 
     private void reconcileActiveBuyOfferHold(
         Offer offer,
         UserAccountHold hold,
         BigDecimal activeAllocationAmount,
-        BigDecimal targetAmount
+        BigDecimal targetAmount,
+        String insufficientFundsCode
     ) {
         UserAccount currentAccount = hold == null ? null : lockAccount(hold.getUserAccountId());
         UserAccount targetAccount = resolveTargetAccount(offer, currentAccount, activeAllocationAmount);
 
         if (hold == null) {
-            ensureAvailableDelta(targetAccount, BigDecimal.ZERO, targetAmount);
+            ensureAvailableDelta(targetAccount, BigDecimal.ZERO, targetAmount, insufficientFundsCode);
             targetAccount.increaseReserved(targetAmount);
             userAccountHoldRepository.save(new UserAccountHold(
                 UUID.randomUUID(),
@@ -214,7 +268,7 @@ public class FundsHoldService {
         }
 
         if (currentAccount != null && currentAccount.getId().equals(targetAccount.getId())) {
-            reconcileHoldOnCurrentAccount(hold, currentAccount, targetAmount);
+            reconcileHoldOnCurrentAccount(hold, currentAccount, targetAmount, insufficientFundsCode);
             return;
         }
 
@@ -222,7 +276,7 @@ public class FundsHoldService {
         if (currentActiveAmount.signum() > 0 && currentAccount != null) {
             currentAccount.decreaseReserved(currentActiveAmount);
         }
-        ensureAvailableDelta(targetAccount, BigDecimal.ZERO, targetAmount);
+        ensureAvailableDelta(targetAccount, BigDecimal.ZERO, targetAmount, insufficientFundsCode);
         targetAccount.increaseReserved(targetAmount);
         hold.activate(targetAccount.getId(), targetAmount, null);
     }
@@ -240,7 +294,12 @@ public class FundsHoldService {
         return userAccountService.getOrCreateAccountForUpdate(offer.getUserId(), offer.getPriceCurrencyCode());
     }
 
-    private void reconcileHoldOnCurrentAccount(UserAccountHold hold, UserAccount account, BigDecimal targetAmount) {
+    private void reconcileHoldOnCurrentAccount(
+        UserAccountHold hold,
+        UserAccount account,
+        BigDecimal targetAmount,
+        String insufficientFundsCode
+    ) {
         BigDecimal currentActiveAmount = hold.isActive() ? hold.getAmount() : BigDecimal.ZERO;
         if (targetAmount.signum() == 0) {
             if (currentActiveAmount.signum() > 0) {
@@ -252,7 +311,7 @@ public class FundsHoldService {
             return;
         }
 
-        ensureAvailableDelta(account, currentActiveAmount, targetAmount);
+        ensureAvailableDelta(account, currentActiveAmount, targetAmount, insufficientFundsCode);
         applyReservedDelta(account, currentActiveAmount, targetAmount);
         hold.activate(account.getId(), targetAmount, null);
     }
@@ -279,7 +338,12 @@ public class FundsHoldService {
             .orElseThrow(() -> invalidHoldAllocation("User account hold references missing wallet"));
     }
 
-    private void ensureAvailableDelta(UserAccount account, BigDecimal currentActiveAmount, BigDecimal targetAmount) {
+    private void ensureAvailableDelta(
+        UserAccount account,
+        BigDecimal currentActiveAmount,
+        BigDecimal targetAmount,
+        String insufficientFundsCode
+    ) {
         BigDecimal delta = targetAmount.subtract(currentActiveAmount);
         if (delta.signum() <= 0) {
             return;
@@ -287,8 +351,8 @@ public class FundsHoldService {
         if (account.available().compareTo(delta) < 0) {
             throw new ApiProblemException(
                 HttpStatus.CONFLICT,
-                "INSUFFICIENT_FUNDS_FOR_BUY_OFFER",
-                "Insufficient funds for active buy offer"
+                insufficientFundsCode,
+                "Insufficient funds"
             );
         }
     }
@@ -318,6 +382,14 @@ public class FundsHoldService {
         return new ApiProblemException(
             HttpStatus.CONFLICT,
             "INVALID_HOLD_ALLOCATION",
+            message
+        );
+    }
+
+    private ApiProblemException buyOfferParentHoldInconsistent(String message) {
+        return new ApiProblemException(
+            HttpStatus.CONFLICT,
+            "BUY_OFFER_PARENT_HOLD_INCONSISTENT",
             message
         );
     }

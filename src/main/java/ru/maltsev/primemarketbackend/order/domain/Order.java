@@ -300,4 +300,31 @@ public class Order {
     public void markExpired() {
         status = STATUS_EXPIRED;
     }
+
+    public void amendQuantity(
+        BigDecimal orderedQuantity,
+        BigDecimal displayTotalAmount,
+        BigDecimal sellerGrossAmount,
+        BigDecimal sellerFeeAmount,
+        BigDecimal sellerNetAmount
+    ) {
+        this.orderedQuantity = orderedQuantity;
+        this.displayTotalAmount = displayTotalAmount;
+        this.sellerGrossAmount = sellerGrossAmount;
+        this.sellerFeeAmount = sellerFeeAmount;
+        this.sellerNetAmount = sellerNetAmount;
+        syncDeliveryStatusAfterQuantityAmend();
+    }
+
+    private void syncDeliveryStatusAfterQuantityAmend() {
+        if (deliveredQuantity.compareTo(orderedQuantity) == 0) {
+            status = STATUS_DELIVERED;
+            return;
+        }
+        if (deliveredQuantity.signum() > 0) {
+            status = STATUS_PARTIALLY_DELIVERED;
+            return;
+        }
+        status = STATUS_IN_PROGRESS;
+    }
 }

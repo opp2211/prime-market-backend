@@ -7,6 +7,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import ru.maltsev.primemarketbackend.exception.ApiProblemException;
 import ru.maltsev.primemarketbackend.offer.domain.Offer;
@@ -14,8 +15,10 @@ import ru.maltsev.primemarketbackend.offer.repository.OfferRepository;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderResponse;
 import ru.maltsev.primemarketbackend.order.domain.OfferReservation;
 import ru.maltsev.primemarketbackend.order.domain.Order;
+import ru.maltsev.primemarketbackend.order.domain.OrderRequest;
 import ru.maltsev.primemarketbackend.order.repository.OfferReservationRepository;
 import ru.maltsev.primemarketbackend.order.repository.OrderRepository;
+import ru.maltsev.primemarketbackend.order.repository.OrderRequestRepository;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +29,7 @@ public class OrderLifecycleService {
 
     private final OrderRepository orderRepository;
     private final OfferReservationRepository offerReservationRepository;
+    private final OrderRequestRepository orderRequestRepository;
     private final OfferRepository offerRepository;
     private final FundsHoldService fundsHoldService;
     private final OrderSettlementService orderSettlementService;
@@ -59,11 +63,18 @@ public class OrderLifecycleService {
             );
         }
 
-        validatePendingForCancel(order);
         String actorRole = resolveParticipantRole(order, actorUserId);
-        transitionPendingToTerminal(order, false, Instant.now());
+        validateForDirectCancel(order, actorRole);
+        Instant now = Instant.now();
+        cancelOrderAndReleaseResources(order, now);
+        cancelPendingRequests(order.getId(), actorUserId, now);
         orderEventWriteService.recordOrderCanceled(order, actorUserId, actorRole);
         return OrderResponse.from(order);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void cancelOrderAndReleaseResources(Order order, Instant now) {
+        transitionToCanceled(order, now);
     }
 
     @Transactional
@@ -105,7 +116,7 @@ public class OrderLifecycleService {
     public int expirePendingOrders(Instant now) {
         List<Order> orders = orderRepository.findAllPendingExpiredForUpdate(now);
         for (Order order : orders) {
-            transitionPendingToTerminal(order, true, now);
+            transitionPendingToExpired(order, now);
             orderEventWriteService.recordOrderExpired(order);
         }
         return orders.size();
@@ -147,10 +158,20 @@ public class OrderLifecycleService {
         throw invalidOrderStatus("Order cannot be confirmed from status " + order.getStatus());
     }
 
-    private void validatePendingForCancel(Order order) {
+    private void validateForDirectCancel(Order order, String actorRole) {
         if (order.isPending()) {
             if (!order.getExpiresAt().isAfter(Instant.now())) {
                 throw orderAlreadyExpired();
+            }
+            return;
+        }
+        if (isActiveCancelableStatus(order)) {
+            if (!ROLE_SELLER.equals(actorRole)) {
+                throw new ApiProblemException(
+                    HttpStatus.FORBIDDEN,
+                    "ONLY_SELLER_CAN_DIRECT_CANCEL",
+                    "Only seller can directly cancel active order"
+                );
             }
             return;
         }
@@ -163,13 +184,6 @@ public class OrderLifecycleService {
         }
         if (order.isExpired()) {
             throw orderAlreadyExpired();
-        }
-        if (order.isInProgress()) {
-            throw new ApiProblemException(
-                HttpStatus.CONFLICT,
-                "UNSUPPORTED_ORDER_TRANSITION",
-                "Cancel is not supported for in_progress orders"
-            );
         }
         throw invalidOrderStatus("Order cannot be canceled from status " + order.getStatus());
     }
@@ -207,18 +221,25 @@ public class OrderLifecycleService {
         throw invalidOrderStatus("Order cannot be completed from status " + order.getStatus());
     }
 
-    private void transitionPendingToTerminal(Order order, boolean expired, Instant now) {
+    private void transitionPendingToExpired(Order order, Instant now) {
         if (!order.isPending()) {
             return;
         }
+        releaseOrderResources(order, true, now);
+        order.markExpired();
+    }
 
+    private void transitionToCanceled(Order order, Instant now) {
+        if (order.isCanceled()) {
+            return;
+        }
+        releaseOrderResources(order, false, now);
+        order.markCanceled();
+    }
+
+    private void releaseOrderResources(Order order, boolean expired, Instant now) {
         OfferReservation reservation = offerReservationRepository.findByOrderIdForUpdate(order.getId())
             .orElseThrow(() -> invalidOrderStatus("Order reservation not found"));
-        if (expired) {
-            order.markExpired();
-        } else {
-            order.markCanceled();
-        }
 
         if (SIDE_SELL.equals(order.getOfferSideSnapshot())) {
             fundsHoldService.releaseOrderFundsHold(order.getId(), expired, now);
@@ -238,6 +259,19 @@ public class OrderLifecycleService {
             Offer offer = offerRepository.findByIdForUpdate(reservation.getOfferId())
                 .orElseThrow(() -> invalidOrderStatus("Offer backing order reservation not found"));
             fundsHoldService.syncBuyOfferFunding(offer);
+        }
+    }
+
+    private boolean isActiveCancelableStatus(Order order) {
+        return order.isInProgress() || order.isPartiallyDelivered() || order.isDelivered();
+    }
+
+    private void cancelPendingRequests(Long orderId, Long actorUserId, Instant now) {
+        for (OrderRequest request : orderRequestRepository.findAllByOrderIdAndStatusOrderByCreatedAtDesc(
+            orderId,
+            OrderRequest.STATUS_PENDING
+        )) {
+            request.markCanceled(actorUserId, now);
         }
     }
 

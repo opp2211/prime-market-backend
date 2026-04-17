@@ -12,6 +12,7 @@ import ru.maltsev.primemarketbackend.config.OrderProperties;
 import ru.maltsev.primemarketbackend.exception.ApiProblemException;
 import ru.maltsev.primemarketbackend.offer.domain.Offer;
 import ru.maltsev.primemarketbackend.offer.repository.OfferRepository;
+import ru.maltsev.primemarketbackend.offer.service.OfferQuantityRules;
 import ru.maltsev.primemarketbackend.order.api.dto.CreateOrderRequest;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderResponse;
 import ru.maltsev.primemarketbackend.order.domain.OfferReservation;
@@ -42,6 +43,7 @@ public class OrderService {
     private final OrderProperties orderProperties;
     private final FundsHoldService fundsHoldService;
     private final OrderEventWriteService orderEventWriteService;
+    private final OrderConversationService orderConversationService;
 
     @Transactional
     public OrderResponse createOrder(Long takerUserId, CreateOrderRequest request) {
@@ -106,6 +108,7 @@ public class OrderService {
         ));
         reserveFunds(quote, offer, order, roles, amounts, expiresAt);
         quote.markConsumed();
+        orderConversationService.createMainConversation(order);
         orderEventWriteService.recordOrderCreated(order, takerUserId, roles.takerRole());
 
         return OrderResponse.from(order);
@@ -170,7 +173,7 @@ public class OrderService {
             throw invalidOrderQuantity();
         }
         if (quote.getQuantityStepSnapshot() != null
-            && requestedQuantity.divideAndRemainder(quote.getQuantityStepSnapshot())[1].compareTo(BigDecimal.ZERO) != 0) {
+            && !OfferQuantityRules.isAlignedToStep(requestedQuantity, quote.getQuantityStepSnapshot())) {
             throw invalidOrderQuantity();
         }
     }

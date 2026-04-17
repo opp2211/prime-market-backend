@@ -3,6 +3,7 @@ package ru.maltsev.primemarketbackend.order.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -100,7 +101,11 @@ class OrderApiIntegrationTest extends AbstractPostgresIntegrationTest {
                 user_account_hold_allocations,
                 user_account_holds,
                 offer_reservations,
+                order_messages,
+                order_conversation_participants,
+                order_conversations,
                 order_events,
+                order_requests,
                 orders,
                 order_quotes,
                 user_account_txs,
@@ -438,7 +443,7 @@ class OrderApiIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(hold.getStatus()).isEqualTo("consumed");
         assertThat(reservation.getStatus()).isEqualTo("consumed");
         assertThat(loadOfferQuantity(offerId)).isEqualByComparingTo("80.00000000");
-        assertThat(loadOfferMaxTradeQuantity(offerId)).isEqualByComparingTo("80.00000000");
+        assertThat(loadOfferMaxTradeQuantity(offerId)).isEqualByComparingTo("100.00000000");
         assertThat(buyerWallet.getReserved()).isEqualByComparingTo("0.0000");
         assertThat(buyerWallet.getBalance()).isEqualByComparingTo("5238.0952");
         assertThat(sellerWallet.getBalance()).isEqualByComparingTo("49.5000");
@@ -483,7 +488,7 @@ class OrderApiIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(parentHold.getAmount()).isEqualByComparingTo("200.0000");
         assertThat(reservation.getStatus()).isEqualTo("consumed");
         assertThat(loadOfferQuantity(offerId)).isEqualByComparingTo("80.00000000");
-        assertThat(loadOfferMaxTradeQuantity(offerId)).isEqualByComparingTo("80.00000000");
+        assertThat(loadOfferMaxTradeQuantity(offerId)).isEqualByComparingTo("100.00000000");
         assertThat(buyerWallet.getReserved()).isEqualByComparingTo("200.0000");
         assertThat(buyerWallet.getBalance()).isEqualByComparingTo("450.0000");
         assertThat(sellerWallet.getBalance()).isEqualByComparingTo("49.5000");
@@ -653,7 +658,7 @@ class OrderApiIntegrationTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
-    void cannotCancelInProgressOrder() throws Exception {
+    void buyerCannotDirectCancelInProgressOrder() throws Exception {
         User seller = createUser("cancel-in-progress-seller");
         User buyer = createUser("cancel-in-progress-buyer");
         fundWallet(buyer, "RUB", "10000.0000");
@@ -663,8 +668,291 @@ class OrderApiIntegrationTest extends AbstractPostgresIntegrationTest {
 
         mockMvc.perform(post("/api/orders/{orderId}/cancel", order.path("publicId").asText())
                 .with(auth(buyer)))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("ONLY_SELLER_CAN_DIRECT_CANCEL"));
+    }
+
+    @Test
+    void sellerCanDirectCancelInProgressOrderAndReleaseResources() throws Exception {
+        User seller = createUser("direct-cancel-progress-s");
+        User buyer = createUser("direct-cancel-progress-b");
+        fundWallet(buyer, "RUB", "10000.0000");
+
+        JsonNode order = createPendingSellOrder(seller, buyer, "20");
+        confirmReady(seller, order.path("publicId").asText());
+
+        JsonNode canceled = cancelOrder(seller, order.path("publicId").asText());
+
+        UserAccountHold hold = userAccountHoldRepository.findByRef("order", order.path("id").asLong(), "order_funds_hold")
+            .orElseThrow();
+        OfferReservation reservation = offerReservationRepository.findByOrderId(order.path("id").asLong()).orElseThrow();
+        UserAccount buyerWallet = userAccountRepository.findByUserIdAndCurrencyCode(buyer.getId(), "RUB").orElseThrow();
+        assertThat(canceled.path("status").asText()).isEqualTo("canceled");
+        assertThat(hold.getStatus()).isEqualTo("released");
+        assertThat(reservation.getStatus()).isEqualTo("released");
+        assertThat(buyerWallet.getReserved()).isEqualByComparingTo("0.0000");
+    }
+
+    @Test
+    void sellerCanDirectCancelPartiallyDeliveredAndDeliveredOrders() throws Exception {
+        User seller = createUser("direct-cancel-active-s");
+        User buyer = createUser("direct-cancel-active-b");
+        fundWallet(buyer, "RUB", "30000.0000");
+
+        JsonNode partialOrder = createPendingSellOrder(seller, buyer, "20", "Partial direct cancel");
+        confirmReady(seller, partialOrder.path("publicId").asText());
+        markPartiallyDelivered(seller, partialOrder.path("publicId").asText(), "10");
+
+        JsonNode deliveredOrder = createPendingSellOrder(seller, buyer, "20", "Delivered direct cancel");
+        confirmReady(seller, deliveredOrder.path("publicId").asText());
+        markDelivered(seller, deliveredOrder.path("publicId").asText());
+
+        assertThat(cancelOrder(seller, partialOrder.path("publicId").asText()).path("status").asText())
+            .isEqualTo("canceled");
+        assertThat(cancelOrder(seller, deliveredOrder.path("publicId").asText()).path("status").asText())
+            .isEqualTo("canceled");
+
+        assertThat(offerReservationRepository.findByOrderId(partialOrder.path("id").asLong()).orElseThrow().getStatus())
+            .isEqualTo("released");
+        assertThat(offerReservationRepository.findByOrderId(deliveredOrder.path("id").asLong()).orElseThrow().getStatus())
+            .isEqualTo("released");
+    }
+
+    @Test
+    void buyerCanRequestCancelInProgressAndRequestAppearsPending() throws Exception {
+        User seller = createUser("request-cancel-s");
+        User buyer = createUser("request-cancel-b");
+        fundWallet(buyer, "RUB", "10000.0000");
+
+        JsonNode order = createPendingSellOrder(seller, buyer, "20");
+        confirmReady(seller, order.path("publicId").asText());
+
+        JsonNode request = requestCancel(buyer, order.path("publicId").asText());
+        JsonNode details = getOrderDetails(seller, order.path("publicId").asText());
+
+        assertThat(request.path("requestType").asText()).isEqualTo("cancel");
+        assertThat(request.path("status").asText()).isEqualTo("pending");
+        assertThat(request.path("requestedByRole").asText()).isEqualTo("buyer");
+        assertThat(details.path("pendingRequests")).hasSize(1);
+        assertThat(details.path("pendingRequests").get(0).path("requestType").asText()).isEqualTo("cancel");
+        assertThat(details.path("pendingRequests").get(0).path("canApprove").asBoolean()).isTrue();
+    }
+
+    @Test
+    void sellerCannotCreateRequestCancelWhenDirectCancelIsAvailable() throws Exception {
+        User seller = createUser("request-cancel-deny-s");
+        User buyer = createUser("request-cancel-deny-b");
+        fundWallet(buyer, "RUB", "10000.0000");
+
+        JsonNode order = createPendingSellOrder(seller, buyer, "20");
+        confirmReady(seller, order.path("publicId").asText());
+
+        mockMvc.perform(post("/api/orders/{orderId}/request-cancel", order.path("publicId").asText())
+                .with(auth(seller)))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("ONLY_BUYER_CAN_REQUEST_CANCEL"));
+    }
+
+    @Test
+    void approveCancelRequestCancelsOrderAndReleasesResources() throws Exception {
+        User seller = createUser("approve-cancel-s");
+        User buyer = createUser("approve-cancel-b");
+        fundWallet(buyer, "RUB", "10000.0000");
+
+        JsonNode order = createPendingSellOrder(seller, buyer, "20");
+        confirmReady(seller, order.path("publicId").asText());
+        JsonNode request = requestCancel(buyer, order.path("publicId").asText());
+
+        JsonNode approved = approveRequest(seller, request.path("publicId").asText());
+
+        UserAccountHold hold = userAccountHoldRepository.findByRef("order", order.path("id").asLong(), "order_funds_hold")
+            .orElseThrow();
+        OfferReservation reservation = offerReservationRepository.findByOrderId(order.path("id").asLong()).orElseThrow();
+        assertThat(approved.path("status").asText()).isEqualTo("approved");
+        assertThat(loadOrderStatus(order.path("publicId").asText())).isEqualTo("canceled");
+        assertThat(hold.getStatus()).isEqualTo("released");
+        assertThat(reservation.getStatus()).isEqualTo("released");
+    }
+
+    @Test
+    void amendQuantityRequestValidatesCapacityAndDeliveredQuantity() throws Exception {
+        User seller = createUser("amend-create-s");
+        User firstBuyer = createUser("amend-create-b1");
+        User secondBuyer = createUser("amend-create-b2");
+        fundWallet(firstBuyer, "RUB", "30000.0000");
+        fundWallet(secondBuyer, "RUB", "30000.0000");
+        long offerId = createActiveOffer(seller, "sell", "USD", "2.50", "Amend capacity");
+
+        JsonNode firstQuote = createQuote(offerId, "buy", "RUB", 1L, BUY_QUOTE_DISPLAY_PRICE);
+        JsonNode firstOrder = createOrder(firstBuyer, firstQuote.path("quoteId").asText(), "40");
+        JsonNode secondQuote = createQuote(offerId, "buy", "RUB", 1L, BUY_QUOTE_DISPLAY_PRICE);
+        JsonNode secondOrder = createOrder(secondBuyer, secondQuote.path("quoteId").asText(), "60");
+        confirmReady(seller, secondOrder.path("publicId").asText());
+
+        mockMvc.perform(post("/api/orders/{orderId}/request-amend-quantity", secondOrder.path("publicId").asText())
+                .with(auth(secondBuyer))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "quantity": 100
+                    }
+                    """))
             .andExpect(status().isConflict())
-            .andExpect(jsonPath("$.code").value("UNSUPPORTED_ORDER_TRANSITION"));
+            .andExpect(jsonPath("$.code").value("AMEND_QUANTITY_EXCEEDS_AVAILABLE_CAPACITY"));
+
+        confirmReady(seller, firstOrder.path("publicId").asText());
+        markPartiallyDelivered(seller, firstOrder.path("publicId").asText(), "20");
+        mockMvc.perform(post("/api/orders/{orderId}/request-amend-quantity", firstOrder.path("publicId").asText())
+                .with(auth(firstBuyer))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "quantity": 15
+                    }
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("AMEND_QUANTITY_BELOW_DELIVERED"));
+
+        JsonNode request = requestAmendQuantity(firstBuyer, firstOrder.path("publicId").asText(), "35.5");
+        assertThat(request.path("requestType").asText()).isEqualTo("amend_quantity");
+        assertThat(request.path("requestedQuantity").decimalValue()).isEqualByComparingTo("35.5");
+        assertThat(request.path("status").asText()).isEqualTo("pending");
+    }
+
+    @Test
+    void approveAmendQuantityForSellOfferRebalancesHoldReservationAndTotals() throws Exception {
+        User seller = createUser("amend-sell-s");
+        User buyer = createUser("amend-sell-b");
+        fundWallet(buyer, "RUB", "30000.0000");
+
+        JsonNode order = createPendingSellOrder(seller, buyer, "20");
+        confirmReady(seller, order.path("publicId").asText());
+        JsonNode request = requestAmendQuantity(buyer, order.path("publicId").asText(), "30");
+
+        JsonNode approved = approveRequest(seller, request.path("publicId").asText());
+        JsonNode details = getOrderDetails(buyer, order.path("publicId").asText());
+
+        UserAccountHold hold = userAccountHoldRepository.findByRef("order", order.path("id").asLong(), "order_funds_hold")
+            .orElseThrow();
+        OfferReservation reservation = offerReservationRepository.findByOrderId(order.path("id").asLong()).orElseThrow();
+        UserAccount buyerWallet = userAccountRepository.findByUserIdAndCurrencyCode(buyer.getId(), "RUB").orElseThrow();
+        assertThat(approved.path("status").asText()).isEqualTo("approved");
+        assertThat(details.path("orderedQuantity").decimalValue()).isEqualByComparingTo("30");
+        assertThat(details.path("price").path("totalAmount").decimalValue()).isEqualByComparingTo("7142.85714300");
+        assertThat(details.path("sellerGrossAmount").decimalValue()).isEqualByComparingTo("75.00000000");
+        assertThat(details.path("sellerFeeAmount").decimalValue()).isEqualByComparingTo("0.75000000");
+        assertThat(details.path("sellerNetAmount").decimalValue()).isEqualByComparingTo("74.25000000");
+        assertThat(hold.getAmount()).isEqualByComparingTo("7142.8572");
+        assertThat(buyerWallet.getReserved()).isEqualByComparingTo("7142.8572");
+        assertThat(reservation.getQuantity()).isEqualByComparingTo("30");
+    }
+
+    @Test
+    void approveAmendQuantityForBuyOfferRebalancesAllocationWithoutDoubleReserve() throws Exception {
+        User buyerMaker = createUser("amend-buy-maker");
+        User sellerTaker = createUser("amend-buy-seller");
+        fundWallet(buyerMaker, "USD", "500.0000");
+
+        JsonNode order = createPendingBuyOrder(buyerMaker, sellerTaker, "20");
+        long offerId = loadOfferIdForOrder(order.path("id").asLong());
+        confirmReady(buyerMaker, order.path("publicId").asText());
+        JsonNode request = requestAmendQuantity(sellerTaker, order.path("publicId").asText(), "30");
+
+        approveRequest(buyerMaker, request.path("publicId").asText());
+
+        UserAccountHold parentHold = userAccountHoldRepository.findByRef("offer", offerId, "buy_offer_funds_hold")
+            .orElseThrow();
+        UserAccountHoldAllocation allocation = userAccountHoldAllocationRepository.findByOrderId(order.path("id").asLong())
+            .orElseThrow();
+        OfferReservation reservation = offerReservationRepository.findByOrderId(order.path("id").asLong()).orElseThrow();
+        UserAccount buyerWallet = userAccountRepository.findByUserIdAndCurrencyCode(buyerMaker.getId(), "USD").orElseThrow();
+        JsonNode details = getOrderDetails(sellerTaker, order.path("publicId").asText());
+
+        assertThat(parentHold.getStatus()).isEqualTo("active");
+        assertThat(parentHold.getAmount()).isEqualByComparingTo("250.0000");
+        assertThat(allocation.getAmount()).isEqualByComparingTo("75.0000");
+        assertThat(buyerWallet.getReserved()).isEqualByComparingTo("250.0000");
+        assertThat(reservation.getQuantity()).isEqualByComparingTo("30");
+        assertThat(details.path("orderedQuantity").decimalValue()).isEqualByComparingTo("30");
+        assertThat(details.path("sellerGrossAmount").decimalValue()).isEqualByComparingTo("75.00000000");
+        assertThat(details.path("sellerFeeAmount").decimalValue()).isEqualByComparingTo("0.75000000");
+        assertThat(details.path("sellerNetAmount").decimalValue()).isEqualByComparingTo("74.25000000");
+    }
+
+    @Test
+    void rejectAmendQuantityRequestLeavesOrderUnchanged() throws Exception {
+        User seller = createUser("amend-reject-s");
+        User buyer = createUser("amend-reject-b");
+        fundWallet(buyer, "RUB", "30000.0000");
+
+        JsonNode order = createPendingSellOrder(seller, buyer, "20");
+        confirmReady(seller, order.path("publicId").asText());
+        JsonNode request = requestAmendQuantity(buyer, order.path("publicId").asText(), "30");
+
+        JsonNode rejected = rejectRequest(seller, request.path("publicId").asText());
+        JsonNode details = getOrderDetails(buyer, order.path("publicId").asText());
+
+        assertThat(rejected.path("status").asText()).isEqualTo("rejected");
+        assertThat(details.path("orderedQuantity").decimalValue()).isEqualByComparingTo("20");
+        assertThat(details.path("price").path("totalAmount").decimalValue()).isEqualByComparingTo("4761.90476200");
+    }
+
+    @Test
+    void orderCreationStillEnforcesQuantityStepForRelaxedOfferQuantityRules() throws Exception {
+        User seller = createUser("step-relaxed-s");
+        User buyer = createUser("step-relaxed-b");
+        fundWallet(buyer, "RUB", "30000.0000");
+        Category category = requireCategory("path-of-exile", "currency");
+
+        MvcResult offerResult = mockMvc.perform(post("/api/offers")
+                .with(auth(seller))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(activeOfferRequest(
+                    category.getGame().getId(),
+                    category.getId(),
+                    "sell",
+                    "USD",
+                    "2.50",
+                    "Relaxed quantity"
+                ).replace("\"quantity\": 100", "\"quantity\": 101")
+                    .replace("\"minTradeQuantity\": 10", "\"minTradeQuantity\": 12")
+                    .replace("\"maxTradeQuantity\": 100", "\"maxTradeQuantity\": 250")
+                    .replace("\"quantityStep\": 5", "\"quantityStep\": 5")))
+            .andExpect(status().isCreated())
+            .andReturn();
+        long offerId = readBody(offerResult).path("id").asLong();
+        JsonNode quote = createQuote(offerId, "buy", "RUB", 1L, BUY_QUOTE_DISPLAY_PRICE);
+        assertThat(quote.path("quantity").decimalValue()).isEqualByComparingTo("101");
+        assertThat(quote.path("minTradeQuantity").decimalValue()).isEqualByComparingTo("15");
+        assertThat(quote.path("maxTradeQuantity").decimalValue()).isEqualByComparingTo("100");
+
+        mockMvc.perform(post("/api/orders")
+                .with(auth(buyer))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(createOrderRequest(quote.path("quoteId").asText(), "12")))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_ORDER_QUANTITY"));
+    }
+
+    @Test
+    void decreasingActiveOfferBelowActiveReservationsIsRejected() throws Exception {
+        User seller = createUser("offer-reserved-s");
+        User buyer = createUser("offer-reserved-b");
+        fundWallet(buyer, "RUB", "30000.0000");
+        long offerId = createActiveOffer(seller, "sell", "USD", "2.50", "Reserved offer");
+        JsonNode quote = createQuote(offerId, "buy", "RUB", 1L, BUY_QUOTE_DISPLAY_PRICE);
+        createOrder(buyer, quote.path("quoteId").asText(), "60");
+
+        mockMvc.perform(patch("/api/offers/{offerId}", offerId)
+                .with(auth(seller))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "quantity": 50
+                    }
+                    """))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("OFFER_QUANTITY_BELOW_ACTIVE_RESERVATIONS"));
     }
 
     @Test
@@ -890,7 +1178,9 @@ class OrderApiIntegrationTest extends AbstractPostgresIntegrationTest {
 
         assertThat(details.path("status").asText()).isEqualTo("in_progress");
         assertThat(details.path("availableActions").path("canConfirmReady").asBoolean()).isFalse();
-        assertThat(details.path("availableActions").path("canCancel").asBoolean()).isFalse();
+        assertThat(details.path("availableActions").path("canCancel").asBoolean()).isTrue();
+        assertThat(details.path("availableActions").path("canRequestCancel").asBoolean()).isFalse();
+        assertThat(details.path("availableActions").path("canRequestAmendQuantity").asBoolean()).isTrue();
         assertThat(details.path("availableActions").path("canMarkPartiallyDelivered").asBoolean()).isTrue();
         assertThat(details.path("availableActions").path("canMarkDelivered").asBoolean()).isTrue();
         assertThat(details.path("availableActions").path("canConfirmReceived").asBoolean()).isFalse();
@@ -898,6 +1188,8 @@ class OrderApiIntegrationTest extends AbstractPostgresIntegrationTest {
         JsonNode buyerDetails = getOrderDetails(buyer, order.path("publicId").asText());
         assertThat(buyerDetails.path("availableActions").path("canConfirmReady").asBoolean()).isFalse();
         assertThat(buyerDetails.path("availableActions").path("canCancel").asBoolean()).isFalse();
+        assertThat(buyerDetails.path("availableActions").path("canRequestCancel").asBoolean()).isTrue();
+        assertThat(buyerDetails.path("availableActions").path("canRequestAmendQuantity").asBoolean()).isTrue();
         assertThat(buyerDetails.path("availableActions").path("canMarkPartiallyDelivered").asBoolean()).isFalse();
         assertThat(buyerDetails.path("availableActions").path("canMarkDelivered").asBoolean()).isFalse();
         assertThat(buyerDetails.path("availableActions").path("canConfirmReceived").asBoolean()).isTrue();
@@ -916,6 +1208,192 @@ class OrderApiIntegrationTest extends AbstractPostgresIntegrationTest {
                 .with(auth(outsider)))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("ORDER_NOT_FOUND"));
+    }
+
+    @Test
+    void orderCreationAutoCreatesOrderMainConversation() throws Exception {
+        User seller = createUser("chat-main-s");
+        User buyer = createUser("chat-main-b");
+        fundWallet(buyer, "RUB", "10000.0000");
+
+        JsonNode order = createPendingSellOrder(seller, buyer, "20");
+        long orderId = order.path("id").asLong();
+
+        assertThat(loadConversationCount(orderId, "order_main")).isEqualTo(1);
+        assertThat(loadConversationParticipantCount(orderId, "order_main")).isEqualTo(2);
+
+        String mainConversationId = loadConversationPublicId(orderId, "order_main");
+        JsonNode messages = getConversationMessages(buyer, mainConversationId);
+        assertThat(messages.path("items")).hasSize(1);
+        assertThat(messages.path("items").get(0).path("messageType").asText()).isEqualTo("system");
+        assertThat(messages.path("items").get(0).path("body").asText()).isEqualTo("Chat opened for this order");
+        assertThat(messages.path("items").get(0).path("sender").isNull()).isTrue();
+    }
+
+    @Test
+    void buyerSeesMainAndOwnSupportConversation() throws Exception {
+        User seller = createUser("chat-buyer-s");
+        User buyer = createUser("chat-buyer-b");
+        fundWallet(buyer, "RUB", "10000.0000");
+
+        JsonNode order = createPendingSellOrder(seller, buyer, "20");
+        JsonNode conversations = getOrderConversations(buyer, order.path("publicId").asText());
+
+        assertThat(conversations.path("items")).hasSize(2);
+        assertThat(findConversationByType(conversations, "order_main").path("publicId").asText()).isNotBlank();
+        assertThat(findConversationByType(conversations, "order_support_buyer").path("publicId").asText()).isNotBlank();
+        assertThat(loadConversationCount(order.path("id").asLong(), "order_support_buyer")).isEqualTo(1);
+        assertThat(loadConversationCount(order.path("id").asLong(), "order_support_seller")).isZero();
+    }
+
+    @Test
+    void sellerSeesMainAndOwnSupportConversation() throws Exception {
+        User seller = createUser("chat-seller-s");
+        User buyer = createUser("chat-seller-b");
+        fundWallet(buyer, "RUB", "10000.0000");
+
+        JsonNode order = createPendingSellOrder(seller, buyer, "20");
+        JsonNode conversations = getOrderConversations(seller, order.path("publicId").asText());
+
+        assertThat(conversations.path("items")).hasSize(2);
+        assertThat(findConversationByType(conversations, "order_main").path("publicId").asText()).isNotBlank();
+        assertThat(findConversationByType(conversations, "order_support_seller").path("publicId").asText()).isNotBlank();
+        assertThat(loadConversationCount(order.path("id").asLong(), "order_support_buyer")).isZero();
+        assertThat(loadConversationCount(order.path("id").asLong(), "order_support_seller")).isEqualTo(1);
+    }
+
+    @Test
+    void buyerCannotAccessSellerSupportConversation() throws Exception {
+        User seller = createUser("chat-deny-bs");
+        User buyer = createUser("chat-deny-bb");
+        fundWallet(buyer, "RUB", "10000.0000");
+
+        JsonNode order = createPendingSellOrder(seller, buyer, "20");
+        JsonNode sellerConversations = getOrderConversations(seller, order.path("publicId").asText());
+        String sellerSupportId = findConversationByType(
+            sellerConversations,
+            "order_support_seller"
+        ).path("publicId").asText();
+
+        mockMvc.perform(get("/api/order-conversations/{conversationId}/messages", sellerSupportId)
+                .with(auth(buyer)))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("ORDER_CONVERSATION_NOT_FOUND"));
+    }
+
+    @Test
+    void sellerCannotAccessBuyerSupportConversation() throws Exception {
+        User seller = createUser("chat-deny-ss");
+        User buyer = createUser("chat-deny-sb");
+        fundWallet(buyer, "RUB", "10000.0000");
+
+        JsonNode order = createPendingSellOrder(seller, buyer, "20");
+        JsonNode buyerConversations = getOrderConversations(buyer, order.path("publicId").asText());
+        String buyerSupportId = findConversationByType(
+            buyerConversations,
+            "order_support_buyer"
+        ).path("publicId").asText();
+
+        mockMvc.perform(get("/api/order-conversations/{conversationId}/messages", buyerSupportId)
+                .with(auth(seller)))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("ORDER_CONVERSATION_NOT_FOUND"));
+    }
+
+    @Test
+    void outsiderCannotAccessOrderConversationsOrMessages() throws Exception {
+        User seller = createUser("chat-outside-s");
+        User buyer = createUser("chat-outside-b");
+        User outsider = createUser("chat-outside-x");
+        fundWallet(buyer, "RUB", "10000.0000");
+
+        JsonNode order = createPendingSellOrder(seller, buyer, "20");
+        JsonNode buyerConversations = getOrderConversations(buyer, order.path("publicId").asText());
+        String mainConversationId = findConversationByType(
+            buyerConversations,
+            "order_main"
+        ).path("publicId").asText();
+
+        mockMvc.perform(get("/api/orders/{orderId}/conversations", order.path("publicId").asText())
+                .with(auth(outsider)))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("ORDER_NOT_FOUND"));
+
+        mockMvc.perform(get("/api/order-conversations/{conversationId}/messages", mainConversationId)
+                .with(auth(outsider)))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("ORDER_CONVERSATION_NOT_FOUND"));
+    }
+
+    @Test
+    void participantCanSendMessageToVisibleConversation() throws Exception {
+        User seller = createUser("chat-send-s");
+        User buyer = createUser("chat-send-b");
+        fundWallet(buyer, "RUB", "10000.0000");
+
+        JsonNode order = createPendingSellOrder(seller, buyer, "20");
+        JsonNode conversations = getOrderConversations(buyer, order.path("publicId").asText());
+        String mainConversationId = findConversationByType(conversations, "order_main")
+            .path("publicId")
+            .asText();
+
+        JsonNode sent = sendOrderMessage(buyer, mainConversationId, "  Hello seller  ");
+
+        assertThat(sent.path("messageType").asText()).isEqualTo("text");
+        assertThat(sent.path("body").asText()).isEqualTo("Hello seller");
+        assertThat(sent.path("sender").path("userId").asLong()).isEqualTo(buyer.getId());
+        assertThat(sent.path("sender").path("role").asText()).isEqualTo("buyer");
+        assertThat(sent.path("sender").path("username").asText()).isEqualTo(buyer.getUsername());
+
+        JsonNode messages = getConversationMessages(seller, mainConversationId);
+        assertThat(messages.path("items")).hasSize(2);
+        assertThat(messages.path("items").get(1).path("publicId").asText()).isEqualTo(sent.path("publicId").asText());
+    }
+
+    @Test
+    void systemMessageExistsInNewlyCreatedSupportConversation() throws Exception {
+        User seller = createUser("chat-system-s");
+        User buyer = createUser("chat-system-b");
+        fundWallet(buyer, "RUB", "10000.0000");
+
+        JsonNode order = createPendingSellOrder(seller, buyer, "20");
+        JsonNode conversations = getOrderConversations(buyer, order.path("publicId").asText());
+        String supportConversationId = findConversationByType(
+            conversations,
+            "order_support_buyer"
+        ).path("publicId").asText();
+
+        JsonNode messages = getConversationMessages(buyer, supportConversationId);
+
+        assertThat(messages.path("items")).hasSize(1);
+        assertThat(messages.path("items").get(0).path("messageType").asText()).isEqualTo("system");
+        assertThat(messages.path("items").get(0).path("body").asText()).isEqualTo("Support chat opened");
+        assertThat(messages.path("items").get(0).path("sender").isNull()).isTrue();
+    }
+
+    @Test
+    void lastMessageAtUpdatesOnSend() throws Exception {
+        User seller = createUser("chat-last-s");
+        User buyer = createUser("chat-last-b");
+        fundWallet(buyer, "RUB", "10000.0000");
+
+        JsonNode order = createPendingSellOrder(seller, buyer, "20");
+        JsonNode conversations = getOrderConversations(buyer, order.path("publicId").asText());
+        String mainConversationId = findConversationByType(conversations, "order_main")
+            .path("publicId")
+            .asText();
+        assertThat(loadConversationLastMessageAt(mainConversationId)).isNull();
+
+        JsonNode sent = sendOrderMessage(buyer, mainConversationId, "Last message timestamp");
+
+        Instant sentAt = Instant.parse(sent.path("createdAt").asText());
+        assertThat(loadConversationLastMessageAt(mainConversationId)).isEqualTo(sentAt);
+
+        JsonNode updatedConversations = getOrderConversations(buyer, order.path("publicId").asText());
+        Instant listedLastMessageAt = Instant.parse(findConversationByType(updatedConversations, "order_main")
+            .path("lastMessageAt")
+            .asText());
+        assertThat(listedLastMessageAt).isEqualTo(sentAt);
     }
 
     @Test
@@ -1081,6 +1559,44 @@ class OrderApiIntegrationTest extends AbstractPostgresIntegrationTest {
         return readBody(result);
     }
 
+    private JsonNode requestCancel(User user, String orderPublicId) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/orders/{orderId}/request-cancel", orderPublicId)
+                .with(auth(user)))
+            .andExpect(status().isCreated())
+            .andReturn();
+        return readBody(result);
+    }
+
+    private JsonNode requestAmendQuantity(User user, String orderPublicId, String quantity) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/orders/{orderId}/request-amend-quantity", orderPublicId)
+                .with(auth(user))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "quantity": %s
+                    }
+                    """.formatted(quantity)))
+            .andExpect(status().isCreated())
+            .andReturn();
+        return readBody(result);
+    }
+
+    private JsonNode approveRequest(User user, String requestPublicId) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/order-requests/{requestId}/approve", requestPublicId)
+                .with(auth(user)))
+            .andExpect(status().isOk())
+            .andReturn();
+        return readBody(result);
+    }
+
+    private JsonNode rejectRequest(User user, String requestPublicId) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/order-requests/{requestId}/reject", requestPublicId)
+                .with(auth(user)))
+            .andExpect(status().isOk())
+            .andReturn();
+        return readBody(result);
+    }
+
     private JsonNode markPartiallyDelivered(User user, String orderPublicId, String deliveredQuantity) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/orders/{orderId}/mark-partially-delivered", orderPublicId)
                 .with(auth(user))
@@ -1163,6 +1679,36 @@ class OrderApiIntegrationTest extends AbstractPostgresIntegrationTest {
         MvcResult result = mockMvc.perform(get("/api/orders/{orderId}/events", orderPublicId)
                 .with(auth(user)))
             .andExpect(status().isOk())
+            .andReturn();
+        return readBody(result);
+    }
+
+    private JsonNode getOrderConversations(User user, String orderPublicId) throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/orders/{orderId}/conversations", orderPublicId)
+                .with(auth(user)))
+            .andExpect(status().isOk())
+            .andReturn();
+        return readBody(result);
+    }
+
+    private JsonNode getConversationMessages(User user, String conversationPublicId) throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/order-conversations/{conversationId}/messages", conversationPublicId)
+                .with(auth(user)))
+            .andExpect(status().isOk())
+            .andReturn();
+        return readBody(result);
+    }
+
+    private JsonNode sendOrderMessage(User user, String conversationPublicId, String body) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/order-conversations/{conversationId}/messages", conversationPublicId)
+                .with(auth(user))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "body": "%s"
+                    }
+                    """.formatted(body)))
+            .andExpect(status().isCreated())
             .andReturn();
         return readBody(result);
     }
@@ -1274,6 +1820,72 @@ class OrderApiIntegrationTest extends AbstractPostgresIntegrationTest {
             refType,
             refId
         );
+    }
+
+    private int loadConversationCount(long orderId, String conversationType) {
+        return jdbcTemplate.queryForObject(
+            """
+                select count(*)
+                from order_conversations
+                where order_id = ?
+                  and conversation_type = ?
+                """,
+            Integer.class,
+            orderId,
+            conversationType
+        );
+    }
+
+    private int loadConversationParticipantCount(long orderId, String conversationType) {
+        return jdbcTemplate.queryForObject(
+            """
+                select count(*)
+                from order_conversation_participants p
+                join order_conversations c
+                  on c.id = p.conversation_id
+                where c.order_id = ?
+                  and c.conversation_type = ?
+                """,
+            Integer.class,
+            orderId,
+            conversationType
+        );
+    }
+
+    private String loadConversationPublicId(long orderId, String conversationType) {
+        return jdbcTemplate.queryForObject(
+            """
+                select public_id::text
+                from order_conversations
+                where order_id = ?
+                  and conversation_type = ?
+                """,
+            String.class,
+            orderId,
+            conversationType
+        );
+    }
+
+    private Instant loadConversationLastMessageAt(String conversationPublicId) {
+        Timestamp timestamp = jdbcTemplate.queryForObject(
+            """
+                select last_message_at
+                from order_conversations
+                where public_id = ?
+                """,
+            Timestamp.class,
+            UUID.fromString(conversationPublicId)
+        );
+        return timestamp == null ? null : timestamp.toInstant();
+    }
+
+    private JsonNode findConversationByType(JsonNode conversations, String conversationType) {
+        for (JsonNode item : conversations.path("items")) {
+            if (conversationType.equals(item.path("conversationType").asText())) {
+                return item;
+            }
+        }
+        throw new AssertionError("Conversation type not found: " + conversationType);
     }
 
     private List<StoredOrderEvent> loadOrderEvents(long orderId) {

@@ -44,6 +44,18 @@ public class MarketOfferQueryRepository {
             ) as available_quantity
         ) aq
           on true
+        join lateral (
+            select
+                floor(
+                    least(aq.available_quantity, coalesce(o.max_trade_quantity, aq.available_quantity))
+                        / o.quantity_step
+                ) * o.quantity_step as effective_max_trade_quantity,
+                case
+                    when o.min_trade_quantity is null then null
+                    else ceil(o.min_trade_quantity / o.quantity_step) * o.quantity_step
+                end as effective_min_trade_quantity
+        ) eql
+          on true
         left join currency_rates cr
           on %s
         where o.status = 'active'
@@ -54,8 +66,13 @@ public class MarketOfferQueryRepository {
           and o.price_amount is not null
           and o.price_currency_code is not null
           and o.quantity is not null
-          and aq.available_quantity > 0
-          and (o.min_trade_quantity is null or aq.available_quantity >= o.min_trade_quantity)
+          and o.quantity_step is not null
+          and o.quantity_step > 0
+          and eql.effective_max_trade_quantity > 0
+          and (
+              eql.effective_min_trade_quantity is null
+                  or eql.effective_min_trade_quantity <= eql.effective_max_trade_quantity
+          )
           and (o.price_currency_code = :viewerCurrencyCode or cr.id is not null)
         """;
     private static final String BUY_RATE_JOIN = """
@@ -110,6 +127,18 @@ public class MarketOfferQueryRepository {
             ) as available_quantity
         ) aq
           on true
+        join lateral (
+            select
+                floor(
+                    least(aq.available_quantity, coalesce(o.max_trade_quantity, aq.available_quantity))
+                        / o.quantity_step
+                ) * o.quantity_step as effective_max_trade_quantity,
+                case
+                    when o.min_trade_quantity is null then null
+                    else ceil(o.min_trade_quantity / o.quantity_step) * o.quantity_step
+                end as effective_min_trade_quantity
+        ) eql
+          on true
         left join currency_rates cr
           on %s
         where o.id = :offerId
@@ -119,8 +148,13 @@ public class MarketOfferQueryRepository {
           and o.price_amount is not null
           and o.price_currency_code is not null
           and o.quantity is not null
-          and aq.available_quantity > 0
-          and (o.min_trade_quantity is null or aq.available_quantity >= o.min_trade_quantity)
+          and o.quantity_step is not null
+          and o.quantity_step > 0
+          and eql.effective_max_trade_quantity > 0
+          and (
+              eql.effective_min_trade_quantity is null
+                  or eql.effective_min_trade_quantity <= eql.effective_max_trade_quantity
+          )
           and (o.price_currency_code = :viewerCurrencyCode or cr.id is not null)
         """;
     private static final RowMapper<MarketOfferRow> MARKET_OFFER_ROW_MAPPER = (rs, rowNum) -> new MarketOfferRow(
@@ -249,11 +283,8 @@ public class MarketOfferQueryRepository {
                 %s as display_price_amount,
                 %s as rate,
                 aq.available_quantity as quantity,
-                o.min_trade_quantity,
-                case
-                    when o.max_trade_quantity is null then null
-                    else least(o.max_trade_quantity, aq.available_quantity)
-                end as max_trade_quantity,
+                eql.effective_min_trade_quantity as min_trade_quantity,
+                eql.effective_max_trade_quantity as max_trade_quantity,
                 o.quantity_step,
                 o.published_at
             %s

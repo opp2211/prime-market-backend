@@ -41,6 +41,7 @@ import ru.maltsev.primemarketbackend.offer.repository.OfferContextValueRepositor
 import ru.maltsev.primemarketbackend.offer.repository.OfferDeliveryMethodRepository;
 import ru.maltsev.primemarketbackend.offer.repository.OfferRepository;
 import ru.maltsev.primemarketbackend.offer.repository.OfferView;
+import ru.maltsev.primemarketbackend.order.repository.OfferReservationRepository;
 import ru.maltsev.primemarketbackend.order.service.FundsHoldService;
 import ru.maltsev.primemarketbackend.tradefield.domain.CategoryTradeFieldConfig;
 import ru.maltsev.primemarketbackend.tradefield.repository.CategoryTradeFieldConfigRepository;
@@ -77,6 +78,7 @@ public class OfferService {
     private final OfferDeliveryMethodRepository offerDeliveryMethodRepository;
     private final CategoryTradeFieldConfigRepository categoryTradeFieldConfigRepository;
     private final CurrencyRepository currencyRepository;
+    private final OfferReservationRepository offerReservationRepository;
     private final FundsHoldService fundsHoldService;
 
     @Transactional
@@ -103,6 +105,7 @@ public class OfferService {
         if (strict) {
             validateTradeFieldsForActive(offer.getCategoryId(), offer, request.deliveryMethods(), null);
             validatePriceForActive(offer);
+            validateEffectiveQuantityForActive(offer);
         }
 
         applyPublishedAtTransition(offer, null, status);
@@ -244,8 +247,14 @@ public class OfferService {
         validatePriceCurrency(offer);
 
         if (strict) {
+            BigDecimal activeReservedQuantity = offerReservationRepository.sumQuantityByOfferIdAndStatus(
+                offerId,
+                FundsHoldService.STATUS_ACTIVE
+            );
+            validateQuantityNotBelowActiveReservations(offer, activeReservedQuantity);
             validateTradeFieldsForActive(targetCategoryId, offer, request.deliveryMethodsPresent() ? request.deliveryMethods() : null, offerId);
             validatePriceForActive(offer);
+            validateEffectiveQuantityForActive(offer);
             if (!request.contextsPresent()) {
                 validateRequiredContexts(targetCategoryId, offerId);
             }
@@ -859,29 +868,6 @@ public class OfferService {
                 "minTradeQuantity must be less than or equal to maxTradeQuantity"
             );
         }
-        if (offer.getMaxTradeQuantity() != null && offer.getQuantity() != null
-            && offer.getMaxTradeQuantity().compareTo(offer.getQuantity()) > 0) {
-            throw new ApiProblemException(
-                HttpStatus.BAD_REQUEST,
-                "MAX_TRADE_GT_QUANTITY",
-                "maxTradeQuantity must be less than or equal to quantity"
-            );
-        }
-        if (offer.getQuantityStep() != null) {
-            requireAlignedWithStep("quantity", offer.getQuantity(), offer.getQuantityStep(), "QUANTITY_STEP_MISMATCH");
-            requireAlignedWithStep(
-                "minTradeQuantity",
-                offer.getMinTradeQuantity(),
-                offer.getQuantityStep(),
-                "MIN_TRADE_QUANTITY_STEP_MISMATCH"
-            );
-            requireAlignedWithStep(
-                "maxTradeQuantity",
-                offer.getMaxTradeQuantity(),
-                offer.getQuantityStep(),
-                "MAX_TRADE_QUANTITY_STEP_MISMATCH"
-            );
-        }
     }
 
     private void validatePriceCurrency(Offer offer) {
@@ -930,6 +916,46 @@ public class OfferService {
                 HttpStatus.BAD_REQUEST,
                 "PRICE_CURRENCY_REQUIRED",
                 "priceCurrencyCode is required for active offer"
+            );
+        }
+    }
+
+    private void validateQuantityNotBelowActiveReservations(Offer offer, BigDecimal activeReservedQuantity) {
+        if (offer.getQuantity() != null && activeReservedQuantity.compareTo(offer.getQuantity()) > 0) {
+            throw new ApiProblemException(
+                HttpStatus.CONFLICT,
+                "OFFER_QUANTITY_BELOW_ACTIVE_RESERVATIONS",
+                "Offer quantity cannot be lower than active reservations"
+            );
+        }
+    }
+
+    private void validateEffectiveQuantityForActive(Offer offer) {
+        if (offer.getQuantity() == null || offer.getQuantity().signum() <= 0) {
+            throw new ApiProblemException(
+                HttpStatus.BAD_REQUEST,
+                "QUANTITY_REQUIRED",
+                "Quantity is required for active offer"
+            );
+        }
+        if (offer.getQuantityStep() == null || offer.getQuantityStep().signum() <= 0) {
+            throw new ApiProblemException(
+                HttpStatus.BAD_REQUEST,
+                "QUANTITY_STEP_REQUIRED",
+                "quantityStep is required for active offer"
+            );
+        }
+        OfferQuantityRules.EffectiveLimits limits = OfferQuantityRules.calculateEffectiveLimits(
+            offer.getQuantity(),
+            offer.getMinTradeQuantity(),
+            offer.getMaxTradeQuantity(),
+            offer.getQuantityStep()
+        );
+        if (!limits.orderCreationAvailable()) {
+            throw new ApiProblemException(
+                HttpStatus.BAD_REQUEST,
+                "OFFER_EFFECTIVE_LIMITS_INVALID",
+                "Offer effective trade limits do not allow order creation"
             );
         }
     }
@@ -1095,19 +1121,6 @@ public class OfferService {
                 HttpStatus.BAD_REQUEST,
                 code,
                 field + " must be greater than 0"
-            );
-        }
-    }
-
-    private void requireAlignedWithStep(String field, BigDecimal value, BigDecimal step, String code) {
-        if (value == null || step == null) {
-            return;
-        }
-        if (value.remainder(step).compareTo(BigDecimal.ZERO) != 0) {
-            throw new ApiProblemException(
-                HttpStatus.BAD_REQUEST,
-                code,
-                field + " must be aligned with quantityStep"
             );
         }
     }

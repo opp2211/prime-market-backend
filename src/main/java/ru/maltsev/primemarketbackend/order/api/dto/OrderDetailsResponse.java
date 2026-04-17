@@ -11,6 +11,7 @@ import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.Context;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.Counterparty;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.DeliveryMethod;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.Game;
+import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.PendingRequest;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.Price;
 
 public record OrderDetailsResponse(
@@ -39,6 +40,7 @@ public record OrderDetailsResponse(
     Instant expiresAt,
     Instant createdAt,
     Instant updatedAt,
-    AvailableActions availableActions
+    AvailableActions availableActions,
+    List<PendingRequest> pendingRequests
 ) {
 }

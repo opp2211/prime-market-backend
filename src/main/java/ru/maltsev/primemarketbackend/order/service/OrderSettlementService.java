@@ -158,10 +158,6 @@ public class OrderSettlementService {
         offer.setQuantity(remainingQuantity);
         if (remainingQuantity.signum() == 0) {
             offer.setMaxTradeQuantity(null);
-            return;
-        }
-        if (offer.getMaxTradeQuantity() != null && offer.getMaxTradeQuantity().compareTo(remainingQuantity) > 0) {
-            offer.setMaxTradeQuantity(remainingQuantity);
         }
     }
 

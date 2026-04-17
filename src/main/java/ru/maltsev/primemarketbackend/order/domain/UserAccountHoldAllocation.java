@@ -75,6 +75,10 @@ public class UserAccountHoldAllocation {
         return STATUS_ACTIVE.equals(status);
     }
 
+    public void changeAmount(BigDecimal amount) {
+        this.amount = amount;
+    }
+
     public void markReleased(Instant releasedAt) {
         status = STATUS_RELEASED;
         this.releasedAt = releasedAt;

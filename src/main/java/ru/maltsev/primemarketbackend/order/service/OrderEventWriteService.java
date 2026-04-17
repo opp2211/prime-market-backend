@@ -23,6 +23,12 @@ public class OrderEventWriteService {
     private static final String EVENT_SELLER_MARKED_DELIVERED = "seller_marked_delivered";
     private static final String EVENT_BUYER_CONFIRMED_RECEIVED = "buyer_confirmed_received";
     private static final String EVENT_ORDER_COMPLETED = "order_completed";
+    private static final String EVENT_CANCEL_REQUESTED = "cancel_requested";
+    private static final String EVENT_CANCEL_REQUEST_APPROVED = "cancel_request_approved";
+    private static final String EVENT_CANCEL_REQUEST_REJECTED = "cancel_request_rejected";
+    private static final String EVENT_AMEND_QUANTITY_REQUESTED = "amend_quantity_requested";
+    private static final String EVENT_AMEND_QUANTITY_APPROVED = "amend_quantity_approved";
+    private static final String EVENT_AMEND_QUANTITY_REJECTED = "amend_quantity_rejected";
     private static final String ACTOR_ROLE_SYSTEM = "system";
     private static final String ACTOR_ROLE_SELLER = "seller";
     private static final String ACTOR_ROLE_BUYER = "buyer";
@@ -106,6 +112,58 @@ public class OrderEventWriteService {
         payload.put("sellerFeeAmount", order.getSellerFeeAmount());
         payload.put("settlementCurrencyCode", order.getOfferPriceCurrencyCodeSnapshot());
         append(order.getId(), EVENT_ORDER_COMPLETED, actorUserId, actorRole, payload);
+    }
+
+    public void recordCancelRequested(Order order, Long requestId, Long actorUserId, String actorRole) {
+        ObjectNode payload = JsonNodeFactory.instance.objectNode();
+        payload.put("requestId", requestId);
+        append(order.getId(), EVENT_CANCEL_REQUESTED, actorUserId, actorRole, payload);
+    }
+
+    public void recordCancelRequestApproved(Order order, Long requestId, Long actorUserId, String actorRole) {
+        ObjectNode payload = JsonNodeFactory.instance.objectNode();
+        payload.put("requestId", requestId);
+        append(order.getId(), EVENT_CANCEL_REQUEST_APPROVED, actorUserId, actorRole, payload);
+    }
+
+    public void recordCancelRequestRejected(Order order, Long requestId, Long actorUserId, String actorRole) {
+        ObjectNode payload = JsonNodeFactory.instance.objectNode();
+        payload.put("requestId", requestId);
+        append(order.getId(), EVENT_CANCEL_REQUEST_REJECTED, actorUserId, actorRole, payload);
+    }
+
+    public void recordAmendQuantityRequested(
+        Order order,
+        Long requestId,
+        Long actorUserId,
+        String actorRole,
+        java.math.BigDecimal requestedQuantity
+    ) {
+        ObjectNode payload = JsonNodeFactory.instance.objectNode();
+        payload.put("requestId", requestId);
+        payload.put("requestedQuantity", requestedQuantity);
+        append(order.getId(), EVENT_AMEND_QUANTITY_REQUESTED, actorUserId, actorRole, payload);
+    }
+
+    public void recordAmendQuantityApproved(
+        Order order,
+        Long requestId,
+        Long actorUserId,
+        String actorRole,
+        java.math.BigDecimal previousQuantity
+    ) {
+        ObjectNode payload = JsonNodeFactory.instance.objectNode();
+        payload.put("requestId", requestId);
+        payload.put("previousQuantity", previousQuantity);
+        payload.put("orderedQuantity", order.getOrderedQuantity());
+        payload.put("displayTotalAmount", order.getDisplayTotalAmount());
+        append(order.getId(), EVENT_AMEND_QUANTITY_APPROVED, actorUserId, actorRole, payload);
+    }
+
+    public void recordAmendQuantityRejected(Order order, Long requestId, Long actorUserId, String actorRole) {
+        ObjectNode payload = JsonNodeFactory.instance.objectNode();
+        payload.put("requestId", requestId);
+        append(order.getId(), EVENT_AMEND_QUANTITY_REJECTED, actorUserId, actorRole, payload);
     }
 
     private void append(

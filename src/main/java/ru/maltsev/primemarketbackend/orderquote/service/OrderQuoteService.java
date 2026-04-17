@@ -19,6 +19,8 @@ import ru.maltsev.primemarketbackend.currency.repository.CurrencyRepository;
 import ru.maltsev.primemarketbackend.exception.ApiProblemException;
 import ru.maltsev.primemarketbackend.market.api.dto.MarketOfferListResponse;
 import ru.maltsev.primemarketbackend.market.service.MarketIntent;
+import ru.maltsev.primemarketbackend.offer.service.OfferQuantityRules;
+import ru.maltsev.primemarketbackend.offer.service.OfferQuantityRules.EffectiveLimits;
 import ru.maltsev.primemarketbackend.offer.repository.OfferAttributeValueRepository;
 import ru.maltsev.primemarketbackend.offer.repository.OfferContextValueRepository;
 import ru.maltsev.primemarketbackend.offer.repository.OfferDeliveryMethodRepository;
@@ -151,10 +153,12 @@ public class OrderQuoteService {
         if (availableQuantity.signum() < 0) {
             availableQuantity = BigDecimal.ZERO.setScale(offer.quantity().scale(), RoundingMode.HALF_UP);
         }
-        BigDecimal maxTradeQuantity = offer.maxTradeQuantity();
-        if (maxTradeQuantity != null && maxTradeQuantity.compareTo(availableQuantity) > 0) {
-            maxTradeQuantity = availableQuantity;
-        }
+        EffectiveLimits effectiveLimits = OfferQuantityRules.calculateEffectiveLimits(
+            availableQuantity,
+            offer.minTradeQuantity(),
+            offer.maxTradeQuantity(),
+            offer.quantityStep()
+        );
         return new OrderQuoteOfferProjection(
             offer.id(),
             offer.offerVersion(),
@@ -176,9 +180,9 @@ public class OrderQuoteService {
             offer.tradeTerms(),
             offer.priceCurrencyCode(),
             offer.priceAmount(),
-            availableQuantity,
-            offer.minTradeQuantity(),
-            maxTradeQuantity,
+            effectiveLimits.availableQuantity(),
+            effectiveLimits.effectiveMinTradeQuantity(),
+            effectiveLimits.effectiveMaxTradeQuantity(),
             offer.quantityStep(),
             offer.publishedAt()
         );
@@ -196,7 +200,11 @@ public class OrderQuoteService {
             || offer.priceCurrencyCode() == null
             || offer.quantity() == null
             || offer.quantity().signum() <= 0
-            || (offer.minTradeQuantity() != null && offer.quantity().compareTo(offer.minTradeQuantity()) < 0)) {
+            || offer.quantityStep() == null
+            || offer.quantityStep().signum() <= 0
+            || offer.maxTradeQuantity() == null
+            || offer.maxTradeQuantity().signum() <= 0
+            || (offer.minTradeQuantity() != null && offer.minTradeQuantity().compareTo(offer.maxTradeQuantity()) > 0)) {
             throw new ApiProblemException(
                 HttpStatus.CONFLICT,
                 "OFFER_UNAVAILABLE",

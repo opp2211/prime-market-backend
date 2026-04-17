@@ -71,6 +71,7 @@ class MarketOfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
                 user_account_hold_allocations,
                 user_account_holds,
                 offer_reservations,
+                order_requests,
                 orders,
                 order_quotes,
                 user_account_txs,
@@ -184,6 +185,43 @@ class MarketOfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(items.get(1).path("title").asText()).isEqualTo("USD offer");
         assertThat(items.get(0).path("price").path("amount").decimalValue()).isEqualByComparingTo("150.00000000");
         assertThat(items.get(1).path("price").path("amount").decimalValue()).isEqualByComparingTo("190.47619048");
+    }
+
+    @Test
+    void marketListingReturnsEffectiveQuantityLimitsForRelaxedRawOfferRules() throws Exception {
+        User seller = createUser("seller-effective-limits");
+        Category category = requireCategory("path-of-exile", "currency");
+        mockMvc.perform(post("/api/offers")
+                .with(auth(seller))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(activeOfferRequest(
+                    category.getGame().getId(),
+                    category.getId(),
+                    "sell",
+                    "USD",
+                    "2.50",
+                    "divine-orb",
+                    "Effective limits"
+                ).replace("\"quantity\": 100", "\"quantity\": 101")
+                    .replace("\"minTradeQuantity\": 10", "\"minTradeQuantity\": 12")
+                    .replace("\"maxTradeQuantity\": 50", "\"maxTradeQuantity\": 250")
+                    .replace("\"quantityStep\": 1", "\"quantityStep\": 5")))
+            .andExpect(status().isCreated());
+
+        MvcResult result = mockMvc.perform(get("/api/market/offers")
+                .queryParam("gameSlug", "path-of-exile")
+                .queryParam("categorySlug", "currency")
+                .queryParam("intent", "buy")
+                .queryParam("viewerCurrencyCode", "RUB"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items.length()").value(1))
+            .andReturn();
+
+        JsonNode item = readBody(result).path("items").get(0);
+        assertThat(item.path("quantity").decimalValue()).isEqualByComparingTo("101");
+        assertThat(item.path("minTradeQuantity").decimalValue()).isEqualByComparingTo("15");
+        assertThat(item.path("maxTradeQuantity").decimalValue()).isEqualByComparingTo("100");
+        assertThat(item.path("quantityStep").decimalValue()).isEqualByComparingTo("5");
     }
 
     @Test

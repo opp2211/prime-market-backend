@@ -80,6 +80,7 @@ class OfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
                 user_account_hold_allocations,
                 user_account_holds,
                 offer_reservations,
+                order_requests,
                 orders,
                 order_quotes,
                 user_account_txs,

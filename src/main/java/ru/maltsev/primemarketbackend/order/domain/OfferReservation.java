@@ -69,6 +69,10 @@ public class OfferReservation {
         return STATUS_ACTIVE.equals(status);
     }
 
+    public void changeQuantity(BigDecimal quantity) {
+        this.quantity = quantity;
+    }
+
     public void markReleased(Instant releasedAt) {
         status = STATUS_RELEASED;
         this.releasedAt = releasedAt;

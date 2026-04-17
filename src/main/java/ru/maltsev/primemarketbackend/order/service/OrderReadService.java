@@ -17,7 +17,9 @@ import ru.maltsev.primemarketbackend.order.api.dto.MyOrdersResponse;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderDetailsResponse;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos;
 import ru.maltsev.primemarketbackend.order.domain.Order;
+import ru.maltsev.primemarketbackend.order.domain.OrderRequest;
 import ru.maltsev.primemarketbackend.order.repository.OrderReadQueryRepository;
+import ru.maltsev.primemarketbackend.order.repository.OrderRequestRepository;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +30,7 @@ public class OrderReadService {
     private static final String FILTER_ROLE_TAKER = "taker";
 
     private final OrderReadQueryRepository orderReadQueryRepository;
+    private final OrderRequestRepository orderRequestRepository;
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
@@ -56,6 +59,11 @@ public class OrderReadService {
         boolean viewerIsMaker = isMaker(order, currentUserId);
         boolean viewerIsSeller = isSeller(order, currentUserId);
         boolean viewerIsBuyer = isBuyer(order, currentUserId);
+        List<OrderReadModelDtos.PendingRequest> pendingRequests = orderRequestRepository
+            .findAllByOrderIdAndStatusOrderByCreatedAtDesc(order.getId(), OrderRequest.STATUS_PENDING)
+            .stream()
+            .map(request -> toPendingRequest(request, order, currentUserId))
+            .toList();
         return new OrderDetailsResponse(
             order.getId(),
             order.getPublicId(),
@@ -96,11 +104,14 @@ public class OrderReadService {
             order.getUpdatedAt(),
             new OrderReadModelDtos.AvailableActions(
                 order.isPending() && viewerIsMaker,
-                order.isPending(),
+                order.isPending() || (viewerIsSeller && isActiveOrder(order)),
+                viewerIsBuyer && isActiveOrder(order),
+                isActiveOrder(order),
                 viewerIsSeller && (order.isInProgress() || order.isPartiallyDelivered()),
                 viewerIsSeller && (order.isInProgress() || order.isPartiallyDelivered()),
                 viewerIsBuyer && (order.isInProgress() || order.isPartiallyDelivered() || order.isDelivered())
-            )
+            ),
+            pendingRequests
         );
     }
 
@@ -150,6 +161,44 @@ public class OrderReadService {
     private boolean isBuyer(Order order, Long currentUserId) {
         return ("buyer".equals(order.getMakerRole()) && order.getMakerUserId().equals(currentUserId))
             || ("buyer".equals(order.getTakerRole()) && order.getTakerUserId().equals(currentUserId));
+    }
+
+    private boolean isActiveOrder(Order order) {
+        return order.isInProgress() || order.isPartiallyDelivered() || order.isDelivered();
+    }
+
+    private OrderReadModelDtos.PendingRequest toPendingRequest(
+        OrderRequest request,
+        Order order,
+        Long currentUserId
+    ) {
+        boolean viewerCanResolve = isParticipant(order, currentUserId)
+            && !request.getRequestedByUserId().equals(currentUserId)
+            && !request.getRequestedByRole().equals(resolveParticipantRole(order, currentUserId));
+        return new OrderReadModelDtos.PendingRequest(
+            request.getPublicId(),
+            request.getRequestType(),
+            request.getRequestedByUserId(),
+            request.getRequestedByRole(),
+            request.getRequestedQuantity(),
+            request.getCreatedAt(),
+            viewerCanResolve,
+            viewerCanResolve
+        );
+    }
+
+    private boolean isParticipant(Order order, Long currentUserId) {
+        return order.getMakerUserId().equals(currentUserId) || order.getTakerUserId().equals(currentUserId);
+    }
+
+    private String resolveParticipantRole(Order order, Long currentUserId) {
+        if (order.getMakerUserId().equals(currentUserId)) {
+            return order.getMakerRole();
+        }
+        if (order.getTakerUserId().equals(currentUserId)) {
+            return order.getTakerRole();
+        }
+        return null;
     }
 
     private String resolveCounterpartyUsername(Order order, boolean viewerIsMaker) {
