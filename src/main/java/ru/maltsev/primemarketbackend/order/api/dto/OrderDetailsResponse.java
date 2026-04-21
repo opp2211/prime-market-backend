@@ -10,6 +10,7 @@ import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.Category;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.Context;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.Counterparty;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.DeliveryMethod;
+import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.FinancialSummary;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.Game;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.PendingRequest;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.Price;
@@ -31,6 +32,7 @@ public record OrderDetailsResponse(
     BigDecimal orderedQuantity,
     BigDecimal deliveredQuantity,
     Price price,
+    FinancialSummary financialSummary,
     BigDecimal sellerGrossAmount,
     BigDecimal sellerFeeAmount,
     BigDecimal sellerNetAmount,

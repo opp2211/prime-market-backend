@@ -3,6 +3,8 @@ package ru.maltsev.primemarketbackend.order.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -28,6 +30,14 @@ public class OrderReadService {
     private static final int DEFAULT_SIZE = 20;
     private static final String FILTER_ROLE_MAKER = "maker";
     private static final String FILTER_ROLE_TAKER = "taker";
+    private static final String ROLE_BUYER = "buyer";
+    private static final String ROLE_SELLER = "seller";
+    private static final String VIEWER_PERSPECTIVE_MAKER = "maker";
+    private static final String VIEWER_PERSPECTIVE_TAKER = "taker";
+    private static final String LABEL_DEAL_AMOUNT = "\u0421\u0443\u043c\u043c\u0430 \u0441\u0434\u0435\u043b\u043a\u0438";
+    private static final String LABEL_MAKER_SELLER_PRIMARY = "\u041a \u043f\u043e\u043b\u0443\u0447\u0435\u043d\u0438\u044e";
+    private static final String LABEL_MAKER_BUYER_PRIMARY = "\u041a \u0441\u043f\u0438\u0441\u0430\u043d\u0438\u044e";
+    private static final int ORDER_MONEY_SCALE = 8;
 
     private final OrderReadQueryRepository orderReadQueryRepository;
     private final OrderRequestRepository orderRequestRepository;
@@ -93,6 +103,7 @@ public class OrderReadService {
                 order.getDisplayTotalAmount(),
                 order.getViewerCurrencyCodeSnapshot()
             ),
+            toFinancialSummary(order, viewerIsMaker),
             order.getSellerGrossAmount(),
             order.getSellerFeeAmount(),
             order.getSellerNetAmount(),
@@ -143,10 +154,88 @@ public class OrderReadService {
             order.getSellerGrossAmount(),
             order.getSellerFeeAmount(),
             order.getSellerNetAmount(),
+            toFinancialSummaryPreview(toFinancialSummary(order, viewerIsMaker)),
             order.getExpiresAt(),
             order.getCreatedAt(),
             order.getUpdatedAt()
         );
+    }
+
+    private OrderReadModelDtos.FinancialSummary toFinancialSummary(Order order, boolean viewerIsMaker) {
+        if (!viewerIsMaker) {
+            return new OrderReadModelDtos.FinancialSummary(
+                LABEL_DEAL_AMOUNT,
+                order.getDisplayTotalAmount(),
+                order.getViewerCurrencyCodeSnapshot(),
+                order.getDisplayTotalAmount(),
+                order.getDisplayUnitPriceAmount(),
+                order.getViewerCurrencyCodeSnapshot(),
+                null,
+                null,
+                null,
+                VIEWER_PERSPECTIVE_TAKER
+            );
+        }
+
+        String settlementCurrencyCode = order.getOfferPriceCurrencyCodeSnapshot();
+        BigDecimal settlementUnitPriceAmount = resolveSettlementUnitPriceAmount(order);
+        if (ROLE_SELLER.equals(order.getMakerRole())) {
+            return new OrderReadModelDtos.FinancialSummary(
+                LABEL_MAKER_SELLER_PRIMARY,
+                order.getSellerNetAmount(),
+                settlementCurrencyCode,
+                order.getSellerGrossAmount(),
+                settlementUnitPriceAmount,
+                settlementCurrencyCode,
+                order.getSellerFeeBpsSnapshot(),
+                feeRatePercent(order.getSellerFeeBpsSnapshot()),
+                order.getSellerFeeAmount(),
+                VIEWER_PERSPECTIVE_MAKER
+            );
+        }
+        if (ROLE_BUYER.equals(order.getMakerRole())) {
+            return new OrderReadModelDtos.FinancialSummary(
+                LABEL_MAKER_BUYER_PRIMARY,
+                order.getSellerGrossAmount(),
+                settlementCurrencyCode,
+                order.getSellerGrossAmount(),
+                settlementUnitPriceAmount,
+                settlementCurrencyCode,
+                null,
+                null,
+                null,
+                VIEWER_PERSPECTIVE_MAKER
+            );
+        }
+        throw new IllegalStateException("Unsupported order maker role: " + order.getMakerRole());
+    }
+
+    private OrderReadModelDtos.FinancialSummaryPreview toFinancialSummaryPreview(
+        OrderReadModelDtos.FinancialSummary summary
+    ) {
+        return new OrderReadModelDtos.FinancialSummaryPreview(
+            summary.primaryLabel(),
+            summary.primaryAmount(),
+            summary.primaryCurrencyCode(),
+            summary.viewerPerspective()
+        );
+    }
+
+    private BigDecimal resolveSettlementUnitPriceAmount(Order order) {
+        if (order.getOfferPriceAmountSnapshot() != null) {
+            return order.getOfferPriceAmountSnapshot();
+        }
+        if (order.getSellerGrossAmount() == null
+            || order.getOrderedQuantity() == null
+            || order.getOrderedQuantity().signum() == 0) {
+            return null;
+        }
+        return order.getSellerGrossAmount()
+            .divide(order.getOrderedQuantity(), ORDER_MONEY_SCALE, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal feeRatePercent(int feeRateBps) {
+        return BigDecimal.valueOf(feeRateBps).movePointLeft(2);
     }
 
     private boolean isMaker(Order order, Long currentUserId) {
@@ -154,13 +243,13 @@ public class OrderReadService {
     }
 
     private boolean isSeller(Order order, Long currentUserId) {
-        return ("seller".equals(order.getMakerRole()) && order.getMakerUserId().equals(currentUserId))
-            || ("seller".equals(order.getTakerRole()) && order.getTakerUserId().equals(currentUserId));
+        return (ROLE_SELLER.equals(order.getMakerRole()) && order.getMakerUserId().equals(currentUserId))
+            || (ROLE_SELLER.equals(order.getTakerRole()) && order.getTakerUserId().equals(currentUserId));
     }
 
     private boolean isBuyer(Order order, Long currentUserId) {
-        return ("buyer".equals(order.getMakerRole()) && order.getMakerUserId().equals(currentUserId))
-            || ("buyer".equals(order.getTakerRole()) && order.getTakerUserId().equals(currentUserId));
+        return (ROLE_BUYER.equals(order.getMakerRole()) && order.getMakerUserId().equals(currentUserId))
+            || (ROLE_BUYER.equals(order.getTakerRole()) && order.getTakerUserId().equals(currentUserId));
     }
 
     private boolean isActiveOrder(Order order) {

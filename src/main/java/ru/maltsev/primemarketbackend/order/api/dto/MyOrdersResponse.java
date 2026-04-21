@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.UUID;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.Category;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.Counterparty;
+import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.FinancialSummaryPreview;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.Game;
 
 public record MyOrdersResponse(
@@ -32,6 +33,7 @@ public record MyOrdersResponse(
         BigDecimal sellerGrossAmount,
         BigDecimal sellerFeeAmount,
         BigDecimal sellerNetAmount,
+        FinancialSummaryPreview financialSummary,
         Instant expiresAt,
         Instant createdAt,
         Instant updatedAt

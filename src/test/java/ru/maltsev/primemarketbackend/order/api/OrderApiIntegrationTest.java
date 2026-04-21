@@ -1081,6 +1081,33 @@ class OrderApiIntegrationTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
+    void getMyOrdersReturnsViewerAwareFinancialSummaryForMakerAndTaker() throws Exception {
+        User sharedUser = createUser("orders-financial-shared");
+        User buyerCounterparty = createUser("orders-financial-buyer");
+        User sellerCounterparty = createUser("orders-financial-seller");
+
+        fundWallet(sharedUser, "RUB", "10000.0000");
+        fundWallet(buyerCounterparty, "RUB", "10000.0000");
+
+        createPendingSellOrder(sharedUser, buyerCounterparty, "20", "Maker financial row");
+        createPendingSellOrder(sellerCounterparty, sharedUser, "25", "Taker financial row");
+
+        JsonNode response = getMyOrders(sharedUser, null, null, null, null);
+
+        JsonNode makerSummary = findOrderByTitle(response, "Maker financial row").path("financialSummary");
+        assertThat(makerSummary.path("primaryLabel").asText()).isEqualTo("\u041a \u043f\u043e\u043b\u0443\u0447\u0435\u043d\u0438\u044e");
+        assertThat(makerSummary.path("primaryAmount").decimalValue()).isEqualByComparingTo("49.50000000");
+        assertThat(makerSummary.path("primaryCurrencyCode").asText()).isEqualTo("USD");
+        assertThat(makerSummary.path("viewerPerspective").asText()).isEqualTo("maker");
+
+        JsonNode takerSummary = findOrderByTitle(response, "Taker financial row").path("financialSummary");
+        assertThat(takerSummary.path("primaryLabel").asText()).isEqualTo("\u0421\u0443\u043c\u043c\u0430 \u0441\u0434\u0435\u043b\u043a\u0438");
+        assertThat(takerSummary.path("primaryAmount").decimalValue()).isEqualByComparingTo("5952.38095250");
+        assertThat(takerSummary.path("primaryCurrencyCode").asText()).isEqualTo("RUB");
+        assertThat(takerSummary.path("viewerPerspective").asText()).isEqualTo("taker");
+    }
+
+    @Test
     void getMyOrdersSupportsStatusAndRoleFilters() throws Exception {
         User sharedUser = createUser("orders-filtered");
         User firstBuyer = createUser("orders-filter-b1");
@@ -1119,6 +1146,73 @@ class OrderApiIntegrationTest extends AbstractPostgresIntegrationTest {
                 .param("size", "0"))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("INVALID_PAGE_SIZE"));
+    }
+
+    @Test
+    void takerOrderDetailsExposeDisplayFinancialSummary() throws Exception {
+        User seller = createUser("financial-taker-s");
+        User buyer = createUser("financial-taker-b");
+        fundWallet(buyer, "RUB", "10000.0000");
+
+        JsonNode order = createPendingSellOrder(seller, buyer, "20", "Taker financial details");
+        JsonNode details = getOrderDetails(buyer, order.path("publicId").asText());
+
+        JsonNode summary = details.path("financialSummary");
+        assertThat(summary.path("primaryLabel").asText()).isEqualTo("\u0421\u0443\u043c\u043c\u0430 \u0441\u0434\u0435\u043b\u043a\u0438");
+        assertThat(summary.path("primaryAmount").decimalValue()).isEqualByComparingTo("4761.90476200");
+        assertThat(summary.path("primaryCurrencyCode").asText()).isEqualTo("RUB");
+        assertThat(summary.path("dealAmount").decimalValue()).isEqualByComparingTo("4761.90476200");
+        assertThat(summary.path("unitPriceAmount").decimalValue()).isEqualByComparingTo("238.09523810");
+        assertThat(summary.path("currencyCode").asText()).isEqualTo("RUB");
+        assertThat(summary.path("feeRateBps").isNull()).isTrue();
+        assertThat(summary.path("feeRatePercent").isNull()).isTrue();
+        assertThat(summary.path("feeAmount").isNull()).isTrue();
+        assertThat(summary.path("viewerPerspective").asText()).isEqualTo("taker");
+    }
+
+    @Test
+    void makerSellerOrderDetailsExposeSettlementFinancialSummaryWithFeeRate() throws Exception {
+        User seller = createUser("financial-maker-s");
+        User buyer = createUser("financial-maker-b");
+        fundWallet(buyer, "RUB", "10000.0000");
+
+        JsonNode order = createPendingSellOrder(seller, buyer, "20", "Maker seller financial details");
+        JsonNode details = getOrderDetails(seller, order.path("publicId").asText());
+
+        JsonNode summary = details.path("financialSummary");
+        assertThat(summary.path("primaryLabel").asText()).isEqualTo("\u041a \u043f\u043e\u043b\u0443\u0447\u0435\u043d\u0438\u044e");
+        assertThat(summary.path("primaryAmount").decimalValue()).isEqualByComparingTo("49.50000000");
+        assertThat(summary.path("primaryCurrencyCode").asText()).isEqualTo("USD");
+        assertThat(summary.path("dealAmount").decimalValue()).isEqualByComparingTo("50.00000000");
+        assertThat(summary.path("unitPriceAmount").decimalValue()).isEqualByComparingTo("2.50000000");
+        assertThat(summary.path("currencyCode").asText()).isEqualTo("USD");
+        assertThat(summary.path("feeRateBps").asInt()).isEqualTo(100);
+        assertThat(summary.path("feeRatePercent").decimalValue()).isEqualByComparingTo("1.00");
+        assertThat(summary.path("feeAmount").decimalValue()).isEqualByComparingTo("0.50000000");
+        assertThat(summary.path("viewerPerspective").asText()).isEqualTo("maker");
+        assertThat(details.path("sellerNetAmount").decimalValue()).isEqualByComparingTo("49.50000000");
+    }
+
+    @Test
+    void makerBuyerOrderDetailsExposeSettlementFinancialSummary() throws Exception {
+        User buyerMaker = createUser("financial-maker-buyer");
+        User sellerTaker = createUser("financial-seller-taker");
+        fundWallet(buyerMaker, "USD", "500.0000");
+
+        JsonNode order = createPendingBuyOrder(buyerMaker, sellerTaker, "20", "Maker buyer financial details");
+        JsonNode details = getOrderDetails(buyerMaker, order.path("publicId").asText());
+
+        JsonNode summary = details.path("financialSummary");
+        assertThat(summary.path("primaryLabel").asText()).isEqualTo("\u041a \u0441\u043f\u0438\u0441\u0430\u043d\u0438\u044e");
+        assertThat(summary.path("primaryAmount").decimalValue()).isEqualByComparingTo("50.00000000");
+        assertThat(summary.path("primaryCurrencyCode").asText()).isEqualTo("USD");
+        assertThat(summary.path("dealAmount").decimalValue()).isEqualByComparingTo("50.00000000");
+        assertThat(summary.path("unitPriceAmount").decimalValue()).isEqualByComparingTo("2.50000000");
+        assertThat(summary.path("currencyCode").asText()).isEqualTo("USD");
+        assertThat(summary.path("feeRateBps").isNull()).isTrue();
+        assertThat(summary.path("feeRatePercent").isNull()).isTrue();
+        assertThat(summary.path("feeAmount").isNull()).isTrue();
+        assertThat(summary.path("viewerPerspective").asText()).isEqualTo("maker");
     }
 
     @Test
@@ -1196,13 +1290,21 @@ class OrderApiIntegrationTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
-    void outsiderCannotReadOrderDetails() throws Exception {
+    void orderReadEndpointsRequireAuthAndHideOrdersFromOutsiders() throws Exception {
         User seller = createUser("details-outside-s");
         User buyer = createUser("details-outside-b");
         User outsider = createUser("details-outside-x");
         fundWallet(buyer, "RUB", "10000.0000");
 
         JsonNode order = createPendingSellOrder(seller, buyer, "20", "Protected order");
+
+        mockMvc.perform(get("/api/my/orders"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+
+        mockMvc.perform(get("/api/orders/{orderId}", order.path("publicId").asText()))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
 
         mockMvc.perform(get("/api/orders/{orderId}", order.path("publicId").asText())
                 .with(auth(outsider)))
@@ -1886,6 +1988,15 @@ class OrderApiIntegrationTest extends AbstractPostgresIntegrationTest {
             }
         }
         throw new AssertionError("Conversation type not found: " + conversationType);
+    }
+
+    private JsonNode findOrderByTitle(JsonNode orders, String title) {
+        for (JsonNode item : orders.path("items")) {
+            if (title.equals(item.path("title").asText())) {
+                return item;
+            }
+        }
+        throw new AssertionError("Order title not found: " + title);
     }
 
     private List<StoredOrderEvent> loadOrderEvents(long orderId) {

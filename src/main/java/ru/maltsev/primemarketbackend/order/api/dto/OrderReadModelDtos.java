@@ -32,6 +32,28 @@ public final class OrderReadModelDtos {
     ) {
     }
 
+    public record FinancialSummary(
+        String primaryLabel,
+        BigDecimal primaryAmount,
+        String primaryCurrencyCode,
+        BigDecimal dealAmount,
+        BigDecimal unitPriceAmount,
+        String currencyCode,
+        Integer feeRateBps,
+        BigDecimal feeRatePercent,
+        BigDecimal feeAmount,
+        String viewerPerspective
+    ) {
+    }
+
+    public record FinancialSummaryPreview(
+        String primaryLabel,
+        BigDecimal primaryAmount,
+        String primaryCurrencyCode,
+        String viewerPerspective
+    ) {
+    }
+
     public record Context(
         String dimensionSlug,
         String valueSlug,

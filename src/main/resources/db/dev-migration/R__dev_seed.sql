@@ -11,6 +11,34 @@ values ('user1',
         '$2a$10$.Kk5wPXj7pUvsGonRUyKwuh4u3QdvWcABsTPaHFdd48HQe/J.Us/e');
 
 
+insert into roles (code)
+select v.code
+from (values ('SUPPORT')) as v(code)
+where not exists(select 1
+                 from roles r
+                 where lower(r.code) = lower(v.code));
+
+insert into role_permissions (role_id, permission_id)
+select r.id, p.id
+from roles r
+         cross join permissions p
+where r.code = 'SUPPORT'
+  and not exists(select 1
+                 from role_permissions rp
+                 where rp.role_id = r.id
+                   and rp.permission_id = p.id);
+
+insert into user_roles (user_id, role_id)
+select u.id, r.id
+from users u
+         join roles r on r.code = 'SUPPORT'
+where lower(u.email) = lower('sup1@123.123')
+  and not exists(select 1
+                 from user_roles ur
+                 where ur.user_id = u.id
+                   and ur.role_id = r.id);
+
+
 insert into games (slug, title, sort_order)
 select v.slug, v.title, v.sort_order
 from (values ('path-of-exile', 'Path of Exile', 10),
