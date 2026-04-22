@@ -6,4 +6,6 @@ import ru.maltsev.primemarketbackend.currency.domain.Currency;
 
 public interface CurrencyRepository extends JpaRepository<Currency, String> {
     List<Currency> findAllByActiveTrueOrderByCodeAsc();
+
+    boolean existsByCodeIgnoreCaseAndActiveTrue(String code);
 }

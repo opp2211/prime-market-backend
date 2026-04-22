@@ -18,6 +18,11 @@ public class UserPrincipal implements UserDetails {
         this.user = user;
     }
 
+    public boolean hasAuthority(String authority) {
+        return getAuthorities().stream()
+            .anyMatch(candidate -> authority.equals(candidate.getAuthority()));
+    }
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         Set<String> authorities = new LinkedHashSet<>();

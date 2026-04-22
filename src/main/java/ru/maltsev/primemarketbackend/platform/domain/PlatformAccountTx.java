@@ -1,0 +1,74 @@
+package ru.maltsev.primemarketbackend.platform.domain;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.Table;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Entity
+@Table(name = "platform_account_txs")
+public class PlatformAccountTx {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "public_id", nullable = false)
+    private UUID publicId;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "platform_account_id", nullable = false)
+    private PlatformAccount platformAccount;
+
+    @Column(name = "amount", nullable = false, precision = 13, scale = 4)
+    private BigDecimal amount;
+
+    @Column(name = "type", nullable = false)
+    private String txType;
+
+    @Column(name = "ref_type", nullable = false)
+    private String refType;
+
+    @Column(name = "ref_id", nullable = false)
+    private Long refId;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
+
+    public PlatformAccountTx(
+        PlatformAccount platformAccount,
+        BigDecimal amount,
+        String txType,
+        String refType,
+        Long refId
+    ) {
+        this.platformAccount = platformAccount;
+        this.amount = amount;
+        this.txType = txType;
+        this.refType = refType;
+        this.refId = refId;
+    }
+
+    @PrePersist
+    private void onCreate() {
+        if (publicId == null) {
+            publicId = UUID.randomUUID();
+        }
+        if (createdAt == null) {
+            createdAt = Instant.now();
+        }
+    }
+}

@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -18,6 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 
 @Slf4j
 @RestControllerAdvice
@@ -58,6 +60,18 @@ public class ApiExceptionHandler {
             "Invalid credentials"
         );
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(problem);
+    }
+
+    @ExceptionHandler(AuthorizationDeniedException.class)
+    public ResponseEntity<ProblemDetail> handleAuthorizationDeniedException(AuthorizationDeniedException ex) {
+        log.warn("Handled AuthorizationDeniedException", ex);
+        ProblemDetail problem = buildProblem(
+            HttpStatus.FORBIDDEN,
+            "FORBIDDEN",
+            "Forbidden",
+            "Forbidden"
+        );
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(problem);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -108,6 +122,18 @@ public class ApiExceptionHandler {
             "MALFORMED_JSON",
             "Malformed JSON",
             "Malformed JSON"
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(problem);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ProblemDetail> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        log.warn("Handled DataIntegrityViolationException", ex);
+        ProblemDetail problem = buildProblem(
+            HttpStatus.BAD_REQUEST,
+            "DATA_INTEGRITY_VIOLATION",
+            "Request violates data constraints",
+            "Invalid request"
         );
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(problem);
     }

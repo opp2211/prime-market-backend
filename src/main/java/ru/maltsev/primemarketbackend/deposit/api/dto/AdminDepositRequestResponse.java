@@ -13,6 +13,7 @@ public record AdminDepositRequestResponse(
     @JsonProperty("user_id") Long userId,
     BigDecimal amount,
     @JsonProperty("currency_code") String currencyCode,
+    @JsonProperty("deposit_method_id") Long depositMethodId,
     @JsonProperty("deposit_method_title") String depositMethodTitle,
     DepositRequestStatus status,
     @JsonProperty("payment_details") String paymentDetails,
@@ -22,15 +23,17 @@ public record AdminDepositRequestResponse(
     @JsonProperty("rejected_at") Instant rejectedAt,
     @JsonProperty("reject_reason") String rejectReason,
     @JsonProperty("cancelled_at") Instant cancelledAt,
-    @JsonProperty("created_at") Instant createdAt
+    @JsonProperty("created_at") Instant createdAt,
+    @JsonProperty("updated_at") Instant updatedAt
 ) {
     public static AdminDepositRequestResponse from(DepositRequest request) {
         return new AdminDepositRequestResponse(
             request.getPublicId(),
             request.getUserId(),
             request.getAmount(),
-            request.getDepositMethod().getCurrencyCode(),
-            request.getDepositMethod().getTitle(),
+            request.getCurrencyCodeSnapshot(),
+            request.getDepositMethod().getId(),
+            request.getDepositMethodTitleSnapshot(),
             request.getStatus(),
             request.getPaymentDetails(),
             request.getDetailsIssuedAt(),
@@ -39,7 +42,8 @@ public record AdminDepositRequestResponse(
             request.getRejectedAt(),
             request.getRejectReason(),
             request.getCancelledAt(),
-            request.getCreatedAt()
+            request.getCreatedAt(),
+            request.getUpdatedAt()
         );
     }
 }

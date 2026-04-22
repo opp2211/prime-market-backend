@@ -19,7 +19,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
-import ru.maltsev.primemarketbackend.account.api.dto.UserAccountTxShortResponse;
 import ru.maltsev.primemarketbackend.account.domain.UserAccount;
 import ru.maltsev.primemarketbackend.account.domain.UserAccountTx;
 
@@ -28,7 +27,7 @@ import ru.maltsev.primemarketbackend.account.domain.UserAccountTx;
 public class UserAccountTxCriteriaRepository {
     private final EntityManager entityManager;
 
-    public Page<UserAccountTxShortResponse> findUserAccountTxs(
+    public Page<UserAccountTxReadRow> findUserAccountTxs(
             Long userId,
             List<String> currency,
             List<String> type,
@@ -38,18 +37,21 @@ public class UserAccountTxCriteriaRepository {
     ) {
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
 
-        CriteriaQuery<UserAccountTxShortResponse> query = cb.createQuery(UserAccountTxShortResponse.class);
+        CriteriaQuery<UserAccountTxReadRow> query = cb.createQuery(UserAccountTxReadRow.class);
         Root<UserAccountTx> tx = query.from(UserAccountTx.class);
         Join<UserAccountTx, UserAccount> acc = tx.join("userAccount");
 
         List<Predicate> predicates = buildTxPredicates(cb, tx, acc, userId, currency, type, from, to);
         query.where(predicates.toArray(new Predicate[0]));
         query.select(cb.construct(
-                UserAccountTxShortResponse.class,
+                UserAccountTxReadRow.class,
+                tx.get("id"),
                 tx.get("publicId"),
                 tx.get("amount"),
                 acc.get("currencyCode"),
                 tx.get("txType"),
+                tx.get("refType"),
+                tx.get("refId"),
                 tx.get("createdAt")
         ));
 
@@ -62,12 +64,12 @@ public class UserAccountTxCriteriaRepository {
             query.orderBy(orders);
         }
 
-        TypedQuery<UserAccountTxShortResponse> typedQuery = entityManager.createQuery(query);
+        TypedQuery<UserAccountTxReadRow> typedQuery = entityManager.createQuery(query);
         int pageSize = pageable != null ? pageable.getPageSize() : 20;
         int pageNumber = pageable != null ? pageable.getPageNumber() : 0;
         typedQuery.setFirstResult(pageNumber * pageSize);
         typedQuery.setMaxResults(pageSize);
-        List<UserAccountTxShortResponse> content = typedQuery.getResultList();
+        List<UserAccountTxReadRow> content = typedQuery.getResultList();
 
         CriteriaQuery<Long> countQuery = cb.createQuery(Long.class);
         Root<UserAccountTx> txCount = countQuery.from(UserAccountTx.class);
