@@ -20,8 +20,6 @@ public interface OfferRepository extends JpaRepository<Offer, Long> {
     @Query("select o from Offer o where o.id = :offerId")
     Optional<Offer> findByIdForUpdate(@Param("offerId") Long offerId);
 
-    List<Offer> findAllByUserIdOrderByCreatedAtDesc(Long userId);
-
     @Query("""
         select new ru.maltsev.primemarketbackend.offer.repository.OfferView(
             o.id,

@@ -77,14 +77,6 @@ public class DepositRequestService {
         return depositRequestRepository.findAllByUserIdAndStatusOrderByCreatedAtDesc(userId, parsedStatus, pageable);
     }
 
-    public Page<DepositRequest> listForAdmin(List<String> statuses, Pageable pageable) {
-        Set<DepositRequestStatus> parsedStatuses = parseStatuses(statuses);
-        if (parsedStatuses == null || parsedStatuses.isEmpty()) {
-            return depositRequestRepository.findAllByOrderByCreatedAtDesc(pageable);
-        }
-        return depositRequestRepository.findAllByStatusInOrderByCreatedAtDesc(parsedStatuses, pageable);
-    }
-
     public Page<AdminDepositRequestShortResponse> listShortForAdmin(List<String> statuses, Pageable pageable) {
         Set<DepositRequestStatus> parsedStatuses = parseStatuses(statuses);
         if (parsedStatuses == null || parsedStatuses.isEmpty()) {

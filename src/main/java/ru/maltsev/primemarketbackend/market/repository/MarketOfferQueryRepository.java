@@ -310,7 +310,7 @@ public class MarketOfferQueryRepository {
             join context_dimension_values cdv
               on cdv.id = ocv.context_dimension_value_id
             where ocv.offer_id in (:offerIds)
-            order by ocv.offer_id asc, cd.sort_order asc, cd.title asc
+            order by ocv.offer_id , cd.sort_order , cd.title
             """;
         List<MarketOfferContextRecord> rows = jdbcTemplate.query(
             sql,
@@ -333,7 +333,7 @@ public class MarketOfferQueryRepository {
             left join category_attribute_options cao
               on cao.id = oav.category_attribute_option_id
             where oav.offer_id in (:offerIds)
-            order by oav.offer_id asc, ca.sort_order asc, ca.title asc
+            order by oav.offer_id , ca.sort_order , ca.title
             """;
         List<MarketOfferAttributeRecord> rows = jdbcTemplate.query(
             sql,
@@ -353,7 +353,7 @@ public class MarketOfferQueryRepository {
             join delivery_methods dm
               on dm.id = odm.delivery_method_id
             where odm.offer_id in (:offerIds)
-            order by odm.offer_id asc, dm.sort_order asc, dm.title asc
+            order by odm.offer_id , dm.sort_order , dm.title
             """;
         List<MarketOfferDeliveryMethodRecord> rows = jdbcTemplate.query(
             sql,

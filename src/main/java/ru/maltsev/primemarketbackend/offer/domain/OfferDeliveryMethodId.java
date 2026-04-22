@@ -2,9 +2,12 @@ package ru.maltsev.primemarketbackend.offer.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
+import lombok.Getter;
+
 import java.io.Serializable;
 import java.util.Objects;
 
+@Getter
 @Embeddable
 public class OfferDeliveryMethodId implements Serializable {
     @Column(name = "offer_id")
@@ -18,14 +21,6 @@ public class OfferDeliveryMethodId implements Serializable {
     public OfferDeliveryMethodId(Long offerId, Long deliveryMethodId) {
         this.offerId = offerId;
         this.deliveryMethodId = deliveryMethodId;
-    }
-
-    public Long getOfferId() {
-        return offerId;
-    }
-
-    public Long getDeliveryMethodId() {
-        return deliveryMethodId;
     }
 
     @Override
