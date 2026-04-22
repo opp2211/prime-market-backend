@@ -74,6 +74,12 @@ public final class OrderReadModelDtos {
     ) {
     }
 
+    public record UserSummary(
+        Long id,
+        String username
+    ) {
+    }
+
     public record AvailableActions(
         boolean canConfirmReady,
         boolean canCancel,
@@ -82,6 +88,28 @@ public final class OrderReadModelDtos {
         boolean canMarkPartiallyDelivered,
         boolean canMarkDelivered,
         boolean canConfirmReceived
+    ) {
+    }
+
+    public record DisputeAvailableActions(
+        boolean canOpenDispute,
+        boolean canTakeInWork,
+        boolean canResolveCancel,
+        boolean canResolveComplete,
+        boolean canResolveAmendQuantityAndComplete
+    ) {
+    }
+
+    public record Dispute(
+        boolean exists,
+        UUID publicId,
+        String status,
+        String reasonCode,
+        String description,
+        String openedByRole,
+        Instant createdAt,
+        UserSummary assignedSupportUser,
+        DisputeAvailableActions availableActions
     ) {
     }
 

@@ -50,7 +50,7 @@ public class OrderReadController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        OrderDetailsResponse response = orderReadService.getOrderDetails(orderId, principal.getUser().getId());
+        OrderDetailsResponse response = orderReadService.getOrderDetails(orderId, principal);
         return ResponseEntity.ok(response);
     }
 }

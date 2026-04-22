@@ -7,7 +7,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 import java.util.Locale;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
@@ -22,6 +21,7 @@ import ru.maltsev.primemarketbackend.order.domain.Order;
 import ru.maltsev.primemarketbackend.order.domain.OrderRequest;
 import ru.maltsev.primemarketbackend.order.repository.OrderReadQueryRepository;
 import ru.maltsev.primemarketbackend.order.repository.OrderRequestRepository;
+import ru.maltsev.primemarketbackend.security.user.UserPrincipal;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +41,8 @@ public class OrderReadService {
 
     private final OrderReadQueryRepository orderReadQueryRepository;
     private final OrderRequestRepository orderRequestRepository;
+    private final OrderAccessService orderAccessService;
+    private final OrderDisputeService orderDisputeService;
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
@@ -58,14 +60,11 @@ public class OrderReadService {
     }
 
     @Transactional(readOnly = true)
-    public OrderDetailsResponse getOrderDetails(UUID publicOrderId, Long currentUserId) {
-        Order order = orderReadQueryRepository.findParticipantOrder(publicOrderId, currentUserId)
-            .orElseThrow(() -> new ApiProblemException(
-                HttpStatus.NOT_FOUND,
-                "ORDER_NOT_FOUND",
-                "Order not found"
-            ));
+    public OrderDetailsResponse getOrderDetails(java.util.UUID publicOrderId, UserPrincipal principal) {
+        Order order = orderAccessService.requireReadableOrder(publicOrderId, principal);
+        Long currentUserId = principal.getUser().getId();
 
+        boolean viewerIsParticipant = isParticipant(order, currentUserId);
         boolean viewerIsMaker = isMaker(order, currentUserId);
         boolean viewerIsSeller = isSeller(order, currentUserId);
         boolean viewerIsBuyer = isBuyer(order, currentUserId);
@@ -78,8 +77,8 @@ public class OrderReadService {
             order.getId(),
             order.getPublicId(),
             order.getStatus(),
-            viewerIsMaker ? order.getMakerRole() : order.getTakerRole(),
-            viewerIsMaker ? order.getTakerRole() : order.getMakerRole(),
+            viewerIsParticipant ? (viewerIsMaker ? order.getMakerRole() : order.getTakerRole()) : null,
+            viewerIsParticipant ? (viewerIsMaker ? order.getTakerRole() : order.getMakerRole()) : null,
             order.getMakerRole(),
             order.getTakerRole(),
             new OrderReadModelDtos.Game(
@@ -92,7 +91,9 @@ public class OrderReadService {
                 order.getCategorySlugSnapshot(),
                 order.getCategoryTitleSnapshot()
             ),
-            new OrderReadModelDtos.Counterparty(resolveCounterpartyUsername(order, viewerIsMaker)),
+            new OrderReadModelDtos.Counterparty(
+                viewerIsParticipant ? resolveCounterpartyUsername(order, viewerIsMaker) : null
+            ),
             order.getTitleSnapshot(),
             order.getDescriptionSnapshot(),
             order.getTradeTermsSnapshot(),
@@ -114,15 +115,16 @@ public class OrderReadService {
             order.getCreatedAt(),
             order.getUpdatedAt(),
             new OrderReadModelDtos.AvailableActions(
-                order.isPending() && viewerIsMaker,
-                order.isPending() || (viewerIsSeller && isActiveOrder(order)),
+                viewerIsMaker && order.isPending(),
+                viewerIsParticipant && (order.isPending() || (viewerIsSeller && isActiveOrder(order))),
                 viewerIsBuyer && isActiveOrder(order),
-                isActiveOrder(order),
+                viewerIsParticipant && isActiveOrder(order),
                 viewerIsSeller && (order.isInProgress() || order.isPartiallyDelivered()),
                 viewerIsSeller && (order.isInProgress() || order.isPartiallyDelivered()),
                 viewerIsBuyer && (order.isInProgress() || order.isPartiallyDelivered() || order.isDelivered())
             ),
-            pendingRequests
+            pendingRequests,
+            orderDisputeService.buildOrderDisputeBlock(order, principal)
         );
     }
 

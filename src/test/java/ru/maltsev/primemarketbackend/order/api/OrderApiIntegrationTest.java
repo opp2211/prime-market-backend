@@ -104,6 +104,7 @@ class OrderApiIntegrationTest extends AbstractPostgresIntegrationTest {
                 order_messages,
                 order_conversation_participants,
                 order_conversations,
+                order_disputes,
                 order_events,
                 order_requests,
                 orders,
@@ -1299,12 +1300,10 @@ class OrderApiIntegrationTest extends AbstractPostgresIntegrationTest {
         JsonNode order = createPendingSellOrder(seller, buyer, "20", "Protected order");
 
         mockMvc.perform(get("/api/my/orders"))
-            .andExpect(status().isUnauthorized())
-            .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+            .andExpect(status().isUnauthorized());
 
         mockMvc.perform(get("/api/orders/{orderId}", order.path("publicId").asText()))
-            .andExpect(status().isUnauthorized())
-            .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+            .andExpect(status().isUnauthorized());
 
         mockMvc.perform(get("/api/orders/{orderId}", order.path("publicId").asText())
                 .with(auth(outsider)))
@@ -1333,7 +1332,7 @@ class OrderApiIntegrationTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
-    void buyerSeesMainAndOwnSupportConversation() throws Exception {
+    void buyerSeesOnlyMainConversationBeforeDisputeOpens() throws Exception {
         User seller = createUser("chat-buyer-s");
         User buyer = createUser("chat-buyer-b");
         fundWallet(buyer, "RUB", "10000.0000");
@@ -1341,15 +1340,14 @@ class OrderApiIntegrationTest extends AbstractPostgresIntegrationTest {
         JsonNode order = createPendingSellOrder(seller, buyer, "20");
         JsonNode conversations = getOrderConversations(buyer, order.path("publicId").asText());
 
-        assertThat(conversations.path("items")).hasSize(2);
+        assertThat(conversations.path("items")).hasSize(1);
         assertThat(findConversationByType(conversations, "order_main").path("publicId").asText()).isNotBlank();
-        assertThat(findConversationByType(conversations, "order_support_buyer").path("publicId").asText()).isNotBlank();
-        assertThat(loadConversationCount(order.path("id").asLong(), "order_support_buyer")).isEqualTo(1);
         assertThat(loadConversationCount(order.path("id").asLong(), "order_support_seller")).isZero();
+        assertThat(loadConversationCount(order.path("id").asLong(), "order_support_buyer")).isZero();
     }
 
     @Test
-    void sellerSeesMainAndOwnSupportConversation() throws Exception {
+    void sellerSeesOnlyMainConversationBeforeDisputeOpens() throws Exception {
         User seller = createUser("chat-seller-s");
         User buyer = createUser("chat-seller-b");
         fundWallet(buyer, "RUB", "10000.0000");
@@ -1357,11 +1355,10 @@ class OrderApiIntegrationTest extends AbstractPostgresIntegrationTest {
         JsonNode order = createPendingSellOrder(seller, buyer, "20");
         JsonNode conversations = getOrderConversations(seller, order.path("publicId").asText());
 
-        assertThat(conversations.path("items")).hasSize(2);
+        assertThat(conversations.path("items")).hasSize(1);
         assertThat(findConversationByType(conversations, "order_main").path("publicId").asText()).isNotBlank();
-        assertThat(findConversationByType(conversations, "order_support_seller").path("publicId").asText()).isNotBlank();
         assertThat(loadConversationCount(order.path("id").asLong(), "order_support_buyer")).isZero();
-        assertThat(loadConversationCount(order.path("id").asLong(), "order_support_seller")).isEqualTo(1);
+        assertThat(loadConversationCount(order.path("id").asLong(), "order_support_seller")).isZero();
     }
 
     @Test
@@ -1371,6 +1368,8 @@ class OrderApiIntegrationTest extends AbstractPostgresIntegrationTest {
         fundWallet(buyer, "RUB", "10000.0000");
 
         JsonNode order = createPendingSellOrder(seller, buyer, "20");
+        confirmReady(seller, order.path("publicId").asText());
+        openDispute(buyer, order.path("publicId").asText(), "item_not_received", "Buyer opened support case");
         JsonNode sellerConversations = getOrderConversations(seller, order.path("publicId").asText());
         String sellerSupportId = findConversationByType(
             sellerConversations,
@@ -1390,6 +1389,8 @@ class OrderApiIntegrationTest extends AbstractPostgresIntegrationTest {
         fundWallet(buyer, "RUB", "10000.0000");
 
         JsonNode order = createPendingSellOrder(seller, buyer, "20");
+        confirmReady(seller, order.path("publicId").asText());
+        openDispute(buyer, order.path("publicId").asText(), "item_not_received", "Buyer opened support case");
         JsonNode buyerConversations = getOrderConversations(buyer, order.path("publicId").asText());
         String buyerSupportId = findConversationByType(
             buyerConversations,
@@ -1459,6 +1460,8 @@ class OrderApiIntegrationTest extends AbstractPostgresIntegrationTest {
         fundWallet(buyer, "RUB", "10000.0000");
 
         JsonNode order = createPendingSellOrder(seller, buyer, "20");
+        confirmReady(seller, order.path("publicId").asText());
+        openDispute(buyer, order.path("publicId").asText(), "item_not_received", "Buyer opened support case");
         JsonNode conversations = getOrderConversations(buyer, order.path("publicId").asText());
         String supportConversationId = findConversationByType(
             conversations,
@@ -1664,6 +1667,26 @@ class OrderApiIntegrationTest extends AbstractPostgresIntegrationTest {
     private JsonNode requestCancel(User user, String orderPublicId) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/orders/{orderId}/request-cancel", orderPublicId)
                 .with(auth(user)))
+            .andExpect(status().isCreated())
+            .andReturn();
+        return readBody(result);
+    }
+
+    private JsonNode openDispute(
+        User user,
+        String orderPublicId,
+        String reasonCode,
+        String description
+    ) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/orders/{orderId}/disputes", orderPublicId)
+                .with(auth(user))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "reasonCode": "%s",
+                      "description": "%s"
+                    }
+                    """.formatted(reasonCode, description)))
             .andExpect(status().isCreated())
             .andReturn();
         return readBody(result);

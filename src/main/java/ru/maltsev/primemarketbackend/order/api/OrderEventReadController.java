@@ -28,7 +28,7 @@ public class OrderEventReadController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        OrderEventsResponse response = orderEventReadService.getOrderEvents(orderId, principal.getUser().getId());
+        OrderEventsResponse response = orderEventReadService.getOrderEvents(orderId, principal);
         return ResponseEntity.ok(response);
     }
 }

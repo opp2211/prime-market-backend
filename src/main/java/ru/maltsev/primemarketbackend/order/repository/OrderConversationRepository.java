@@ -14,6 +14,8 @@ import ru.maltsev.primemarketbackend.order.domain.OrderConversation;
 public interface OrderConversationRepository extends JpaRepository<OrderConversation, Long> {
     Optional<OrderConversation> findByPublicId(UUID publicId);
 
+    Optional<OrderConversation> findByOrderIdAndConversationType(Long orderId, String conversationType);
+
     List<OrderConversation> findAllByOrderIdAndConversationTypeIn(
         Long orderId,
         Collection<String> conversationTypes

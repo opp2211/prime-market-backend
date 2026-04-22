@@ -10,6 +10,7 @@ import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.Category;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.Context;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.Counterparty;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.DeliveryMethod;
+import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.Dispute;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.FinancialSummary;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.Game;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.PendingRequest;
@@ -43,6 +44,7 @@ public record OrderDetailsResponse(
     Instant createdAt,
     Instant updatedAt,
     AvailableActions availableActions,
-    List<PendingRequest> pendingRequests
+    List<PendingRequest> pendingRequests,
+    Dispute dispute
 ) {
 }

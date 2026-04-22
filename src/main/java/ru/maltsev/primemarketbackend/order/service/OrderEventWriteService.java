@@ -29,9 +29,16 @@ public class OrderEventWriteService {
     private static final String EVENT_AMEND_QUANTITY_REQUESTED = "amend_quantity_requested";
     private static final String EVENT_AMEND_QUANTITY_APPROVED = "amend_quantity_approved";
     private static final String EVENT_AMEND_QUANTITY_REJECTED = "amend_quantity_rejected";
+    private static final String EVENT_DISPUTE_OPENED = "dispute_opened";
+    private static final String EVENT_DISPUTE_TAKEN_IN_WORK = "dispute_taken_in_work";
+    private static final String EVENT_DISPUTE_RESOLVED = "dispute_resolved";
+    private static final String EVENT_ORDER_FORCE_CANCELED_BY_SUPPORT = "order_force_canceled_by_support";
+    private static final String EVENT_ORDER_FORCE_COMPLETED_BY_SUPPORT = "order_force_completed_by_support";
+    private static final String EVENT_ORDER_FORCE_AMENDED_QUANTITY_BY_SUPPORT = "order_force_amended_quantity_by_support";
     private static final String ACTOR_ROLE_SYSTEM = "system";
     private static final String ACTOR_ROLE_SELLER = "seller";
     private static final String ACTOR_ROLE_BUYER = "buyer";
+    private static final String ACTOR_ROLE_SUPPORT = "support";
 
     private final OrderEventRepository orderEventRepository;
 
@@ -164,6 +171,75 @@ public class OrderEventWriteService {
         ObjectNode payload = JsonNodeFactory.instance.objectNode();
         payload.put("requestId", requestId);
         append(order.getId(), EVENT_AMEND_QUANTITY_REJECTED, actorUserId, actorRole, payload);
+    }
+
+    public void recordDisputeOpened(Order order, Long disputeId, Long actorUserId, String actorRole, String reasonCode) {
+        ObjectNode payload = JsonNodeFactory.instance.objectNode();
+        payload.put("disputeId", disputeId);
+        payload.put("reasonCode", reasonCode);
+        append(order.getId(), EVENT_DISPUTE_OPENED, actorUserId, actorRole, payload);
+    }
+
+    public void recordDisputeTakenInWork(Order order, Long disputeId, Long actorUserId) {
+        ObjectNode payload = JsonNodeFactory.instance.objectNode();
+        payload.put("disputeId", disputeId);
+        append(order.getId(), EVENT_DISPUTE_TAKEN_IN_WORK, actorUserId, ACTOR_ROLE_SUPPORT, payload);
+    }
+
+    public void recordDisputeResolved(
+        Order order,
+        Long disputeId,
+        Long actorUserId,
+        String resolutionType
+    ) {
+        ObjectNode payload = JsonNodeFactory.instance.objectNode();
+        payload.put("disputeId", disputeId);
+        payload.put("resolutionType", resolutionType);
+        append(order.getId(), EVENT_DISPUTE_RESOLVED, actorUserId, ACTOR_ROLE_SUPPORT, payload);
+    }
+
+    public void recordOrderForceCanceledBySupport(Order order, Long actorUserId) {
+        ObjectNode payload = JsonNodeFactory.instance.objectNode();
+        payload.put("status", order.getStatus());
+        append(
+            order.getId(),
+            EVENT_ORDER_FORCE_CANCELED_BY_SUPPORT,
+            actorUserId,
+            ACTOR_ROLE_SUPPORT,
+            payload
+        );
+    }
+
+    public void recordOrderForceCompletedBySupport(Order order, Long actorUserId) {
+        ObjectNode payload = JsonNodeFactory.instance.objectNode();
+        payload.put("sellerNetAmount", order.getSellerNetAmount());
+        payload.put("sellerFeeAmount", order.getSellerFeeAmount());
+        payload.put("settlementCurrencyCode", order.getOfferPriceCurrencyCodeSnapshot());
+        append(
+            order.getId(),
+            EVENT_ORDER_FORCE_COMPLETED_BY_SUPPORT,
+            actorUserId,
+            ACTOR_ROLE_SUPPORT,
+            payload
+        );
+    }
+
+    public void recordOrderForceAmendedQuantityBySupport(
+        Order order,
+        Long actorUserId,
+        java.math.BigDecimal previousQuantity
+    ) {
+        ObjectNode payload = JsonNodeFactory.instance.objectNode();
+        payload.put("previousQuantity", previousQuantity);
+        payload.put("orderedQuantity", order.getOrderedQuantity());
+        payload.put("displayTotalAmount", order.getDisplayTotalAmount());
+        append(
+            order.getId(),
+            EVENT_ORDER_FORCE_AMENDED_QUANTITY_BY_SUPPORT,
+            actorUserId,
+            ACTOR_ROLE_SUPPORT,
+            payload
+        );
     }
 
     private void append(

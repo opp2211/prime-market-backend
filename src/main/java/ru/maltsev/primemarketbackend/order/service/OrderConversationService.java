@@ -24,11 +24,15 @@ import ru.maltsev.primemarketbackend.order.api.dto.SendOrderMessageRequest;
 import ru.maltsev.primemarketbackend.order.domain.Order;
 import ru.maltsev.primemarketbackend.order.domain.OrderConversation;
 import ru.maltsev.primemarketbackend.order.domain.OrderConversationParticipant;
+import ru.maltsev.primemarketbackend.order.domain.OrderDispute;
 import ru.maltsev.primemarketbackend.order.domain.OrderMessage;
 import ru.maltsev.primemarketbackend.order.repository.OrderConversationParticipantRepository;
 import ru.maltsev.primemarketbackend.order.repository.OrderConversationRepository;
+import ru.maltsev.primemarketbackend.order.repository.OrderDisputeRepository;
 import ru.maltsev.primemarketbackend.order.repository.OrderMessageRepository;
 import ru.maltsev.primemarketbackend.order.repository.OrderRepository;
+import ru.maltsev.primemarketbackend.security.PermissionCodes;
+import ru.maltsev.primemarketbackend.security.user.UserPrincipal;
 import ru.maltsev.primemarketbackend.user.domain.User;
 import ru.maltsev.primemarketbackend.user.repository.UserRepository;
 
@@ -42,11 +46,17 @@ public class OrderConversationService {
     private static final int DEFAULT_MESSAGE_PAGE_SIZE = 50;
     private static final int MAX_MESSAGE_PAGE_SIZE = 100;
     private static final int MAX_MESSAGE_BODY_LENGTH = 4000;
+    private static final List<String> ACTIVE_DISPUTE_STATUSES = List.of(
+        OrderDispute.STATUS_OPEN,
+        OrderDispute.STATUS_IN_REVIEW
+    );
 
     private final OrderRepository orderRepository;
     private final OrderConversationRepository conversationRepository;
     private final OrderConversationParticipantRepository participantRepository;
     private final OrderMessageRepository messageRepository;
+    private final OrderDisputeRepository orderDisputeRepository;
+    private final OrderAccessService orderAccessService;
     private final UserRepository userRepository;
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -54,20 +64,55 @@ public class OrderConversationService {
         ensureMainConversation(order);
     }
 
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void ensureSupportConversationsForDispute(Order order) {
+        ensureSupportConversation(
+            order,
+            OrderConversation.TYPE_SUPPORT_BUYER,
+            orderAccessService.resolveBuyerUserId(order),
+            OrderConversationParticipant.ROLE_BUYER
+        );
+        ensureSupportConversation(
+            order,
+            OrderConversation.TYPE_SUPPORT_SELLER,
+            orderAccessService.resolveSellerUserId(order),
+            OrderConversationParticipant.ROLE_SELLER
+        );
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void connectSupportToOrderMainConversation(Order order, Long supportUserId, String systemMessage) {
+        OrderConversation mainConversation = ensureMainConversation(order);
+        ensureParticipant(mainConversation, supportUserId, OrderConversationParticipant.ROLE_SUPPORT);
+        createSystemMessage(mainConversation, systemMessage);
+    }
+
     @Transactional
-    public OrderConversationListResponse getOrderConversations(UUID publicOrderId, Long currentUserId) {
+    public OrderConversationListResponse getOrderConversations(UUID publicOrderId, UserPrincipal principal) {
         Order order = orderRepository.findByPublicIdForUpdate(publicOrderId)
             .orElseThrow(this::orderNotFound);
-        String currentUserRole = resolveParticipantRole(order, currentUserId);
-        if (currentUserRole == null) {
+        Long currentUserId = principal.getUser().getId();
+        String currentUserRole = orderAccessService.resolveParticipantRole(order, currentUserId);
+        boolean participant = currentUserRole != null;
+        boolean supportPassiveAccess = !participant && canPassiveSupportView(order, principal);
+        if (!participant && !supportPassiveAccess) {
             throw orderNotFound();
         }
 
         ensureMainConversation(order);
-        String supportType = resolveSupportConversationType(currentUserRole);
-        ensureSupportConversation(order, supportType, currentUserId, currentUserRole);
 
-        List<String> visibleTypes = List.of(OrderConversation.TYPE_MAIN, supportType);
+        List<String> visibleTypes = new ArrayList<>();
+        visibleTypes.add(OrderConversation.TYPE_MAIN);
+        if (participant) {
+            String supportType = resolveSupportConversationType(currentUserRole);
+            if (conversationRepository.findByOrderIdAndConversationType(order.getId(), supportType).isPresent()) {
+                visibleTypes.add(supportType);
+            }
+        } else {
+            visibleTypes.add(OrderConversation.TYPE_SUPPORT_BUYER);
+            visibleTypes.add(OrderConversation.TYPE_SUPPORT_SELLER);
+        }
+
         List<OrderConversationResponse> items = conversationRepository
             .findAllByOrderIdAndConversationTypeIn(order.getId(), visibleTypes)
             .stream()
@@ -82,9 +127,9 @@ public class OrderConversationService {
         UUID publicConversationId,
         UUID beforeMessageId,
         Integer requestedSize,
-        Long currentUserId
+        UserPrincipal principal
     ) {
-        OrderConversation conversation = loadParticipantConversation(publicConversationId, currentUserId);
+        OrderConversation conversation = loadAccessibleConversation(publicConversationId, principal, false);
         int size = normalizePageSize(requestedSize);
         List<OrderMessage> messages = loadMessagePage(conversation, beforeMessageId, size);
         return new OrderMessagesResponse(toMessageResponses(conversation.getId(), messages));
@@ -93,11 +138,15 @@ public class OrderConversationService {
     @Transactional
     public OrderMessageResponse sendMessage(
         UUID publicConversationId,
-        Long currentUserId,
+        UserPrincipal principal,
         SendOrderMessageRequest request
     ) {
-        OrderConversation conversation = loadParticipantConversationForUpdate(publicConversationId, currentUserId);
+        OrderConversation conversation = loadAccessibleConversation(publicConversationId, principal, true);
+        Long currentUserId = principal.getUser().getId();
         String body = normalizeMessageBody(request);
+        if (!participantRepository.existsByConversationIdAndUserId(conversation.getId(), currentUserId)) {
+            ensureSupportSenderParticipant(conversation, principal);
+        }
 
         OrderMessage message = messageRepository.saveAndFlush(new OrderMessage(
             UUID.randomUUID(),
@@ -125,15 +174,23 @@ public class OrderConversationService {
                 return created;
             });
 
-        ensureParticipant(conversation, resolveBuyerUserId(order), OrderConversationParticipant.ROLE_BUYER);
-        ensureParticipant(conversation, resolveSellerUserId(order), OrderConversationParticipant.ROLE_SELLER);
+        ensureParticipant(
+            conversation,
+            orderAccessService.resolveBuyerUserId(order),
+            OrderConversationParticipant.ROLE_BUYER
+        );
+        ensureParticipant(
+            conversation,
+            orderAccessService.resolveSellerUserId(order),
+            OrderConversationParticipant.ROLE_SELLER
+        );
         return conversation;
     }
 
     private OrderConversation ensureSupportConversation(
         Order order,
         String conversationType,
-        Long currentUserId,
+        Long participantUserId,
         String participantRole
     ) {
         OrderConversation conversation = conversationRepository
@@ -149,7 +206,7 @@ public class OrderConversationService {
                 return created;
             });
 
-        ensureParticipant(conversation, currentUserId, participantRole);
+        ensureParticipant(conversation, participantUserId, participantRole);
         return conversation;
     }
 
@@ -174,24 +231,74 @@ public class OrderConversationService {
         ));
     }
 
-    private OrderConversation loadParticipantConversation(UUID publicConversationId, Long userId) {
-        OrderConversation conversation = conversationRepository.findByPublicId(publicConversationId)
+    private OrderConversation loadAccessibleConversation(
+        UUID publicConversationId,
+        UserPrincipal principal,
+        boolean forSend
+    ) {
+        OrderConversation conversation = (forSend
+            ? conversationRepository.findByPublicIdForUpdate(publicConversationId)
+            : conversationRepository.findByPublicId(publicConversationId))
             .orElseThrow(this::conversationNotFound);
-        ensureConversationParticipant(conversation, userId);
+        ensureConversationAccess(conversation, principal, forSend);
         return conversation;
     }
 
-    private OrderConversation loadParticipantConversationForUpdate(UUID publicConversationId, Long userId) {
-        OrderConversation conversation = conversationRepository.findByPublicIdForUpdate(publicConversationId)
-            .orElseThrow(this::conversationNotFound);
-        ensureConversationParticipant(conversation, userId);
-        return conversation;
-    }
-
-    private void ensureConversationParticipant(OrderConversation conversation, Long userId) {
-        if (!participantRepository.existsByConversationIdAndUserId(conversation.getId(), userId)) {
+    private void ensureConversationAccess(OrderConversation conversation, UserPrincipal principal, boolean forSend) {
+        Long userId = principal.getUser().getId();
+        if (participantRepository.existsByConversationIdAndUserId(conversation.getId(), userId)) {
+            return;
+        }
+        if (!principal.hasAuthority(PermissionCodes.ORDER_CHATS_VIEW_ANY)) {
             throw conversationNotFound();
         }
+        if (!orderDisputeRepository.existsByOrderId(conversation.getOrderId())) {
+            throw conversationNotFound();
+        }
+        if (!forSend) {
+            return;
+        }
+        if (!principal.hasAuthority(PermissionCodes.ORDER_CHATS_SEND_AS_SUPPORT)) {
+            throw new ApiProblemException(
+                HttpStatus.FORBIDDEN,
+                "ORDER_CHAT_SEND_FORBIDDEN",
+                "Current user cannot send support chat messages"
+            );
+        }
+
+        OrderDispute activeDispute = orderDisputeRepository
+            .findTopByOrderIdAndStatusInOrderByCreatedAtDescIdDesc(
+                conversation.getOrderId(),
+                ACTIVE_DISPUTE_STATUSES
+            )
+            .orElseThrow(() -> new ApiProblemException(
+                HttpStatus.CONFLICT,
+                "ORDER_DISPUTE_NOT_ACTIVE",
+                "Support chat messages are available only while dispute is active"
+            ));
+        if (OrderConversation.TYPE_MAIN.equals(conversation.getConversationType())
+            && !userId.equals(activeDispute.getAssignedSupportUserId())) {
+            throw new ApiProblemException(
+                HttpStatus.CONFLICT,
+                "ORDER_DISPUTE_TAKE_REQUIRED",
+                "Take dispute in work before sending messages to the main order chat"
+            );
+        }
+    }
+
+    private void ensureSupportSenderParticipant(OrderConversation conversation, UserPrincipal principal) {
+        if (OrderConversation.TYPE_MAIN.equals(conversation.getConversationType())) {
+            throw new ApiProblemException(
+                HttpStatus.CONFLICT,
+                "ORDER_DISPUTE_TAKE_REQUIRED",
+                "Take dispute in work before sending messages to the main order chat"
+            );
+        }
+        ensureParticipant(
+            conversation,
+            principal.getUser().getId(),
+            OrderConversationParticipant.ROLE_SUPPORT
+        );
     }
 
     private List<OrderMessage> loadMessagePage(
@@ -316,28 +423,9 @@ public class OrderConversationService {
         return size;
     }
 
-    private String resolveParticipantRole(Order order, Long userId) {
-        if (order.getMakerUserId().equals(userId)) {
-            return order.getMakerRole();
-        }
-        if (order.getTakerUserId().equals(userId)) {
-            return order.getTakerRole();
-        }
-        return null;
-    }
-
-    private Long resolveBuyerUserId(Order order) {
-        if (OrderConversationParticipant.ROLE_BUYER.equals(order.getMakerRole())) {
-            return order.getMakerUserId();
-        }
-        return order.getTakerUserId();
-    }
-
-    private Long resolveSellerUserId(Order order) {
-        if (OrderConversationParticipant.ROLE_SELLER.equals(order.getMakerRole())) {
-            return order.getMakerUserId();
-        }
-        return order.getTakerUserId();
+    private boolean canPassiveSupportView(Order order, UserPrincipal principal) {
+        return principal.hasAuthority(PermissionCodes.ORDER_CHATS_VIEW_ANY)
+            && orderDisputeRepository.existsByOrderId(order.getId());
     }
 
     private String resolveSupportConversationType(String participantRole) {

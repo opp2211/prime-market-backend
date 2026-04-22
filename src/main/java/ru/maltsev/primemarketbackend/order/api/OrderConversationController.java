@@ -34,10 +34,7 @@ public class OrderConversationController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        OrderConversationListResponse response = orderConversationService.getOrderConversations(
-            orderId,
-            principal.getUser().getId()
-        );
+        OrderConversationListResponse response = orderConversationService.getOrderConversations(orderId, principal);
         return ResponseEntity.ok(response);
     }
 
@@ -56,7 +53,7 @@ public class OrderConversationController {
             conversationId,
             before,
             size,
-            principal.getUser().getId()
+            principal
         );
         return ResponseEntity.ok(response);
     }
@@ -73,7 +70,7 @@ public class OrderConversationController {
 
         OrderMessageResponse response = orderConversationService.sendMessage(
             conversationId,
-            principal.getUser().getId(),
+            principal,
             request
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
