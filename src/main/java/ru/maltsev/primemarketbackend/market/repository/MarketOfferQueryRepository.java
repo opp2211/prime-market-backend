@@ -239,12 +239,14 @@ public class MarketOfferQueryRepository {
         return toOfferRecords(rows, viewerCurrencyCode).stream().findFirst();
     }
 
+    @SuppressWarnings("SqlSourceToSinkFlow")
     private long queryTotal(SqlFragments sqlFragments) {
         String countSql = "select count(*) " + sqlFragments.fromWhereClause();
         Long total = jdbcTemplate.queryForObject(countSql, sqlFragments.parameters(), Long.class);
         return total == null ? 0L : total;
     }
 
+    @SuppressWarnings("SqlSourceToSinkFlow")
     private List<MarketOfferRow> queryRows(MarketOfferSearchCriteria criteria, SqlFragments sqlFragments) {
         String selectSql = buildSelectSql(
             sqlFragments.displayPriceExpression(),

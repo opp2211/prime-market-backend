@@ -11,19 +11,23 @@ import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.Generated;
 import org.hibernate.generator.EventType;
 
 @Getter
+@Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "offers")
 public class Offer {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Setter(AccessLevel.NONE)
     private Long id;
 
     @Column(name = "user_id", nullable = false)
+    @Setter(AccessLevel.NONE)
     private Long userId;
 
     @Column(name = "game_id", nullable = false)
@@ -63,6 +67,7 @@ public class Offer {
     private BigDecimal quantityStep;
 
     @Column(nullable = false)
+    @Setter(AccessLevel.NONE)
     private Long version = 1L;
 
     @Column(nullable = false, length = 16)
@@ -70,10 +75,12 @@ public class Offer {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     @Generated(event = EventType.INSERT)
+    @Setter(AccessLevel.NONE)
     private Instant createdAt;
 
     @Column(name = "updated_at", nullable = false)
     @Generated(event = {EventType.INSERT, EventType.UPDATE})
+    @Setter(AccessLevel.NONE)
     private Instant updatedAt;
 
     @Column(name = "published_at")
@@ -85,62 +92,6 @@ public class Offer {
         this.categoryId = categoryId;
         this.side = side;
         this.status = status;
-    }
-
-    public void setGameId(Long gameId) {
-        this.gameId = gameId;
-    }
-
-    public void setCategoryId(Long categoryId) {
-        this.categoryId = categoryId;
-    }
-
-    public void setSide(String side) {
-        this.side = side;
-    }
-
-    public void setTitle(String title) {
-        this.title = title;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public void setTradeTerms(String tradeTerms) {
-        this.tradeTerms = tradeTerms;
-    }
-
-    public void setPriceCurrencyCode(String priceCurrencyCode) {
-        this.priceCurrencyCode = priceCurrencyCode;
-    }
-
-    public void setPriceAmount(BigDecimal priceAmount) {
-        this.priceAmount = priceAmount;
-    }
-
-    public void setQuantity(BigDecimal quantity) {
-        this.quantity = quantity;
-    }
-
-    public void setMinTradeQuantity(BigDecimal minTradeQuantity) {
-        this.minTradeQuantity = minTradeQuantity;
-    }
-
-    public void setMaxTradeQuantity(BigDecimal maxTradeQuantity) {
-        this.maxTradeQuantity = maxTradeQuantity;
-    }
-
-    public void setQuantityStep(BigDecimal quantityStep) {
-        this.quantityStep = quantityStep;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
-    public void setPublishedAt(Instant publishedAt) {
-        this.publishedAt = publishedAt;
     }
 
     public void incrementVersion() {

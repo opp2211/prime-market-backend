@@ -334,7 +334,7 @@ public class FundsHoldService {
     }
 
     private UserAccount lockAccount(Long userAccountId) {
-        return userAccountRepository.findById(userAccountId)
+        return userAccountRepository.findByIdForUpdate(userAccountId)
             .orElseThrow(() -> invalidHoldAllocation("User account hold references missing wallet"));
     }
 

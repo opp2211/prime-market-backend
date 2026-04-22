@@ -4,10 +4,9 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -20,9 +19,9 @@ import ru.maltsev.primemarketbackend.account.api.dto.WalletItemResponse;
 import ru.maltsev.primemarketbackend.account.api.dto.WalletTransactionResponse;
 import ru.maltsev.primemarketbackend.account.api.dto.WalletsResponse;
 import ru.maltsev.primemarketbackend.account.domain.UserAccount;
-import ru.maltsev.primemarketbackend.account.repository.UserAccountTxReadRow;
 import ru.maltsev.primemarketbackend.account.repository.UserAccountRepository;
 import ru.maltsev.primemarketbackend.account.repository.UserAccountTxCriteriaRepository;
+import ru.maltsev.primemarketbackend.account.repository.UserAccountTxReadRow;
 import ru.maltsev.primemarketbackend.currency.domain.Currency;
 import ru.maltsev.primemarketbackend.currency.repository.CurrencyRepository;
 import ru.maltsev.primemarketbackend.deposit.domain.DepositRequest;
@@ -37,6 +36,8 @@ import ru.maltsev.primemarketbackend.withdrawal.repository.WithdrawalRequestRepo
 @Service
 @RequiredArgsConstructor
 public class UserAccountService {
+    private static final BigDecimal ZERO_ACCOUNT_MONEY = BigDecimal.valueOf(0L, 4);
+
     private final UserAccountRepository userAccountRepository;
     private final UserAccountTxCriteriaRepository userAccountTxCriteriaRepository;
     private final CurrencyRepository currencyRepository;
@@ -112,9 +113,9 @@ public class UserAccountService {
                 currency.getCode(),
                 currency.getTitle(),
                 false,
-                BigDecimal.ZERO.setScale(4),
-                BigDecimal.ZERO.setScale(4),
-                BigDecimal.ZERO.setScale(4)
+                ZERO_ACCOUNT_MONEY,
+                ZERO_ACCOUNT_MONEY,
+                ZERO_ACCOUNT_MONEY
             );
         }
 

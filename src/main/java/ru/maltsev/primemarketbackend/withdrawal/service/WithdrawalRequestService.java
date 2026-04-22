@@ -176,7 +176,7 @@ public class WithdrawalRequestService {
             );
         }
 
-        UserAccount account = userAccountRepository.findById(request.getUserAccountId())
+        UserAccount account = userAccountRepository.findByIdForUpdate(request.getUserAccountId())
             .orElseThrow(() -> conflict("USER_ACCOUNT_NOT_FOUND", "Withdrawal wallet not found"));
         int updatedRows = userAccountRepository.decreaseReserved(account.getId(), request.getAmount());
         if (updatedRows != 1) {
@@ -251,7 +251,7 @@ public class WithdrawalRequestService {
     }
 
     private void releaseReservedAmount(WithdrawalRequest request) {
-        userAccountRepository.findById(request.getUserAccountId())
+        userAccountRepository.findByIdForUpdate(request.getUserAccountId())
             .orElseThrow(() -> conflict("USER_ACCOUNT_NOT_FOUND", "Withdrawal wallet not found"));
         int updatedRows = userAccountRepository.decreaseReserved(request.getUserAccountId(), request.getAmount());
         if (updatedRows != 1) {

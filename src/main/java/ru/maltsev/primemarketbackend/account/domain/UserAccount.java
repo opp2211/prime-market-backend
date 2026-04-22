@@ -10,10 +10,10 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
-import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import ru.maltsev.primemarketbackend.account.AccountBalanceSupport;
 import ru.maltsev.primemarketbackend.user.domain.User;
 
 @Getter
@@ -46,25 +46,14 @@ public class UserAccount {
     }
 
     public BigDecimal available() {
-        return balance.subtract(reserved);
+        return AccountBalanceSupport.available(balance, reserved);
     }
 
     public void increaseReserved(BigDecimal amount) {
-        Objects.requireNonNull(amount, "amount");
-        if (amount.signum() <= 0) {
-            throw new IllegalArgumentException("Reserved amount must be positive");
-        }
-        reserved = reserved.add(amount);
+        reserved = AccountBalanceSupport.increaseReserved(reserved, amount);
     }
 
     public void decreaseReserved(BigDecimal amount) {
-        Objects.requireNonNull(amount, "amount");
-        if (amount.signum() <= 0) {
-            throw new IllegalArgumentException("Reserved amount must be positive");
-        }
-        if (reserved.compareTo(amount) < 0) {
-            throw new IllegalArgumentException("Reserved amount cannot become negative");
-        }
-        reserved = reserved.subtract(amount);
+        reserved = AccountBalanceSupport.decreaseReserved(reserved, amount);
     }
 }

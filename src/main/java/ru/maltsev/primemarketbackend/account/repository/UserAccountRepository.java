@@ -19,9 +19,9 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<UserAccount> findByUserIdAndCurrencyCodeIgnoreCase(Long userId, String currencyCode);
 
-    @Override
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    Optional<UserAccount> findById(Long id);
+    @Query("select ua from UserAccount ua where ua.id = :userAccountId")
+    Optional<UserAccount> findByIdForUpdate(@Param("userAccountId") Long userAccountId);
 
     @Modifying
     @Query("""

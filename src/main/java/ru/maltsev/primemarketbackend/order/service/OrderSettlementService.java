@@ -211,7 +211,7 @@ public class OrderSettlementService {
     }
 
     private UserAccount lockUserAccount(Long userAccountId) {
-        return userAccountRepository.findById(userAccountId)
+        return userAccountRepository.findByIdForUpdate(userAccountId)
             .orElseThrow(() -> settlementError("User account not found"));
     }
 
