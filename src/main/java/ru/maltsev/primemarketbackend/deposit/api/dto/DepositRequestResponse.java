@@ -12,6 +12,7 @@ public record DepositRequestResponse(
     @JsonProperty("public_id") UUID publicId,
     BigDecimal amount,
     @JsonProperty("currency_code") String currencyCode,
+    @JsonProperty("deposit_method_id") Long depositMethodId,
     @JsonProperty("deposit_method_title") String depositMethodTitle,
     DepositRequestStatus status,
     @JsonProperty("payment_details") String paymentDetails,
@@ -21,14 +22,16 @@ public record DepositRequestResponse(
     @JsonProperty("rejected_at") Instant rejectedAt,
     @JsonProperty("reject_reason") String rejectReason,
     @JsonProperty("cancelled_at") Instant cancelledAt,
-    @JsonProperty("created_at") Instant createdAt
+    @JsonProperty("created_at") Instant createdAt,
+    @JsonProperty("updated_at") Instant updatedAt
 ) {
     public static DepositRequestResponse from(DepositRequest request) {
         return new DepositRequestResponse(
             request.getPublicId(),
             request.getAmount(),
-            request.getDepositMethod().getCurrencyCode(),
-            request.getDepositMethod().getTitle(),
+            request.getCurrencyCodeSnapshot(),
+            request.getDepositMethod().getId(),
+            request.getDepositMethodTitleSnapshot(),
             request.getStatus(),
             request.getPaymentDetails(),
             request.getDetailsIssuedAt(),
@@ -37,7 +40,8 @@ public record DepositRequestResponse(
             request.getRejectedAt(),
             request.getRejectReason(),
             request.getCancelledAt(),
-            request.getCreatedAt()
+            request.getCreatedAt(),
+            request.getUpdatedAt()
         );
     }
 }

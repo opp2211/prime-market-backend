@@ -417,3 +417,54 @@ where not exists (select 1
                   from currency_rates cr
                   where cr.from_currency_code = v.from_currency_code
                     and cr.to_currency_code = v.to_currency_code);
+
+insert into withdrawal_methods (code, title, currency_code, requisites_schema, min_amount, is_active, note)
+select v.code, v.title, v.currency_code, v.requisites_schema, v.min_amount, true, v.note
+from (values
+          ('SBP',
+           'SBP',
+           'RUB',
+           '{
+             "fields": [
+               {"name":"phoneNumber","type":"string","required":true},
+               {"name":"bankName","type":"string","required":true},
+               {"name":"recipientName","type":"string","required":true}
+             ]
+           }'::jsonb,
+           500.0000,
+           'Minimum amount is 500 RUB'),
+          ('ONCHAIN_USDT',
+           'USDT On-Chain',
+           'USD',
+           '{
+             "fields": [
+               {"name":"address","type":"string","required":true},
+               {"name":"network","type":"string","required":true}
+             ]
+           }'::jsonb,
+           10.0000,
+           'Select the target network in requisites'),
+          ('BINANCE_UID',
+           'Binance UID',
+           'USD',
+           '{
+             "fields": [
+               {"name":"uid","type":"string","required":true}
+             ]
+           }'::jsonb,
+           10.0000,
+           'Transfers are processed to Binance UID'),
+          ('BYBIT_UID',
+           'Bybit UID',
+           'USD',
+           '{
+             "fields": [
+               {"name":"uid","type":"string","required":true}
+             ]
+           }'::jsonb,
+           10.0000,
+           'Transfers are processed to Bybit UID')) as v(code, title, currency_code, requisites_schema, min_amount, note)
+where not exists(select 1
+                 from withdrawal_methods wm
+                 where lower(wm.code) = lower(v.code)
+                   and lower(wm.currency_code) = lower(v.currency_code));

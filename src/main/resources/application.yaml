@@ -64,6 +64,7 @@ app:
       - GET
       - POST
       - PATCH
+      - DELETE
       - OPTIONS
     allowed-headers:
       - "*"
@@ -73,6 +74,8 @@ logging:
   level:
     ru.maltsev.primemarketbackend: INFO
 springdoc:
+  paths-to-match:
+    - /api/**
   api-docs:
     enabled: false
   swagger-ui:

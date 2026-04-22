@@ -13,14 +13,13 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import ru.maltsev.primemarketbackend.account.api.dto.UserAccountResponse;
-import ru.maltsev.primemarketbackend.account.api.dto.UserAccountTxShortResponse;
+import ru.maltsev.primemarketbackend.account.api.dto.WalletTransactionResponse;
+import ru.maltsev.primemarketbackend.account.api.dto.WalletsResponse;
 import ru.maltsev.primemarketbackend.account.service.UserAccountService;
 import ru.maltsev.primemarketbackend.security.user.UserPrincipal;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/wallets")
@@ -29,7 +28,7 @@ public class UserAccountController {
     private final UserAccountService userAccountService;
 
     @GetMapping("/me")
-    public ResponseEntity<Map<String, UserAccountResponse>> getMyWallets(
+    public ResponseEntity<WalletsResponse> getMyWallets(
             @AuthenticationPrincipal UserPrincipal principal
     ) {
         if (principal == null) {
@@ -37,12 +36,11 @@ public class UserAccountController {
         }
 
         Long userId = principal.getUser().getId();
-        Map<String, UserAccountResponse> responseMap = userAccountService.getUserAccountsWithPositiveBalance(userId);
-        return ResponseEntity.ok(responseMap);
+        return ResponseEntity.ok(userAccountService.getWallets(userId));
     }
 
     @GetMapping("/me/txs")
-    public ResponseEntity<Page<UserAccountTxShortResponse>> getMyTransactions(
+    public ResponseEntity<Page<WalletTransactionResponse>> getMyTransactions(
             @AuthenticationPrincipal UserPrincipal principal,
             @RequestParam(required = false) List<String> currency,
             @RequestParam(required = false) List<String> type,
@@ -55,7 +53,7 @@ public class UserAccountController {
         }
 
         Long userId = principal.getUser().getId();
-        Page<UserAccountTxShortResponse> response = userAccountService.getUserAccountTxs(
+        Page<WalletTransactionResponse> response = userAccountService.getUserAccountTxs(
                 userId,
                 currency,
                 type,

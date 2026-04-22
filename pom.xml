@@ -152,4 +152,24 @@
         </plugins>
     </build>
 
+    <profiles>
+        <profile>
+            <id>openapi-contract</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <test>OpenApiContractArtifactIT</test>
+                            <systemPropertyVariables>
+                                <openapi.contract.output>${project.basedir}/api-contract/openapi.json</openapi.contract.output>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
 </project>

@@ -10,6 +10,7 @@ import ru.maltsev.primemarketbackend.account.domain.UserAccount;
 import ru.maltsev.primemarketbackend.account.domain.UserAccountTx;
 import ru.maltsev.primemarketbackend.account.repository.UserAccountTxRepository;
 import ru.maltsev.primemarketbackend.account.service.UserAccountService;
+import ru.maltsev.primemarketbackend.deposit.api.dto.AdminDepositRequestShortResponse;
 import ru.maltsev.primemarketbackend.deposit.api.dto.CreateDepositRequest;
 import ru.maltsev.primemarketbackend.deposit.domain.DepositMethod;
 import ru.maltsev.primemarketbackend.deposit.domain.DepositRequest;
@@ -84,9 +85,27 @@ public class DepositRequestService {
         return depositRequestRepository.findAllByStatusInOrderByCreatedAtDesc(parsedStatuses, pageable);
     }
 
+    public Page<AdminDepositRequestShortResponse> listShortForAdmin(List<String> statuses, Pageable pageable) {
+        Set<DepositRequestStatus> parsedStatuses = parseStatuses(statuses);
+        if (parsedStatuses == null || parsedStatuses.isEmpty()) {
+            return depositRequestRepository.findAdminQueueRows(pageable)
+                .map(AdminDepositRequestShortResponse::from);
+        }
+        return depositRequestRepository.findAdminQueueRowsByStatusIn(parsedStatuses, pageable)
+            .map(AdminDepositRequestShortResponse::from);
+    }
+
     @Transactional
     public DepositRequest markPaid(UUID publicId, Long userId) {
-        DepositRequest request = getForUser(publicId, userId);
+        DepositRequest request = depositRequestRepository.findByPublicIdAndUserIdForUpdate(publicId, userId)
+            .orElseThrow(() -> new ApiProblemException(
+                HttpStatus.NOT_FOUND,
+                "DEPOSIT_REQUEST_NOT_FOUND",
+                "Deposit request not found"
+            ));
+        if (request.getStatus() == DepositRequestStatus.PAYMENT_VERIFICATION) {
+            return request;
+        }
         requireStatus(request, DepositRequestStatus.WAITING_PAYMENT, "mark as paid");
         request.markPaid();
         return depositRequestRepository.save(request);
@@ -94,7 +113,15 @@ public class DepositRequestService {
 
     @Transactional
     public DepositRequest cancel(UUID publicId, Long userId) {
-        DepositRequest request = getForUser(publicId, userId);
+        DepositRequest request = depositRequestRepository.findByPublicIdAndUserIdForUpdate(publicId, userId)
+            .orElseThrow(() -> new ApiProblemException(
+                HttpStatus.NOT_FOUND,
+                "DEPOSIT_REQUEST_NOT_FOUND",
+                "Deposit request not found"
+            ));
+        if (request.getStatus() == DepositRequestStatus.CANCELLED) {
+            return request;
+        }
         if (!USER_CANCELLABLE_STATUSES.contains(request.getStatus())) {
             throw new ApiProblemException(
                 HttpStatus.CONFLICT,
@@ -108,7 +135,7 @@ public class DepositRequestService {
 
     @Transactional
     public DepositRequest issueDetails(UUID publicId, String paymentDetails) {
-        DepositRequest request = getByPublicId(publicId);
+        DepositRequest request = getByPublicIdForUpdate(publicId);
         requireStatus(request, DepositRequestStatus.PENDING_DETAILS, "issue payment details");
         if (paymentDetails == null || paymentDetails.isBlank()) {
             throw new ApiProblemException(
@@ -144,7 +171,10 @@ public class DepositRequestService {
 
     @Transactional
     public DepositRequest reject(UUID publicId, String rejectReason) {
-        DepositRequest request = getByPublicId(publicId);
+        DepositRequest request = getByPublicIdForUpdate(publicId);
+        if (request.getStatus() == DepositRequestStatus.REJECTED) {
+            return request;
+        }
         requireStatus(request, DepositRequestStatus.PAYMENT_VERIFICATION, "reject payment");
         request.reject(rejectReason);
         return depositRequestRepository.save(request);

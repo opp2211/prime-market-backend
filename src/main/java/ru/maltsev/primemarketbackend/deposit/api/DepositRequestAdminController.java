@@ -25,12 +25,13 @@ import ru.maltsev.primemarketbackend.deposit.api.dto.IssueDetailsRequest;
 import ru.maltsev.primemarketbackend.deposit.api.dto.RejectDepositRequest;
 import ru.maltsev.primemarketbackend.deposit.domain.DepositRequest;
 import ru.maltsev.primemarketbackend.deposit.service.DepositRequestService;
+import ru.maltsev.primemarketbackend.security.PermissionCodes;
 import ru.maltsev.primemarketbackend.security.user.UserPrincipal;
 
 @RestController
-@RequestMapping("/api/admin/deposit-requests")
+@RequestMapping({"/api/admin/deposit-requests", "/api/backoffice/deposit-requests"})
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('DEPOSIT_APPROVE')")
+@PreAuthorize("hasAuthority('" + PermissionCodes.DEPOSIT_APPROVE + "')")
 public class DepositRequestAdminController {
     private final DepositRequestService depositRequestService;
 
@@ -44,9 +45,7 @@ public class DepositRequestAdminController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        Page<AdminDepositRequestShortResponse> response = depositRequestService
-            .listForAdmin(status, pageable)
-            .map(AdminDepositRequestShortResponse::from);
+        Page<AdminDepositRequestShortResponse> response = depositRequestService.listShortForAdmin(status, pageable);
         return ResponseEntity.ok(response);
     }
 

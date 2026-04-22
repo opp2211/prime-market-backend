@@ -15,6 +15,8 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
 
     List<UserAccount> findAllByUserIdAndBalanceGreaterThan(Long userId, BigDecimal balance);
 
+    List<UserAccount> findAllByUserId(Long userId);
+
     Optional<UserAccount> findByUserIdAndCurrencyCode(Long userId, String currencyCode);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

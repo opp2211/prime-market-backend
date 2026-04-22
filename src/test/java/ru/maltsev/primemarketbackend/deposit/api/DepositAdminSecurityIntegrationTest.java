@@ -43,14 +43,18 @@ class DepositAdminSecurityIntegrationTest extends AbstractPostgresIntegrationTes
     }
 
     @Test
-    void adminDepositRequestsRequireDepositApprovePermission() throws Exception {
+    void adminDepositRequestsRequireDepositApprovePermissionOnAdminAndBackofficeAliases() throws Exception {
         User support = loadUser("sup1@123.123");
         User regularUser = loadUser("user1@123.123");
 
         mockMvc.perform(get("/api/admin/deposit-requests").with(auth(regularUser)))
             .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/backoffice/deposit-requests").with(auth(regularUser)))
+            .andExpect(status().isForbidden());
 
         mockMvc.perform(get("/api/admin/deposit-requests").with(auth(support)))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/api/backoffice/deposit-requests").with(auth(support)))
             .andExpect(status().isOk());
     }
 

@@ -22,6 +22,13 @@ public interface DepositRequestRepository extends JpaRepository<DepositRequest, 
 
     Optional<DepositRequest> findByPublicIdAndUserId(UUID publicId, Long userId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select dr from DepositRequest dr where dr.publicId = :publicId and dr.userId = :userId")
+    Optional<DepositRequest> findByPublicIdAndUserIdForUpdate(
+        @Param("publicId") UUID publicId,
+        @Param("userId") Long userId
+    );
+
     Page<DepositRequest> findAllByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);
 
     Page<DepositRequest> findAllByUserIdAndStatusOrderByCreatedAtDesc(
@@ -38,4 +45,75 @@ public interface DepositRequestRepository extends JpaRepository<DepositRequest, 
     );
 
     Page<DepositRequest> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    @Query(
+        value = """
+            select new ru.maltsev.primemarketbackend.deposit.repository.AdminDepositRequestQueueRow(
+                dr.publicId,
+                dr.amount,
+                dr.currencyCodeSnapshot,
+                dm.id,
+                dr.depositMethodTitleSnapshot,
+                dr.status,
+                dr.userId,
+                u.username,
+                dr.detailsIssuedAt,
+                dr.userMarkedPaidAt,
+                dr.confirmedAt,
+                dr.rejectedAt,
+                dr.cancelledAt,
+                dr.createdAt,
+                dr.updatedAt
+            )
+            from DepositRequest dr
+            join dr.depositMethod dm,
+                 User u
+            where u.id = dr.userId
+            """,
+        countQuery = """
+            select count(dr)
+            from DepositRequest dr,
+                 User u
+            where u.id = dr.userId
+            """
+    )
+    Page<AdminDepositRequestQueueRow> findAdminQueueRows(Pageable pageable);
+
+    @Query(
+        value = """
+            select new ru.maltsev.primemarketbackend.deposit.repository.AdminDepositRequestQueueRow(
+                dr.publicId,
+                dr.amount,
+                dr.currencyCodeSnapshot,
+                dm.id,
+                dr.depositMethodTitleSnapshot,
+                dr.status,
+                dr.userId,
+                u.username,
+                dr.detailsIssuedAt,
+                dr.userMarkedPaidAt,
+                dr.confirmedAt,
+                dr.rejectedAt,
+                dr.cancelledAt,
+                dr.createdAt,
+                dr.updatedAt
+            )
+            from DepositRequest dr
+            join dr.depositMethod dm,
+                 User u
+            where u.id = dr.userId
+              and dr.status in :statuses
+            """,
+        countQuery = """
+            select count(dr)
+            from DepositRequest dr,
+                 User u
+            where u.id = dr.userId
+              and dr.status in :statuses
+            """
+    )
+    Page<AdminDepositRequestQueueRow> findAdminQueueRowsByStatusIn(
+        @Param("statuses") Set<DepositRequestStatus> statuses,
+        Pageable pageable
+    );
 }
