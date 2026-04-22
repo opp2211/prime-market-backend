@@ -12,9 +12,6 @@ import org.springframework.data.repository.query.Param;
 import ru.maltsev.primemarketbackend.account.domain.UserAccount;
 
 public interface UserAccountRepository extends JpaRepository<UserAccount, Long> {
-
-    List<UserAccount> findAllByUserIdAndBalanceGreaterThan(Long userId, BigDecimal balance);
-
     List<UserAccount> findAllByUserId(Long userId);
 
     Optional<UserAccount> findByUserIdAndCurrencyCode(Long userId, String currencyCode);

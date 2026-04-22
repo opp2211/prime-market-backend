@@ -73,7 +73,7 @@ public class OrderDisputeService {
                 "Only order participant can open a dispute"
             );
         }
-        if (!canOpenDispute(order)) {
+        if (!isDisputeEligibleOrderStatus(order)) {
             throw invalidOrderStatus("Dispute cannot be opened from status " + order.getStatus());
         }
         if (orderDisputeRepository.existsByOrderIdAndStatusIn(order.getId(), ACTIVE_DISPUTE_STATUSES)) {
@@ -126,7 +126,7 @@ public class OrderDisputeService {
             .orElse(null);
 
         boolean canOpenDispute = orderAccessService.isParticipant(order, principal.getUser().getId())
-            && canOpenDispute(order)
+            && isDisputeEligibleOrderStatus(order)
             && activeDispute == null;
         if (latestDispute == null) {
             return new OrderReadModelDtos.Dispute(
@@ -168,6 +168,8 @@ public class OrderDisputeService {
             );
         }
 
+        boolean canTakeDisputeInWork = canTakeDisputeInWork(latestDispute, principal);
+        boolean canResolveDispute = canResolveDispute(latestDispute, order, principal);
         return new OrderReadModelDtos.Dispute(
             true,
             latestDispute.getPublicId(),
@@ -180,16 +182,10 @@ public class OrderDisputeService {
                 .get(latestDispute.getAssignedSupportUserId())),
             new OrderReadModelDtos.DisputeAvailableActions(
                 canOpenDispute,
-                latestDispute.isOpen() && principal.hasAuthority(PermissionCodes.ORDER_DISPUTES_TAKE),
-                latestDispute.isActive()
-                    && isResolvableOrder(order)
-                    && principal.hasAuthority(PermissionCodes.ORDER_DISPUTES_RESOLVE),
-                latestDispute.isActive()
-                    && isResolvableOrder(order)
-                    && principal.hasAuthority(PermissionCodes.ORDER_DISPUTES_RESOLVE),
-                latestDispute.isActive()
-                    && isResolvableOrder(order)
-                    && principal.hasAuthority(PermissionCodes.ORDER_DISPUTES_RESOLVE)
+                canTakeDisputeInWork,
+                canResolveDispute,
+                canResolveDispute,
+                canResolveDispute
             )
         );
     }
@@ -363,7 +359,7 @@ public class OrderDisputeService {
             );
         }
         Order order = loadOrderForUpdate(dispute.getOrderId());
-        if (!isResolvableOrder(order)) {
+        if (!isDisputeEligibleOrderStatus(order)) {
             throw invalidOrderStatus("Order cannot be resolved from status " + order.getStatus());
         }
         return new ResolutionContext(dispute, order, normalizeOptional(resolutionNote));
@@ -384,12 +380,18 @@ public class OrderDisputeService {
             || principal.hasAuthority(PermissionCodes.ORDER_DISPUTES_VIEW);
     }
 
-    private boolean canOpenDispute(Order order) {
+    private boolean isDisputeEligibleOrderStatus(Order order) {
         return order.isInProgress() || order.isPartiallyDelivered() || order.isDelivered();
     }
 
-    private boolean isResolvableOrder(Order order) {
-        return order.isInProgress() || order.isPartiallyDelivered() || order.isDelivered();
+    private boolean canTakeDisputeInWork(OrderDispute dispute, UserPrincipal principal) {
+        return dispute.isOpen() && principal.hasAuthority(PermissionCodes.ORDER_DISPUTES_TAKE);
+    }
+
+    private boolean canResolveDispute(OrderDispute dispute, Order order, UserPrincipal principal) {
+        return dispute.isActive()
+            && isDisputeEligibleOrderStatus(order)
+            && principal.hasAuthority(PermissionCodes.ORDER_DISPUTES_RESOLVE);
     }
 
     private void cancelPendingRequests(Long orderId, Long actorUserId, Instant now) {
@@ -406,6 +408,8 @@ public class OrderDisputeService {
             dispute.getAssignedSupportUserId(),
             dispute.getResolvedByUserId()
         ));
+        boolean canTakeDisputeInWork = canTakeDisputeInWork(dispute, principal);
+        boolean canResolveDispute = canResolveDispute(dispute, order, principal);
         return new OrderDisputeResponse(
             dispute.getPublicId(),
             new OrderDisputeDtos.OrderSummary(
@@ -430,10 +434,10 @@ public class OrderDisputeService {
             dispute.getResolutionType(),
             dispute.getResolutionNote(),
             new OrderDisputeDtos.AvailableActions(
-                dispute.isOpen() && principal.hasAuthority(PermissionCodes.ORDER_DISPUTES_TAKE),
-                dispute.isActive() && isResolvableOrder(order) && principal.hasAuthority(PermissionCodes.ORDER_DISPUTES_RESOLVE),
-                dispute.isActive() && isResolvableOrder(order) && principal.hasAuthority(PermissionCodes.ORDER_DISPUTES_RESOLVE),
-                dispute.isActive() && isResolvableOrder(order) && principal.hasAuthority(PermissionCodes.ORDER_DISPUTES_RESOLVE)
+                canTakeDisputeInWork,
+                canResolveDispute,
+                canResolveDispute,
+                canResolveDispute
             )
         );
     }

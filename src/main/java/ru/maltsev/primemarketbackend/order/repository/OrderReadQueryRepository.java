@@ -8,7 +8,6 @@ import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -52,20 +51,6 @@ public class OrderReadQueryRepository {
         long total = entityManager.createQuery(countQuery).getSingleResult();
 
         return new PageImpl<>(items, PageRequest.of(page, size), total);
-    }
-
-    public Optional<Order> findParticipantOrder(UUID publicOrderId, Long userId) {
-        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
-        CriteriaQuery<Order> query = cb.createQuery(Order.class);
-        Root<Order> root = query.from(Order.class);
-        List<Predicate> predicates = buildPredicates(cb, root, userId, null, null, publicOrderId);
-        query.select(root);
-        query.where(predicates.toArray(Predicate[]::new));
-
-        List<Order> items = entityManager.createQuery(query)
-            .setMaxResults(1)
-            .getResultList();
-        return items.stream().findFirst();
     }
 
     private List<Predicate> buildPredicates(

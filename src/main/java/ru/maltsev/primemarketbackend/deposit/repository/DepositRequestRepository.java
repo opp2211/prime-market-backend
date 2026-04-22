@@ -37,8 +37,6 @@ public interface DepositRequestRepository extends JpaRepository<DepositRequest, 
         Pageable pageable
     );
 
-    Page<DepositRequest> findAllByStatusOrderByCreatedAtDesc(DepositRequestStatus status, Pageable pageable);
-
     Page<DepositRequest> findAllByStatusInOrderByCreatedAtDesc(
         Set<DepositRequestStatus> statuses,
         Pageable pageable
