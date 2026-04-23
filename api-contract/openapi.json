@@ -159,23 +159,6 @@
         },
         "type" : "object"
       },
-      "AvailableActions" : {
-        "properties" : {
-          "canResolveAmendQuantityAndComplete" : {
-            "type" : "boolean"
-          },
-          "canResolveCancel" : {
-            "type" : "boolean"
-          },
-          "canResolveComplete" : {
-            "type" : "boolean"
-          },
-          "canTakeInWork" : {
-            "type" : "boolean"
-          }
-        },
-        "type" : "object"
-      },
       "BackofficeDisputesResponse" : {
         "properties" : {
           "inReview" : {
@@ -710,7 +693,7 @@
             "$ref" : "#/components/schemas/UserSummary"
           },
           "availableActions" : {
-            "$ref" : "#/components/schemas/DisputeAvailableActions"
+            "$ref" : "#/components/schemas/OrderDisputeSummaryAvailableActions"
           },
           "createdAt" : {
             "format" : "date-time",
@@ -734,26 +717,6 @@
           },
           "status" : {
             "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "DisputeAvailableActions" : {
-        "properties" : {
-          "canOpenDispute" : {
-            "type" : "boolean"
-          },
-          "canResolveAmendQuantityAndComplete" : {
-            "type" : "boolean"
-          },
-          "canResolveCancel" : {
-            "type" : "boolean"
-          },
-          "canResolveComplete" : {
-            "type" : "boolean"
-          },
-          "canTakeInWork" : {
-            "type" : "boolean"
           }
         },
         "type" : "object"
@@ -787,6 +750,23 @@
           },
           "unitPriceAmount" : {
             "type" : "number"
+          },
+          "viewerPerspective" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "FinancialSummaryPreview" : {
+        "properties" : {
+          "primaryAmount" : {
+            "type" : "number"
+          },
+          "primaryCurrencyCode" : {
+            "type" : "string"
+          },
+          "primaryLabel" : {
+            "type" : "string"
           },
           "viewerPerspective" : {
             "type" : "string"
@@ -831,28 +811,6 @@
           }
         },
         "required" : [ "payment_details" ],
-        "type" : "object"
-      },
-      "Item" : {
-        "properties" : {
-          "actor" : {
-            "$ref" : "#/components/schemas/Actor"
-          },
-          "createdAt" : {
-            "format" : "date-time",
-            "type" : "string"
-          },
-          "eventType" : {
-            "type" : "string"
-          },
-          "id" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "payload" : {
-            "$ref" : "#/components/schemas/JsonNode"
-          }
-        },
         "type" : "object"
       },
       "JsonNode" : { },
@@ -930,7 +888,7 @@
             "$ref" : "#/components/schemas/Owner"
           },
           "price" : {
-            "$ref" : "#/components/schemas/Price"
+            "$ref" : "#/components/schemas/MarketOfferPrice"
           },
           "publishedAt" : {
             "format" : "date-time",
@@ -954,11 +912,79 @@
         },
         "type" : "object"
       },
+      "MarketOfferListItem" : {
+        "properties" : {
+          "action" : {
+            "type" : "string"
+          },
+          "attributes" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Attribute"
+            },
+            "type" : "array"
+          },
+          "category" : {
+            "$ref" : "#/components/schemas/Category"
+          },
+          "contexts" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Context"
+            },
+            "type" : "array"
+          },
+          "deliveryMethods" : {
+            "items" : {
+              "$ref" : "#/components/schemas/DeliveryMethod"
+            },
+            "type" : "array"
+          },
+          "game" : {
+            "$ref" : "#/components/schemas/Game"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "maxTradeQuantity" : {
+            "type" : "number"
+          },
+          "minTradeQuantity" : {
+            "type" : "number"
+          },
+          "offerVersion" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "owner" : {
+            "$ref" : "#/components/schemas/Owner"
+          },
+          "price" : {
+            "$ref" : "#/components/schemas/MarketOfferPrice"
+          },
+          "publishedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "quantity" : {
+            "type" : "number"
+          },
+          "quantityStep" : {
+            "type" : "number"
+          },
+          "side" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "MarketOfferListResponse" : {
         "properties" : {
           "items" : {
             "items" : {
-              "$ref" : "#/components/schemas/Item"
+              "$ref" : "#/components/schemas/MarketOfferListItem"
             },
             "type" : "array"
           },
@@ -977,11 +1003,98 @@
         },
         "type" : "object"
       },
+      "MarketOfferPrice" : {
+        "properties" : {
+          "amount" : {
+            "type" : "number"
+          },
+          "currencyCode" : {
+            "type" : "string"
+          },
+          "rate" : {
+            "type" : "number"
+          }
+        },
+        "type" : "object"
+      },
+      "MyOrderListItem" : {
+        "properties" : {
+          "category" : {
+            "$ref" : "#/components/schemas/Category"
+          },
+          "counterparty" : {
+            "$ref" : "#/components/schemas/Counterparty"
+          },
+          "counterpartyRole" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "deliveredQuantity" : {
+            "type" : "number"
+          },
+          "displayTotalAmount" : {
+            "type" : "number"
+          },
+          "displayUnitPriceAmount" : {
+            "type" : "number"
+          },
+          "expiresAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "financialSummary" : {
+            "$ref" : "#/components/schemas/FinancialSummaryPreview"
+          },
+          "game" : {
+            "$ref" : "#/components/schemas/Game"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "myRole" : {
+            "type" : "string"
+          },
+          "orderedQuantity" : {
+            "type" : "number"
+          },
+          "publicId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "sellerFeeAmount" : {
+            "type" : "number"
+          },
+          "sellerGrossAmount" : {
+            "type" : "number"
+          },
+          "sellerNetAmount" : {
+            "type" : "number"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "updatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "viewerCurrencyCode" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "MyOrdersResponse" : {
         "properties" : {
           "items" : {
             "items" : {
-              "$ref" : "#/components/schemas/Item"
+              "$ref" : "#/components/schemas/MyOrderListItem"
             },
             "type" : "array"
           },
@@ -1435,6 +1548,32 @@
         },
         "type" : "object"
       },
+      "OrderAvailableActions" : {
+        "properties" : {
+          "canCancel" : {
+            "type" : "boolean"
+          },
+          "canConfirmReady" : {
+            "type" : "boolean"
+          },
+          "canConfirmReceived" : {
+            "type" : "boolean"
+          },
+          "canMarkDelivered" : {
+            "type" : "boolean"
+          },
+          "canMarkPartiallyDelivered" : {
+            "type" : "boolean"
+          },
+          "canRequestAmendQuantity" : {
+            "type" : "boolean"
+          },
+          "canRequestCancel" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
       "OrderConversationListResponse" : {
         "properties" : {
           "items" : {
@@ -1477,7 +1616,7 @@
             "type" : "array"
           },
           "availableActions" : {
-            "$ref" : "#/components/schemas/AvailableActions"
+            "$ref" : "#/components/schemas/OrderAvailableActions"
           },
           "category" : {
             "$ref" : "#/components/schemas/Category"
@@ -1543,7 +1682,7 @@
             "type" : "array"
           },
           "price" : {
-            "$ref" : "#/components/schemas/Price"
+            "$ref" : "#/components/schemas/OrderPrice"
           },
           "publicId" : {
             "format" : "uuid",
@@ -1577,13 +1716,30 @@
         },
         "type" : "object"
       },
+      "OrderDisputeAvailableActions" : {
+        "properties" : {
+          "canResolveAmendQuantityAndComplete" : {
+            "type" : "boolean"
+          },
+          "canResolveCancel" : {
+            "type" : "boolean"
+          },
+          "canResolveComplete" : {
+            "type" : "boolean"
+          },
+          "canTakeInWork" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
       "OrderDisputeResponse" : {
         "properties" : {
           "assignedSupportUser" : {
             "$ref" : "#/components/schemas/UserSummary"
           },
           "availableActions" : {
-            "$ref" : "#/components/schemas/AvailableActions"
+            "$ref" : "#/components/schemas/OrderDisputeAvailableActions"
           },
           "createdAt" : {
             "format" : "date-time",
@@ -1636,11 +1792,53 @@
         },
         "type" : "object"
       },
+      "OrderDisputeSummaryAvailableActions" : {
+        "properties" : {
+          "canOpenDispute" : {
+            "type" : "boolean"
+          },
+          "canResolveAmendQuantityAndComplete" : {
+            "type" : "boolean"
+          },
+          "canResolveCancel" : {
+            "type" : "boolean"
+          },
+          "canResolveComplete" : {
+            "type" : "boolean"
+          },
+          "canTakeInWork" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "OrderEventItem" : {
+        "properties" : {
+          "actor" : {
+            "$ref" : "#/components/schemas/Actor"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "eventType" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "payload" : {
+            "$ref" : "#/components/schemas/JsonNode"
+          }
+        },
+        "type" : "object"
+      },
       "OrderEventsResponse" : {
         "properties" : {
           "items" : {
             "items" : {
-              "$ref" : "#/components/schemas/Item"
+              "$ref" : "#/components/schemas/OrderEventItem"
             },
             "type" : "array"
           }
@@ -1676,6 +1874,20 @@
               "$ref" : "#/components/schemas/OrderMessageResponse"
             },
             "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "OrderPrice" : {
+        "properties" : {
+          "currencyCode" : {
+            "type" : "string"
+          },
+          "totalAmount" : {
+            "type" : "number"
+          },
+          "unitAmount" : {
+            "type" : "number"
           }
         },
         "type" : "object"
@@ -1737,7 +1949,7 @@
             "$ref" : "#/components/schemas/Owner"
           },
           "price" : {
-            "$ref" : "#/components/schemas/Price"
+            "$ref" : "#/components/schemas/MarketOfferPrice"
           },
           "priceChanged" : {
             "type" : "boolean"
@@ -2141,27 +2353,6 @@
         },
         "type" : "object"
       },
-      "Pageable" : {
-        "properties" : {
-          "page" : {
-            "format" : "int32",
-            "minimum" : 0,
-            "type" : "integer"
-          },
-          "size" : {
-            "format" : "int32",
-            "minimum" : 1,
-            "type" : "integer"
-          },
-          "sort" : {
-            "items" : {
-              "type" : "string"
-            },
-            "type" : "array"
-          }
-        },
-        "type" : "object"
-      },
       "PageableObject" : {
         "properties" : {
           "offset" : {
@@ -2258,20 +2449,6 @@
             "type" : "integer"
           },
           "requestedQuantity" : {
-            "type" : "number"
-          }
-        },
-        "type" : "object"
-      },
-      "Price" : {
-        "properties" : {
-          "amount" : {
-            "type" : "number"
-          },
-          "currencyCode" : {
-            "type" : "string"
-          },
-          "rate" : {
             "type" : "number"
           }
         },
@@ -2663,21 +2840,49 @@
       "get" : {
         "operationId" : "list_5",
         "parameters" : [ {
+          "description" : "Canonical multi-value status filter. Supports repeated `status` params and comma-separated values in a single parameter.",
+          "example" : "PENDING_DETAILS,WAITING_PAYMENT",
           "in" : "query",
           "name" : "status",
           "required" : false,
           "schema" : {
             "items" : {
+              "enum" : [ "PENDING_DETAILS", "WAITING_PAYMENT", "PAYMENT_VERIFICATION", "CONFIRMED", "REJECTED", "EXPIRED", "CANCELLED" ],
               "type" : "string"
             },
             "type" : "array"
           }
         }, {
+          "description" : "Zero-based page index (0..N)",
           "in" : "query",
-          "name" : "pageable",
-          "required" : true,
+          "name" : "page",
+          "required" : false,
           "schema" : {
-            "$ref" : "#/components/schemas/Pageable"
+            "default" : 0,
+            "minimum" : 0,
+            "type" : "integer"
+          }
+        }, {
+          "description" : "The size of the page to be returned",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "minimum" : 1,
+            "type" : "integer"
+          }
+        }, {
+          "description" : "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "default" : [ "createdAt,DESC" ],
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
           }
         } ],
         "responses" : {
@@ -2968,21 +3173,49 @@
       "get" : {
         "operationId" : "list_4",
         "parameters" : [ {
+          "description" : "Canonical multi-value status filter. Supports repeated `status` params and comma-separated values in a single parameter.",
+          "example" : "PENDING_DETAILS,WAITING_PAYMENT",
           "in" : "query",
           "name" : "status",
           "required" : false,
           "schema" : {
             "items" : {
+              "enum" : [ "PENDING_DETAILS", "WAITING_PAYMENT", "PAYMENT_VERIFICATION", "CONFIRMED", "REJECTED", "EXPIRED", "CANCELLED" ],
               "type" : "string"
             },
             "type" : "array"
           }
         }, {
+          "description" : "Zero-based page index (0..N)",
           "in" : "query",
-          "name" : "pageable",
-          "required" : true,
+          "name" : "page",
+          "required" : false,
           "schema" : {
-            "$ref" : "#/components/schemas/Pageable"
+            "default" : 0,
+            "minimum" : 0,
+            "type" : "integer"
+          }
+        }, {
+          "description" : "The size of the page to be returned",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "minimum" : 1,
+            "type" : "integer"
+          }
+        }, {
+          "description" : "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "default" : [ "createdAt,DESC" ],
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
           }
         } ],
         "responses" : {
@@ -3148,23 +3381,52 @@
     },
     "/api/backoffice/withdrawal-requests" : {
       "get" : {
+        "description" : "Supports the canonical multi-value `status` filter plus standard pageable query params `page`, `size`, and `sort`. For multiple statuses use repeated `status` params or a single comma-separated value. `statuses` and `currency_code` are not supported.",
         "operationId" : "list_3",
         "parameters" : [ {
+          "description" : "Canonical multi-value status filter. Supports repeated `status` params and comma-separated values in a single parameter.",
+          "example" : "OPEN,PROCESSING",
           "in" : "query",
           "name" : "status",
           "required" : false,
           "schema" : {
             "items" : {
+              "enum" : [ "OPEN", "PROCESSING", "COMPLETED", "CANCELLED", "REJECTED" ],
               "type" : "string"
             },
             "type" : "array"
           }
         }, {
+          "description" : "Zero-based page index (0..N)",
           "in" : "query",
-          "name" : "pageable",
-          "required" : true,
+          "name" : "page",
+          "required" : false,
           "schema" : {
-            "$ref" : "#/components/schemas/Pageable"
+            "default" : 0,
+            "minimum" : 0,
+            "type" : "integer"
+          }
+        }, {
+          "description" : "The size of the page to be returned",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "minimum" : 1,
+            "type" : "integer"
+          }
+        }, {
+          "description" : "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "default" : [ "createdAt,DESC" ],
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
           }
         } ],
         "responses" : {
@@ -3179,6 +3441,7 @@
             "description" : "OK"
           }
         },
+        "summary" : "List backoffice withdrawal requests",
         "tags" : [ "backoffice-withdrawal-request-controller" ]
       }
     },
@@ -3396,18 +3659,45 @@
       "get" : {
         "operationId" : "list_2",
         "parameters" : [ {
+          "description" : "Canonical single-value request status. Omit the parameter to return requests of all statuses.",
           "in" : "query",
           "name" : "status",
           "required" : false,
           "schema" : {
+            "enum" : [ "PENDING_DETAILS", "WAITING_PAYMENT", "PAYMENT_VERIFICATION", "CONFIRMED", "REJECTED", "EXPIRED", "CANCELLED" ],
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index (0..N)",
           "in" : "query",
-          "name" : "pageable",
-          "required" : true,
+          "name" : "page",
+          "required" : false,
           "schema" : {
-            "$ref" : "#/components/schemas/Pageable"
+            "default" : 0,
+            "minimum" : 0,
+            "type" : "integer"
+          }
+        }, {
+          "description" : "The size of the page to be returned",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "minimum" : 1,
+            "type" : "integer"
+          }
+        }, {
+          "description" : "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "default" : [ "createdAt,DESC" ],
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
           }
         } ],
         "responses" : {
@@ -3437,7 +3727,7 @@
           "required" : true
         },
         "responses" : {
-          "200" : {
+          "201" : {
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3445,7 +3735,7 @@
                 }
               }
             },
-            "description" : "OK"
+            "description" : "Created"
           }
         },
         "tags" : [ "deposit-request-controller" ]
@@ -3689,32 +3979,41 @@
     },
     "/api/market/offers" : {
       "get" : {
+        "description" : "`gameSlug`, `categorySlug`, `intent`, and `viewerCurrencyCode` are runtime-required even though the controller keeps them optional to preserve the current validation flow.",
         "operationId" : "listOffers",
         "parameters" : [ {
+          "description" : "Required game slug.",
+          "example" : "lineage-2",
           "in" : "query",
           "name" : "gameSlug",
-          "required" : false,
+          "required" : true,
           "schema" : {
             "type" : "string"
           }
         }, {
+          "description" : "Required category slug.",
+          "example" : "currency",
           "in" : "query",
           "name" : "categorySlug",
-          "required" : false,
+          "required" : true,
           "schema" : {
             "type" : "string"
           }
         }, {
+          "description" : "Requested market intent.",
           "in" : "query",
           "name" : "intent",
-          "required" : false,
+          "required" : true,
           "schema" : {
+            "enum" : [ "buy", "sell" ],
             "type" : "string"
           }
         }, {
+          "description" : "Viewer currency code used for display price.",
+          "example" : "RUB",
           "in" : "query",
           "name" : "viewerCurrencyCode",
-          "required" : false,
+          "required" : true,
           "schema" : {
             "type" : "string"
           }
@@ -3754,26 +4053,30 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page number.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
-            "format" : "int32",
+            "minimum" : 0,
             "type" : "integer"
           }
         }, {
+          "description" : "Page size. Defaults to 20 when omitted.",
           "in" : "query",
           "name" : "size",
           "required" : false,
           "schema" : {
-            "format" : "int32",
+            "minimum" : 1,
             "type" : "integer"
           }
         }, {
+          "description" : "Explicit sort order. When omitted, backend uses `price_asc` for `buy` and `price_desc` for `sell`.",
           "in" : "query",
           "name" : "sort",
           "required" : false,
           "schema" : {
+            "enum" : [ "price_asc", "price_desc" ],
             "type" : "string"
           }
         } ],
@@ -3789,11 +4092,13 @@
             "description" : "OK"
           }
         },
+        "summary" : "List market offers",
         "tags" : [ "market-offer-controller" ]
       }
     },
     "/api/market/offers/{offerId}" : {
       "get" : {
+        "description" : "`intent` and `viewerCurrencyCode` are runtime-required and affect both trade direction and display price.",
         "operationId" : "getOffer",
         "parameters" : [ {
           "in" : "path",
@@ -3804,16 +4109,20 @@
             "type" : "integer"
           }
         }, {
+          "description" : "Requested market intent.",
           "in" : "query",
           "name" : "intent",
-          "required" : false,
+          "required" : true,
           "schema" : {
+            "enum" : [ "buy", "sell" ],
             "type" : "string"
           }
         }, {
+          "description" : "Viewer currency code used for display price.",
+          "example" : "RUB",
           "in" : "query",
           "name" : "viewerCurrencyCode",
-          "required" : false,
+          "required" : true,
           "schema" : {
             "type" : "string"
           }
@@ -3830,6 +4139,7 @@
             "description" : "OK"
           }
         },
+        "summary" : "Get market offer details",
         "tags" : [ "market-offer-controller" ]
       }
     },
@@ -4972,6 +5282,7 @@
       "get" : {
         "operationId" : "getMyTransactions",
         "parameters" : [ {
+          "description" : "Optional multi-value wallet currency filter.",
           "in" : "query",
           "name" : "currency",
           "required" : false,
@@ -4982,6 +5293,7 @@
             "type" : "array"
           }
         }, {
+          "description" : "Optional multi-value transaction type filter.",
           "in" : "query",
           "name" : "type",
           "required" : false,
@@ -5008,11 +5320,36 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index (0..N)",
           "in" : "query",
-          "name" : "pageable",
-          "required" : true,
+          "name" : "page",
+          "required" : false,
           "schema" : {
-            "$ref" : "#/components/schemas/Pageable"
+            "default" : 0,
+            "minimum" : 0,
+            "type" : "integer"
+          }
+        }, {
+          "description" : "The size of the page to be returned",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "minimum" : 1,
+            "type" : "integer"
+          }
+        }, {
+          "description" : "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "default" : [ "createdAt,DESC" ],
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
           }
         } ],
         "responses" : {
@@ -5061,20 +5398,48 @@
     },
     "/api/withdrawal-requests" : {
       "get" : {
+        "description" : "Supports only the canonical single-value `status` filter plus standard pageable query params `page`, `size`, and `sort`. `statuses` and `currency_code` filters are not supported by this endpoint.",
         "operationId" : "list",
         "parameters" : [ {
+          "description" : "Canonical single-value request status. Omit the parameter to return requests of all statuses.",
           "in" : "query",
           "name" : "status",
           "required" : false,
           "schema" : {
+            "enum" : [ "OPEN", "PROCESSING", "COMPLETED", "CANCELLED", "REJECTED" ],
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index (0..N)",
           "in" : "query",
-          "name" : "pageable",
-          "required" : true,
+          "name" : "page",
+          "required" : false,
           "schema" : {
-            "$ref" : "#/components/schemas/Pageable"
+            "default" : 0,
+            "minimum" : 0,
+            "type" : "integer"
+          }
+        }, {
+          "description" : "The size of the page to be returned",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "minimum" : 1,
+            "type" : "integer"
+          }
+        }, {
+          "description" : "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "default" : [ "createdAt,DESC" ],
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
           }
         } ],
         "responses" : {
@@ -5089,6 +5454,7 @@
             "description" : "OK"
           }
         },
+        "summary" : "List user withdrawal requests",
         "tags" : [ "withdrawal-request-controller" ]
       },
       "post" : {
@@ -5104,7 +5470,7 @@
           "required" : true
         },
         "responses" : {
-          "200" : {
+          "201" : {
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -5112,7 +5478,7 @@
                 }
               }
             },
-            "description" : "OK"
+            "description" : "Created"
           }
         },
         "tags" : [ "withdrawal-request-controller" ]

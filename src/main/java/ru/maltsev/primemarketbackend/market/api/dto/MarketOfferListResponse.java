@@ -1,5 +1,6 @@
 package ru.maltsev.primemarketbackend.market.api.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -10,6 +11,7 @@ public record MarketOfferListResponse(
     int size,
     long total
 ) {
+    @Schema(name = "MarketOfferListItem")
     public record Item(
         Long id,
         Long offerVersion,
@@ -48,6 +50,7 @@ public record MarketOfferListResponse(
     public record Owner(String username) {
     }
 
+    @Schema(name = "MarketOfferPrice")
     public record Price(
         BigDecimal amount,
         String currencyCode,

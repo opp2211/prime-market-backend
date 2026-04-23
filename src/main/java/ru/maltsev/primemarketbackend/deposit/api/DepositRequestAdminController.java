@@ -1,9 +1,13 @@
 package ru.maltsev.primemarketbackend.deposit.api;
 
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -38,7 +42,24 @@ public class DepositRequestAdminController {
     @GetMapping
     public ResponseEntity<Page<AdminDepositRequestShortResponse>> list(
         @AuthenticationPrincipal UserPrincipal principal,
+        @Parameter(
+            description = "Canonical multi-value status filter. Supports repeated `status` params and comma-separated values in a single parameter.",
+            example = "PENDING_DETAILS,WAITING_PAYMENT",
+            array = @ArraySchema(schema = @Schema(
+                type = "string",
+                allowableValues = {
+                    "PENDING_DETAILS",
+                    "WAITING_PAYMENT",
+                    "PAYMENT_VERIFICATION",
+                    "CONFIRMED",
+                    "REJECTED",
+                    "EXPIRED",
+                    "CANCELLED"
+                }
+            ))
+        )
         @RequestParam(required = false) List<String> status,
+        @ParameterObject
         @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
         if (principal == null) {

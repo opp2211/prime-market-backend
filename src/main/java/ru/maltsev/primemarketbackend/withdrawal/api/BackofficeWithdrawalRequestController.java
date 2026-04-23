@@ -1,9 +1,14 @@
 package ru.maltsev.primemarketbackend.withdrawal.api;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -35,9 +40,22 @@ public class BackofficeWithdrawalRequestController {
     private final WithdrawalRequestService withdrawalRequestService;
 
     @GetMapping
+    @Operation(
+        summary = "List backoffice withdrawal requests",
+        description = "Supports the canonical multi-value `status` filter plus standard pageable query params `page`, `size`, and `sort`. For multiple statuses use repeated `status` params or a single comma-separated value. `statuses` and `currency_code` are not supported."
+    )
     public ResponseEntity<Page<BackofficeWithdrawalRequestResponse>> list(
         @AuthenticationPrincipal UserPrincipal principal,
+        @Parameter(
+            description = "Canonical multi-value status filter. Supports repeated `status` params and comma-separated values in a single parameter.",
+            example = "OPEN,PROCESSING",
+            array = @ArraySchema(schema = @Schema(
+                type = "string",
+                allowableValues = { "OPEN", "PROCESSING", "COMPLETED", "CANCELLED", "REJECTED" }
+            ))
+        )
         @RequestParam(required = false) List<String> status,
+        @ParameterObject
         @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
         if (principal == null) {

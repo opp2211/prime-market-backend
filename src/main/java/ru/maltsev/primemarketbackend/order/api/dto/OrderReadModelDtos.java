@@ -1,5 +1,6 @@
 package ru.maltsev.primemarketbackend.order.api.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -25,6 +26,7 @@ public final class OrderReadModelDtos {
     public record Counterparty(String username) {
     }
 
+    @Schema(name = "OrderPrice")
     public record Price(
         BigDecimal unitAmount,
         BigDecimal totalAmount,
@@ -80,6 +82,7 @@ public final class OrderReadModelDtos {
     ) {
     }
 
+    @Schema(name = "OrderAvailableActions")
     public record AvailableActions(
         boolean canConfirmReady,
         boolean canCancel,
@@ -91,6 +94,7 @@ public final class OrderReadModelDtos {
     ) {
     }
 
+    @Schema(name = "OrderDisputeSummaryAvailableActions")
     public record DisputeAvailableActions(
         boolean canOpenDispute,
         boolean canTakeInWork,

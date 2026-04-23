@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -49,6 +50,7 @@ class OpenApiContractArtifactIT extends AbstractPostgresIntegrationTest {
         JsonNode contract = objectMapper.readTree(rawContract);
 
         assertCoreCoverage(contract);
+        assertContractClarity(contract);
         writeContract(rawContract);
     }
 
@@ -93,6 +95,126 @@ class OpenApiContractArtifactIT extends AbstractPostgresIntegrationTest {
         assertThat(paths.has("/test/public")).isFalse();
         assertThat(contract.path("servers")).hasSize(1);
         assertThat(contract.path("servers").get(0).path("url").asText()).isEqualTo("/");
+    }
+
+    private void assertContractClarity(JsonNode contract) {
+        JsonNode schemas = contract.path("components").path("schemas");
+
+        assertThat(schemas.has("Item")).isFalse();
+        assertThat(schemas.has("Price")).isFalse();
+        assertThat(schemas.has("AvailableActions")).isFalse();
+
+        assertThat(refOf(schemas, "MyOrdersResponse", "items", "items"))
+            .isEqualTo("#/components/schemas/MyOrderListItem");
+        assertThat(refOf(schemas, "MarketOfferListResponse", "items", "items"))
+            .isEqualTo("#/components/schemas/MarketOfferListItem");
+        assertThat(refOf(schemas, "MarketOfferListItem", "price"))
+            .isEqualTo("#/components/schemas/MarketOfferPrice");
+        assertThat(refOf(schemas, "OrderDetailsResponse", "price"))
+            .isEqualTo("#/components/schemas/OrderPrice");
+        assertThat(refOf(schemas, "OrderDetailsResponse", "availableActions"))
+            .isEqualTo("#/components/schemas/OrderAvailableActions");
+        assertThat(refOf(schemas, "OrderDisputeResponse", "availableActions"))
+            .isEqualTo("#/components/schemas/OrderDisputeAvailableActions");
+        assertThat(refOf(schemas, "Dispute", "availableActions"))
+            .isEqualTo("#/components/schemas/OrderDisputeSummaryAvailableActions");
+
+        assertThat(queryParameterNames(contract, "/api/withdrawal-requests", "get"))
+            .containsExactly("status", "page", "size", "sort");
+        assertThat(queryParameterNames(contract, "/api/backoffice/withdrawal-requests", "get"))
+            .containsExactly("status", "page", "size", "sort");
+        assertThat(queryParameterNames(contract, "/api/deposit-requests", "get"))
+            .containsExactly("status", "page", "size", "sort");
+        assertThat(queryParameterNames(contract, "/api/backoffice/deposit-requests", "get"))
+            .containsExactly("status", "page", "size", "sort");
+        assertThat(queryParameterNames(contract, "/api/wallets/me/txs", "get"))
+            .containsExactly("currency", "type", "from", "to", "page", "size", "sort");
+
+        assertThat(queryParameterNames(contract, "/api/withdrawal-requests", "get"))
+            .doesNotContain("pageable", "statuses", "currency_code");
+        assertThat(queryParameterNames(contract, "/api/backoffice/withdrawal-requests", "get"))
+            .doesNotContain("pageable", "statuses", "currency_code");
+        assertThat(allQueryParameterNames(contract)).doesNotContain("pageable");
+
+        JsonNode userWithdrawalStatus = queryParameter(contract, "/api/withdrawal-requests", "get", "status");
+        assertThat(userWithdrawalStatus.path("schema").path("type").asText()).isEqualTo("string");
+        assertThat(jsonTextValues(userWithdrawalStatus.path("schema").path("enum")))
+            .containsExactly("OPEN", "PROCESSING", "COMPLETED", "CANCELLED", "REJECTED");
+
+        JsonNode backofficeWithdrawalStatus = queryParameter(contract, "/api/backoffice/withdrawal-requests", "get", "status");
+        assertThat(backofficeWithdrawalStatus.path("schema").path("type").asText()).isEqualTo("array");
+        assertThat(jsonTextValues(backofficeWithdrawalStatus.path("schema").path("items").path("enum")))
+            .containsExactly("OPEN", "PROCESSING", "COMPLETED", "CANCELLED", "REJECTED");
+
+        assertThat(queryParameter(contract, "/api/market/offers", "get", "gameSlug").path("required").asBoolean()).isTrue();
+        assertThat(queryParameter(contract, "/api/market/offers", "get", "categorySlug").path("required").asBoolean()).isTrue();
+        assertThat(queryParameter(contract, "/api/market/offers", "get", "intent").path("required").asBoolean()).isTrue();
+        assertThat(queryParameter(contract, "/api/market/offers", "get", "viewerCurrencyCode").path("required").asBoolean()).isTrue();
+        assertThat(queryParameter(contract, "/api/market/offers/{offerId}", "get", "intent").path("required").asBoolean()).isTrue();
+        assertThat(queryParameter(contract, "/api/market/offers/{offerId}", "get", "viewerCurrencyCode").path("required").asBoolean()).isTrue();
+
+        assertThat(contract.path("paths").path("/api/withdrawal-requests").path("post").path("responses").has("201")).isTrue();
+        assertThat(contract.path("paths").path("/api/withdrawal-requests").path("post").path("responses").has("200")).isFalse();
+        assertThat(contract.path("paths").path("/api/deposit-requests").path("post").path("responses").has("201")).isTrue();
+        assertThat(contract.path("paths").path("/api/deposit-requests").path("post").path("responses").has("200")).isFalse();
+    }
+
+    private String refOf(JsonNode schemas, String schemaName, String propertyName) {
+        return schemas.path(schemaName).path("properties").path(propertyName).path("$ref").asText();
+    }
+
+    private String refOf(JsonNode schemas, String schemaName, String propertyName, String nestedPropertyName) {
+        return schemas.path(schemaName)
+            .path("properties")
+            .path(propertyName)
+            .path(nestedPropertyName)
+            .path("$ref")
+            .asText();
+    }
+
+    private List<String> queryParameterNames(JsonNode contract, String path, String method) {
+        List<String> names = new ArrayList<>();
+        JsonNode parameters = contract.path("paths").path(path).path(method).path("parameters");
+        parameters.forEach(parameter -> {
+            if ("query".equals(parameter.path("in").asText())) {
+                names.add(parameter.path("name").asText());
+            }
+        });
+        return names;
+    }
+
+    private List<String> allQueryParameterNames(JsonNode contract) {
+        List<String> names = new ArrayList<>();
+        Iterator<Map.Entry<String, JsonNode>> pathEntries = contract.path("paths").fields();
+        while (pathEntries.hasNext()) {
+            Map.Entry<String, JsonNode> pathEntry = pathEntries.next();
+            Iterator<Map.Entry<String, JsonNode>> methodEntries = pathEntry.getValue().fields();
+            while (methodEntries.hasNext()) {
+                Map.Entry<String, JsonNode> methodEntry = methodEntries.next();
+                methodEntry.getValue().path("parameters").forEach(parameter -> {
+                    if ("query".equals(parameter.path("in").asText())) {
+                        names.add(parameter.path("name").asText());
+                    }
+                });
+            }
+        }
+        return names;
+    }
+
+    private JsonNode queryParameter(JsonNode contract, String path, String method, String parameterName) {
+        for (JsonNode parameter : contract.path("paths").path(path).path(method).path("parameters")) {
+            if ("query".equals(parameter.path("in").asText())
+                && parameterName.equals(parameter.path("name").asText())) {
+                return parameter;
+            }
+        }
+        throw new IllegalStateException("Missing query parameter '%s' for %s %s".formatted(parameterName, method, path));
+    }
+
+    private List<String> jsonTextValues(JsonNode values) {
+        List<String> result = new ArrayList<>();
+        values.forEach(value -> result.add(value.asText()));
+        return result;
     }
 
     private void writeContract(String rawContract) throws IOException {

@@ -1,8 +1,13 @@
 package ru.maltsev.primemarketbackend.deposit.api;
 
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -30,6 +35,11 @@ public class DepositRequestController {
     private final DepositRequestService depositRequestService;
 
     @PostMapping
+    @ApiResponse(
+        responseCode = "201",
+        description = "Created",
+        content = @Content(schema = @Schema(implementation = DepositRequestResponse.class))
+    )
     public ResponseEntity<DepositRequestResponse> create(
         @AuthenticationPrincipal UserPrincipal principal,
         @Valid @RequestBody CreateDepositRequest request
@@ -45,7 +55,23 @@ public class DepositRequestController {
     @GetMapping
     public ResponseEntity<Page<DepositRequestResponse>> list(
         @AuthenticationPrincipal UserPrincipal principal,
+        @Parameter(
+            description = "Canonical single-value request status. Omit the parameter to return requests of all statuses.",
+            schema = @Schema(
+                type = "string",
+                allowableValues = {
+                    "PENDING_DETAILS",
+                    "WAITING_PAYMENT",
+                    "PAYMENT_VERIFICATION",
+                    "CONFIRMED",
+                    "REJECTED",
+                    "EXPIRED",
+                    "CANCELLED"
+                }
+            )
+        )
         @RequestParam(required = false) String status,
+        @ParameterObject
         @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
         if (principal == null) {

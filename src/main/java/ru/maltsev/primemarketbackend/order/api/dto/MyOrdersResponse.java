@@ -1,5 +1,6 @@
 package ru.maltsev.primemarketbackend.order.api.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -15,6 +16,7 @@ public record MyOrdersResponse(
     int size,
     long total
 ) {
+    @Schema(name = "MyOrderListItem")
     public record Item(
         Long id,
         UUID publicId,

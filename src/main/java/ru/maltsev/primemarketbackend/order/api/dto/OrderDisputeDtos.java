@@ -1,5 +1,6 @@
 package ru.maltsev.primemarketbackend.order.api.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.UUID;
 
 public final class OrderDisputeDtos {
@@ -22,6 +23,7 @@ public final class OrderDisputeDtos {
     ) {
     }
 
+    @Schema(name = "OrderDisputeAvailableActions")
     public record AvailableActions(
         boolean canTakeInWork,
         boolean canResolveCancel,
