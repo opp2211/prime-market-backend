@@ -81,6 +81,10 @@ class OpenApiContractArtifactIT extends AbstractPostgresIntegrationTest {
         assertThat(paths.has("/api/backoffice/deposit-requests")).isTrue();
         assertThat(paths.has("/api/withdrawal-requests")).isTrue();
         assertThat(paths.has("/api/backoffice/withdrawal-requests")).isTrue();
+        assertThat(paths.has("/api/notifications")).isTrue();
+        assertThat(paths.has("/api/notifications/unread-count")).isTrue();
+        assertThat(paths.has("/api/notifications/{publicId}/read")).isTrue();
+        assertThat(paths.has("/api/notifications/read-all")).isTrue();
         assertThat(paths.has("/api/offers")).isTrue();
         assertThat(paths.has("/api/market/offers")).isTrue();
         assertThat(paths.has("/api/market/offers/{offerId}/quote")).isTrue();
@@ -127,6 +131,8 @@ class OpenApiContractArtifactIT extends AbstractPostgresIntegrationTest {
             .containsExactly("status", "page", "size", "sort");
         assertThat(queryParameterNames(contract, "/api/backoffice/deposit-requests", "get"))
             .containsExactly("status", "page", "size", "sort");
+        assertThat(queryParameterNames(contract, "/api/notifications", "get"))
+            .containsExactly("isRead", "page", "size", "sort");
         assertThat(queryParameterNames(contract, "/api/wallets/me/txs", "get"))
             .containsExactly("currency", "type", "from", "to", "page", "size", "sort");
 
@@ -134,6 +140,8 @@ class OpenApiContractArtifactIT extends AbstractPostgresIntegrationTest {
             .doesNotContain("pageable", "statuses", "currency_code");
         assertThat(queryParameterNames(contract, "/api/backoffice/withdrawal-requests", "get"))
             .doesNotContain("pageable", "statuses", "currency_code");
+        assertThat(queryParameterNames(contract, "/api/notifications", "get"))
+            .doesNotContain("pageable");
         assertThat(allQueryParameterNames(contract)).doesNotContain("pageable");
 
         JsonNode userWithdrawalStatus = queryParameter(contract, "/api/withdrawal-requests", "get", "status");

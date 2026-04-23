@@ -18,6 +18,7 @@ import ru.maltsev.primemarketbackend.deposit.domain.DepositRequestStatus;
 import ru.maltsev.primemarketbackend.deposit.repository.DepositMethodRepository;
 import ru.maltsev.primemarketbackend.deposit.repository.DepositRequestRepository;
 import ru.maltsev.primemarketbackend.exception.ApiProblemException;
+import ru.maltsev.primemarketbackend.notification.service.NotificationService;
 
 import java.util.EnumSet;
 import java.util.List;
@@ -39,6 +40,7 @@ public class DepositRequestService {
     private final DepositMethodRepository depositMethodRepository;
     private final UserAccountTxRepository userAccountTxRepository;
     private final UserAccountService userAccountService;
+    private final NotificationService notificationService;
 
     @Transactional
     public DepositRequest create(Long userId, CreateDepositRequest request) {
@@ -158,7 +160,9 @@ public class DepositRequestService {
         );
         userAccountTxRepository.save(tx);
         request.confirm();
-        return depositRequestRepository.save(request);
+        DepositRequest confirmedRequest = depositRequestRepository.save(request);
+        notificationService.notifyDepositConfirmed(confirmedRequest);
+        return confirmedRequest;
     }
 
     @Transactional
@@ -169,7 +173,9 @@ public class DepositRequestService {
         }
         requireStatus(request, DepositRequestStatus.PAYMENT_VERIFICATION, "reject payment");
         request.reject(rejectReason);
-        return depositRequestRepository.save(request);
+        DepositRequest rejectedRequest = depositRequestRepository.save(request);
+        notificationService.notifyDepositRejected(rejectedRequest);
+        return rejectedRequest;
     }
 
     public DepositRequest getByPublicIdForAdmin(UUID publicId) {

@@ -3,9 +3,11 @@ package ru.maltsev.primemarketbackend.order.service;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -16,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import ru.maltsev.primemarketbackend.exception.ApiProblemException;
+import ru.maltsev.primemarketbackend.notification.service.NotificationService;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderConversationListResponse;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderConversationResponse;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderMessageResponse;
@@ -58,6 +61,7 @@ public class OrderConversationService {
     private final OrderDisputeRepository orderDisputeRepository;
     private final OrderAccessService orderAccessService;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void createMainConversation(Order order) {
@@ -156,6 +160,7 @@ public class OrderConversationService {
             body
         ));
         conversation.markLastMessageAt(message.getCreatedAt());
+        notifyUsersAboutNewMessage(conversation, currentUserId);
 
         return toMessageResponses(conversation.getId(), List.of(message)).get(0);
     }
@@ -330,6 +335,25 @@ public class OrderConversationService {
             .comparing(OrderMessage::getCreatedAt)
             .thenComparing(OrderMessage::getId));
         return oldestFirst;
+    }
+
+    private void notifyUsersAboutNewMessage(OrderConversation conversation, Long senderUserId) {
+        List<Long> recipientUserIds = participantRepository.findAllByConversationId(conversation.getId())
+            .stream()
+            .filter(participant -> !Objects.equals(participant.getUserId(), senderUserId))
+            .filter(participant -> OrderConversationParticipant.ROLE_BUYER.equals(participant.getParticipantRole())
+                || OrderConversationParticipant.ROLE_SELLER.equals(participant.getParticipantRole()))
+            .map(OrderConversationParticipant::getUserId)
+            .collect(Collectors.toCollection(LinkedHashSet::new))
+            .stream()
+            .toList();
+        if (recipientUserIds.isEmpty()) {
+            return;
+        }
+
+        Order order = orderRepository.findById(conversation.getOrderId())
+            .orElseThrow(this::orderNotFound);
+        notificationService.notifyOrderMessageReceived(order, conversation, recipientUserIds);
     }
 
     private List<OrderMessageResponse> toMessageResponses(Long conversationId, List<OrderMessage> messages) {

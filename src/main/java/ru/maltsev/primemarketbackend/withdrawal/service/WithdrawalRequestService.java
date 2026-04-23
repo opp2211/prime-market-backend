@@ -21,6 +21,7 @@ import ru.maltsev.primemarketbackend.account.repository.UserAccountRepository;
 import ru.maltsev.primemarketbackend.account.repository.UserAccountTxRepository;
 import ru.maltsev.primemarketbackend.account.service.UserAccountService;
 import ru.maltsev.primemarketbackend.exception.ApiProblemException;
+import ru.maltsev.primemarketbackend.notification.service.NotificationService;
 import ru.maltsev.primemarketbackend.withdrawal.api.dto.ConfirmWithdrawalRequest;
 import ru.maltsev.primemarketbackend.withdrawal.api.dto.CreateWithdrawalRequest;
 import ru.maltsev.primemarketbackend.withdrawal.api.dto.RejectWithdrawalRequest;
@@ -45,6 +46,7 @@ public class WithdrawalRequestService {
     private final UserAccountService userAccountService;
     private final UserAccountRepository userAccountRepository;
     private final UserAccountTxRepository userAccountTxRepository;
+    private final NotificationService notificationService;
 
     @Transactional
     public WithdrawalRequest create(Long userId, CreateWithdrawalRequest request) {
@@ -160,7 +162,9 @@ public class WithdrawalRequestService {
             normalizeOptional(payload.operatorComment()),
             Instant.now()
         );
-        return withdrawalRequestRepository.save(request);
+        WithdrawalRequest rejectedRequest = withdrawalRequestRepository.save(request);
+        notificationService.notifyWithdrawalRejected(rejectedRequest);
+        return rejectedRequest;
     }
 
     @Transactional
@@ -200,7 +204,9 @@ public class WithdrawalRequestService {
             payload == null ? null : normalizeOptional(payload.operatorComment()),
             Instant.now()
         );
-        return withdrawalRequestRepository.save(request);
+        WithdrawalRequest confirmedRequest = withdrawalRequestRepository.save(request);
+        notificationService.notifyWithdrawalCompleted(confirmedRequest);
+        return confirmedRequest;
     }
 
     private ResolvedPayoutData resolvePayoutData(Long userId, WithdrawalMethod method, CreateWithdrawalRequest request) {

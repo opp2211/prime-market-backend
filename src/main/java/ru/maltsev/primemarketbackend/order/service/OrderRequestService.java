@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.maltsev.primemarketbackend.exception.ApiProblemException;
+import ru.maltsev.primemarketbackend.notification.service.NotificationService;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderRequestResponse;
 import ru.maltsev.primemarketbackend.order.domain.Order;
 import ru.maltsev.primemarketbackend.order.domain.OrderRequest;
@@ -24,6 +25,7 @@ public class OrderRequestService {
     private final OrderLifecycleService orderLifecycleService;
     private final OrderEventWriteService orderEventWriteService;
     private final OrderQuantityAmendService orderQuantityAmendService;
+    private final NotificationService notificationService;
 
     @Transactional
     public OrderRequestResponse requestCancel(UUID publicOrderId, Long actorUserId) {
@@ -55,6 +57,7 @@ public class OrderRequestService {
             null
         ));
         orderEventWriteService.recordCancelRequested(order, request.getId(), actorUserId, actorRole);
+        notificationService.notifyOrderRequestCreated(order, request, resolveCounterpartyUserId(order, actorUserId));
         return OrderRequestResponse.from(request);
     }
 
@@ -89,6 +92,7 @@ public class OrderRequestService {
             actorRole,
             requestedQuantity
         );
+        notificationService.notifyOrderRequestCreated(order, request, resolveCounterpartyUserId(order, actorUserId));
         return OrderRequestResponse.from(request);
     }
 
@@ -105,6 +109,11 @@ public class OrderRequestService {
             approveAmendQuantityRequest(order, request, actorUserId, actorRole);
         } else {
             throw invalidOrderStatus("Unsupported order request type " + request.getRequestType());
+        }
+
+        notificationService.notifyOrderRequestResolved(order, request);
+        if (request.isCancelRequest()) {
+            notificationService.notifyOrderStatusChanged(order, java.util.List.of(request.getRequestedByUserId()));
         }
 
         return OrderRequestResponse.from(request);
@@ -124,6 +133,7 @@ public class OrderRequestService {
         } else if (request.isAmendQuantityRequest()) {
             orderEventWriteService.recordAmendQuantityRejected(order, request.getId(), actorUserId, actorRole);
         }
+        notificationService.notifyOrderRequestResolved(order, request);
         return OrderRequestResponse.from(request);
     }
 
@@ -260,6 +270,16 @@ public class OrderRequestService {
 
     private boolean isParticipant(Order order, Long actorUserId) {
         return order.getMakerUserId().equals(actorUserId) || order.getTakerUserId().equals(actorUserId);
+    }
+
+    private Long resolveCounterpartyUserId(Order order, Long actorUserId) {
+        if (order.getMakerUserId().equals(actorUserId)) {
+            return order.getTakerUserId();
+        }
+        if (order.getTakerUserId().equals(actorUserId)) {
+            return order.getMakerUserId();
+        }
+        throw invalidOrderStatus("Order counterparty is not defined");
     }
 
     private String resolveParticipantRole(Order order, Long actorUserId) {

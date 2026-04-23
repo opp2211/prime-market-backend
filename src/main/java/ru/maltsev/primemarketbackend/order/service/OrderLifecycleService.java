@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import ru.maltsev.primemarketbackend.exception.ApiProblemException;
+import ru.maltsev.primemarketbackend.notification.service.NotificationService;
 import ru.maltsev.primemarketbackend.offer.domain.Offer;
 import ru.maltsev.primemarketbackend.offer.repository.OfferRepository;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderResponse;
@@ -34,6 +35,7 @@ public class OrderLifecycleService {
     private final FundsHoldService fundsHoldService;
     private final OrderSettlementService orderSettlementService;
     private final OrderEventWriteService orderEventWriteService;
+    private final NotificationService notificationService;
 
     @Transactional
     public OrderResponse confirmReady(UUID publicOrderId, Long actorUserId) {
@@ -49,6 +51,7 @@ public class OrderLifecycleService {
         validatePendingForConfirm(order);
         order.markInProgress();
         orderEventWriteService.recordMakerConfirmedReady(order);
+        notificationService.notifyOrderStatusChanged(order, List.of(resolveCounterpartyUserId(order, actorUserId)));
         return OrderResponse.from(order);
     }
 
@@ -69,6 +72,7 @@ public class OrderLifecycleService {
         cancelOrderAndReleaseResources(order, now);
         cancelPendingRequests(order.getId(), actorUserId, now);
         orderEventWriteService.recordOrderCanceled(order, actorUserId, actorRole);
+        notificationService.notifyOrderStatusChanged(order, List.of(resolveCounterpartyUserId(order, actorUserId)));
         return OrderResponse.from(order);
     }
 
@@ -85,6 +89,7 @@ public class OrderLifecycleService {
 
         order.markPartiallyDelivered(deliveredQuantity);
         orderEventWriteService.recordSellerMarkedPartialDelivery(order, actorUserId);
+        notificationService.notifyOrderStatusChanged(order, List.of(resolveBuyerUserId(order)));
         return OrderResponse.from(order);
     }
 
@@ -96,6 +101,7 @@ public class OrderLifecycleService {
 
         order.markDelivered();
         orderEventWriteService.recordSellerMarkedDelivered(order, actorUserId);
+        notificationService.notifyOrderStatusChanged(order, List.of(resolveBuyerUserId(order)));
         return OrderResponse.from(order);
     }
 
@@ -109,6 +115,7 @@ public class OrderLifecycleService {
         orderSettlementService.settleCompletedOrder(order);
         orderEventWriteService.recordBuyerConfirmedReceived(order, actorUserId);
         orderEventWriteService.recordOrderCompleted(order, actorUserId, resolveParticipantRole(order, actorUserId));
+        notificationService.notifyOrderStatusChanged(order, List.of(resolveSellerUserId(order)));
         return OrderResponse.from(order);
     }
 
@@ -277,6 +284,16 @@ public class OrderLifecycleService {
 
     private boolean isParticipant(Order order, Long actorUserId) {
         return order.getMakerUserId().equals(actorUserId) || order.getTakerUserId().equals(actorUserId);
+    }
+
+    private Long resolveCounterpartyUserId(Order order, Long actorUserId) {
+        if (order.getMakerUserId().equals(actorUserId)) {
+            return order.getTakerUserId();
+        }
+        if (order.getTakerUserId().equals(actorUserId)) {
+            return order.getMakerUserId();
+        }
+        throw invalidOrderStatus("Order counterparty is not defined");
     }
 
     private void requireSeller(Order order, Long actorUserId, String code, String message) {

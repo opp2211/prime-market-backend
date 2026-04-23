@@ -13,6 +13,7 @@ import ru.maltsev.primemarketbackend.exception.ApiProblemException;
 import ru.maltsev.primemarketbackend.offer.domain.Offer;
 import ru.maltsev.primemarketbackend.offer.repository.OfferRepository;
 import ru.maltsev.primemarketbackend.offer.service.OfferQuantityRules;
+import ru.maltsev.primemarketbackend.notification.service.NotificationService;
 import ru.maltsev.primemarketbackend.order.api.dto.CreateOrderRequest;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderResponse;
 import ru.maltsev.primemarketbackend.order.domain.OfferReservation;
@@ -44,6 +45,7 @@ public class OrderService {
     private final FundsHoldService fundsHoldService;
     private final OrderEventWriteService orderEventWriteService;
     private final OrderConversationService orderConversationService;
+    private final NotificationService notificationService;
 
     @Transactional
     public OrderResponse createOrder(Long takerUserId, CreateOrderRequest request) {
@@ -110,6 +112,7 @@ public class OrderService {
         quote.markConsumed();
         orderConversationService.createMainConversation(order);
         orderEventWriteService.recordOrderCreated(order, takerUserId, roles.takerRole());
+        notificationService.notifyOrderCreated(order);
 
         return OrderResponse.from(order);
     }

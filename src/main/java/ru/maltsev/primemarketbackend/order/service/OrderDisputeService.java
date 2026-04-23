@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.maltsev.primemarketbackend.exception.ApiProblemException;
+import ru.maltsev.primemarketbackend.notification.service.NotificationService;
 import ru.maltsev.primemarketbackend.order.api.dto.BackofficeDisputesResponse;
 import ru.maltsev.primemarketbackend.order.api.dto.CreateOrderDisputeRequest;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderDisputeDtos;
@@ -56,6 +57,7 @@ public class OrderDisputeService {
     private final OrderQuantityAmendService orderQuantityAmendService;
     private final OrderEventWriteService orderEventWriteService;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     @Transactional
     public OrderDisputeResponse openDispute(
@@ -101,6 +103,7 @@ public class OrderDisputeService {
             openedByRole,
             dispute.getReasonCode()
         );
+        notificationService.notifyDisputeOpened(order, dispute, resolveCounterpartyUserId(order, currentUserId));
         return toResponse(dispute, order, principal);
     }
 
@@ -210,6 +213,7 @@ public class OrderDisputeService {
             SUPPORT_JOINED_ORDER_MESSAGE
         );
         orderEventWriteService.recordDisputeTakenInWork(order, dispute.getId(), principal.getUser().getId());
+        notificationService.notifyDisputeTakenInWork(order, dispute, resolveParticipantUserIds(order));
         return toResponse(dispute, order, principal);
     }
 
@@ -240,6 +244,7 @@ public class OrderDisputeService {
             OrderDispute.RESOLUTION_FORCE_CANCEL
         );
         orderEventWriteService.recordOrderForceCanceledBySupport(context.order(), principal.getUser().getId());
+        notificationService.notifyOrderStatusChanged(context.order(), resolveParticipantUserIds(context.order()));
         return toResponse(context.dispute(), context.order(), principal);
     }
 
@@ -271,6 +276,7 @@ public class OrderDisputeService {
             OrderDispute.RESOLUTION_FORCE_COMPLETE
         );
         orderEventWriteService.recordOrderForceCompletedBySupport(context.order(), principal.getUser().getId());
+        notificationService.notifyOrderStatusChanged(context.order(), resolveParticipantUserIds(context.order()));
         return toResponse(context.dispute(), context.order(), principal);
     }
 
@@ -319,6 +325,7 @@ public class OrderDisputeService {
             OrderDispute.RESOLUTION_FORCE_AMEND_QUANTITY_AND_COMPLETE
         );
         orderEventWriteService.recordOrderForceCompletedBySupport(context.order(), principal.getUser().getId());
+        notificationService.notifyOrderStatusChanged(context.order(), resolveParticipantUserIds(context.order()));
         return toResponse(context.dispute(), context.order(), principal);
     }
 
@@ -363,6 +370,20 @@ public class OrderDisputeService {
             throw invalidOrderStatus("Order cannot be resolved from status " + order.getStatus());
         }
         return new ResolutionContext(dispute, order, normalizeOptional(resolutionNote));
+    }
+
+    private Long resolveCounterpartyUserId(Order order, Long actorUserId) {
+        if (order.getMakerUserId().equals(actorUserId)) {
+            return order.getTakerUserId();
+        }
+        if (order.getTakerUserId().equals(actorUserId)) {
+            return order.getMakerUserId();
+        }
+        throw invalidOrderStatus("Order counterparty is not defined");
+    }
+
+    private List<Long> resolveParticipantUserIds(Order order) {
+        return List.of(order.getMakerUserId(), order.getTakerUserId());
     }
 
     private OrderDispute loadDisputeForUpdate(UUID publicDisputeId) {

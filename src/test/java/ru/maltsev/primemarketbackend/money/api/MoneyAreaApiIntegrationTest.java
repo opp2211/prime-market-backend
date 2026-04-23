@@ -62,6 +62,7 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
     void resetState() {
         jdbcTemplate.execute("""
             truncate table
+                notifications,
                 withdrawal_requests,
                 payout_profiles,
                 deposit_requests,
