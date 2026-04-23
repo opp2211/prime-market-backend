@@ -56,6 +56,10 @@ app:
     pending-ttl: ${APP_ORDERS_PENDING_TTL:15m}
     pending-expire-sweep-delay: ${APP_ORDERS_PENDING_EXPIRE_SWEEP_DELAY:1m}
     default-seller-fee-bps: ${APP_ORDERS_DEFAULT_SELLER_FEE_BPS:100}
+  notifications:
+    sse:
+      emitter-timeout: 30m
+      keepalive-interval: 25s
   cors:
     allowed-origins:
       - ${APP_CORS_ALLOWED_ORIGIN_1:http://localhost:5173}

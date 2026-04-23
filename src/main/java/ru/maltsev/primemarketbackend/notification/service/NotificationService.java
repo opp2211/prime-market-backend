@@ -15,6 +15,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import ru.maltsev.primemarketbackend.deposit.domain.DepositRequest;
 import ru.maltsev.primemarketbackend.exception.ApiProblemException;
 import ru.maltsev.primemarketbackend.notification.api.dto.NotificationResponse;
@@ -31,6 +33,7 @@ import ru.maltsev.primemarketbackend.withdrawal.domain.WithdrawalRequest;
 @RequiredArgsConstructor
 public class NotificationService {
     private final NotificationRepository notificationRepository;
+    private final NotificationStreamService notificationStreamService;
 
     @Transactional(readOnly = true)
     public Page<NotificationResponse> listForUser(Long userId, Boolean isRead, Pageable pageable) {
@@ -46,16 +49,25 @@ public class NotificationService {
     }
 
     @Transactional
+    public UUID createNotification(Long userId, String type, String title, String body, ObjectNode payload) {
+        Notification notification = create(userId, type, title, body, payload);
+        return notification == null ? null : notification.getPublicId();
+    }
+
+    @Transactional
     public NotificationResponse markRead(Long userId, UUID publicId) {
         Notification notification = notificationRepository.findByPublicIdAndUserIdForUpdate(publicId, userId)
             .orElseThrow(this::notificationNotFound);
         notification.markRead(Instant.now());
+        publishUnreadCountAfterCommit(userId);
         return NotificationResponse.from(notification);
     }
 
     @Transactional
     public long markAllRead(Long userId) {
-        return notificationRepository.markAllAsRead(userId, Instant.now());
+        long updatedCount = notificationRepository.markAllAsRead(userId, Instant.now());
+        publishUnreadCountAfterCommit(userId);
+        return updatedCount;
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -213,11 +225,11 @@ public class NotificationService {
         }
     }
 
-    private void create(Long userId, String type, String title, String body, ObjectNode payload) {
+    private Notification create(Long userId, String type, String title, String body, ObjectNode payload) {
         if (userId == null) {
-            return;
+            return null;
         }
-        notificationRepository.save(new Notification(
+        Notification notification = notificationRepository.save(new Notification(
             UUID.randomUUID(),
             userId,
             type,
@@ -225,6 +237,8 @@ public class NotificationService {
             body,
             payload
         ));
+        publishCreatedNotificationAfterCommit(userId, notification.getPublicId());
+        return notification;
     }
 
     private ObjectNode orderPayload(Order order) {
@@ -299,6 +313,33 @@ public class NotificationService {
 
     private String formatAmount(BigDecimal amount) {
         return amount == null ? "0" : amount.toPlainString();
+    }
+
+    private void publishCreatedNotificationAfterCommit(Long userId, UUID publicId) {
+        afterCommit(() -> {
+            notificationStreamService.publishNotificationCreated(userId, publicId);
+            notificationStreamService.publishUnreadCount(userId);
+        });
+    }
+
+    private void publishUnreadCountAfterCommit(Long userId) {
+        afterCommit(() -> notificationStreamService.publishUnreadCount(userId));
+    }
+
+    // Live events must be emitted only after a successful database commit.
+    private void afterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()
+            && TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+            return;
+        }
+
+        action.run();
     }
 
     private ApiProblemException notificationNotFound() {
