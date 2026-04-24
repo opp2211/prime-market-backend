@@ -1135,7 +1135,8 @@
             "type" : "boolean"
           },
           "payload" : {
-            "$ref" : "#/components/schemas/JsonNode"
+            "additionalProperties" : { },
+            "type" : "object"
           },
           "publicId" : {
             "format" : "uuid",

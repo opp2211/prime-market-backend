@@ -7,6 +7,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.time.Duration;
@@ -42,6 +44,9 @@ class NotificationStreamIntegrationTest extends AbstractPostgresIntegrationTest 
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Autowired
     private UserRepository userRepository;
@@ -123,6 +128,29 @@ class NotificationStreamIntegrationTest extends AbstractPostgresIntegrationTest 
         awaitStreamContains(stream, "notification.created");
         awaitStreamContains(stream, publicId.toString());
         awaitStreamContains(stream, "\"count\":1");
+    }
+
+    @Test
+    void createdNotificationEventReturnsPlainPayloadObject() throws Exception {
+        User user = createUser("stream-created-payload");
+        MvcResult stream = openStream(user);
+        String orderPublicId = UUID.randomUUID().toString();
+        String conversationPublicId = UUID.randomUUID().toString();
+
+        awaitStreamContains(stream, "\"count\":0");
+
+        UUID publicId = notificationService.createNotification(
+            user.getId(),
+            NotificationTypes.ORDER_MESSAGE_RECEIVED,
+            "Payload notification",
+            "Payload notification body",
+            payload(orderPublicId, conversationPublicId)
+        );
+
+        JsonNode event = awaitEventData(stream, "notification.created");
+
+        assertThat(event.path("publicId").asText()).isEqualTo(publicId.toString());
+        assertPlainNotificationPayload(event.path("payload"), orderPublicId, conversationPublicId);
     }
 
     @Test
@@ -215,6 +243,12 @@ class NotificationStreamIntegrationTest extends AbstractPostgresIntegrationTest 
             .put("createdAtHint", Instant.now().toString());
     }
 
+    private ObjectNode payload(String orderPublicId, String conversationPublicId) {
+        return JsonNodeFactory.instance.objectNode()
+            .put("orderPublicId", orderPublicId)
+            .put("conversationPublicId", conversationPublicId);
+    }
+
     private void awaitStreamContains(MvcResult result, String expected) throws Exception {
         Instant deadline = Instant.now().plus(Duration.ofSeconds(5));
         while (Instant.now().isBefore(deadline)) {
@@ -229,5 +263,55 @@ class NotificationStreamIntegrationTest extends AbstractPostgresIntegrationTest 
             expected,
             result.getResponse().getContentAsString()
         ));
+    }
+
+    private JsonNode awaitEventData(MvcResult result, String eventName) throws Exception {
+        Instant deadline = Instant.now().plus(Duration.ofSeconds(5));
+        while (Instant.now().isBefore(deadline)) {
+            String body = result.getResponse().getContentAsString();
+            String data = extractLatestEventData(body, eventName);
+            if (data != null) {
+                return objectMapper.readTree(data);
+            }
+            Thread.sleep(50L);
+        }
+
+        throw new AssertionError("SSE stream does not contain data for '%s'. Body: %s".formatted(
+            eventName,
+            result.getResponse().getContentAsString()
+        ));
+    }
+
+    private String extractLatestEventData(String body, String eventName) {
+        int eventIndex = body.lastIndexOf("event:" + eventName);
+        if (eventIndex < 0) {
+            eventIndex = body.lastIndexOf("event: " + eventName);
+        }
+        if (eventIndex < 0) {
+            return null;
+        }
+
+        int dataIndex = body.indexOf("data:", eventIndex);
+        if (dataIndex < 0) {
+            return null;
+        }
+
+        int valueStart = dataIndex + "data:".length();
+        int valueEnd = body.indexOf('\n', valueStart);
+        if (valueEnd < 0) {
+            return null;
+        }
+
+        return body.substring(valueStart, valueEnd).trim();
+    }
+
+    private void assertPlainNotificationPayload(JsonNode payload, String orderPublicId, String conversationPublicId) {
+        assertThat(payload.isObject()).isTrue();
+        assertThat(payload.size()).isEqualTo(2);
+        assertThat(payload.path("orderPublicId").asText()).isEqualTo(orderPublicId);
+        assertThat(payload.path("conversationPublicId").asText()).isEqualTo(conversationPublicId);
+        assertThat(payload.has("array")).isFalse();
+        assertThat(payload.has("containerNode")).isFalse();
+        assertThat(payload.has("nodeType")).isFalse();
     }
 }

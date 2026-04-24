@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -145,6 +146,25 @@ class NotificationApiIntegrationTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
+    void listNotificationsReturnsPlainPayloadObject() throws Exception {
+        User user = createUser("notifications-list-payload");
+        String orderPublicId = UUID.randomUUID().toString();
+        String conversationPublicId = UUID.randomUUID().toString();
+        saveNotification(
+            user,
+            NotificationTypes.ORDER_MESSAGE_RECEIVED,
+            Instant.parse("2026-04-20T13:00:00Z"),
+            false,
+            notificationPayload(orderPublicId, conversationPublicId)
+        );
+
+        JsonNode response = listNotifications(user, null);
+        JsonNode payload = response.path("content").get(0).path("payload");
+
+        assertPlainNotificationPayload(payload, orderPublicId, conversationPublicId);
+    }
+
+    @Test
     void unreadCountReflectsMarkReadChanges() throws Exception {
         User user = createUser("notifications-count-owner");
         User otherUser = createUser("notifications-count-other");
@@ -202,6 +222,25 @@ class NotificationApiIntegrationTest extends AbstractPostgresIntegrationTest {
 
         assertThat(secondResponse.path("isRead").asBoolean()).isTrue();
         assertThat(loadNotificationReadAt(notification.getPublicId())).isEqualTo(persistedReadAt);
+    }
+
+    @Test
+    void markReadReturnsPlainPayloadObject() throws Exception {
+        User user = createUser("notifications-mark-payload");
+        String orderPublicId = UUID.randomUUID().toString();
+        String conversationPublicId = UUID.randomUUID().toString();
+        Notification notification = saveNotification(
+            user,
+            NotificationTypes.ORDER_MESSAGE_RECEIVED,
+            Instant.parse("2026-04-20T12:30:00Z"),
+            false,
+            notificationPayload(orderPublicId, conversationPublicId)
+        );
+
+        JsonNode response = markNotificationRead(user, notification.getPublicId().toString());
+
+        assertThat(response.path("isRead").asBoolean()).isTrue();
+        assertPlainNotificationPayload(response.path("payload"), orderPublicId, conversationPublicId);
     }
 
     @Test
@@ -384,13 +423,23 @@ class NotificationApiIntegrationTest extends AbstractPostgresIntegrationTest {
     }
 
     private Notification saveNotification(User user, String type, Instant createdAt, boolean isRead) {
+        return saveNotification(
+            user,
+            type,
+            createdAt,
+            isRead,
+            notificationPayload(UUID.randomUUID().toString(), null)
+        );
+    }
+
+    private Notification saveNotification(User user, String type, Instant createdAt, boolean isRead, ObjectNode payload) {
         Notification notification = notificationRepository.saveAndFlush(new Notification(
             UUID.randomUUID(),
             user.getId(),
             type,
             "Test title " + type,
             "Test body " + type,
-            JsonNodeFactory.instance.objectNode().put("orderPublicId", UUID.randomUUID().toString())
+            payload
         ));
         jdbcTemplate.update(
             "update notifications set created_at = ?, is_read = ?, read_at = ? where id = ?",
@@ -400,6 +449,27 @@ class NotificationApiIntegrationTest extends AbstractPostgresIntegrationTest {
             notification.getId()
         );
         return notificationRepository.findById(notification.getId()).orElseThrow();
+    }
+
+    private ObjectNode notificationPayload(String orderPublicId, String conversationPublicId) {
+        ObjectNode payload = JsonNodeFactory.instance.objectNode()
+            .put("orderPublicId", orderPublicId);
+        if (conversationPublicId != null) {
+            payload.put("conversationPublicId", conversationPublicId);
+        }
+        return payload;
+    }
+
+    private void assertPlainNotificationPayload(JsonNode payload, String orderPublicId, String conversationPublicId) {
+        assertThat(payload.isObject()).isTrue();
+        assertThat(payload.size()).isEqualTo(conversationPublicId == null ? 1 : 2);
+        assertThat(payload.path("orderPublicId").asText()).isEqualTo(orderPublicId);
+        if (conversationPublicId != null) {
+            assertThat(payload.path("conversationPublicId").asText()).isEqualTo(conversationPublicId);
+        }
+        assertThat(payload.has("array")).isFalse();
+        assertThat(payload.has("containerNode")).isFalse();
+        assertThat(payload.has("nodeType")).isFalse();
     }
 
     private boolean loadNotificationReadState(UUID publicId) {
