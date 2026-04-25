@@ -91,8 +91,15 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
             """.formatted(methodId));
 
         JsonNode wallets = getWallets(user);
-        assertThat(wallets.path("items")).hasSizeGreaterThanOrEqualTo(6);
+        assertThat(wallets.path("items")).hasSizeGreaterThanOrEqualTo(8);
         assertThat(wallets.path("items").get(0).path("currency_code").asText()).isEqualTo("USD");
+        assertThat(wallets.path("items").get(1).path("currency_code").asText()).isEqualTo("RUB");
+        assertThat(wallets.path("items").get(2).path("currency_code").asText()).isEqualTo("EUR");
+        assertThat(wallets.path("items").get(3).path("currency_code").asText()).isEqualTo("CNY");
+        assertThat(wallets.path("items").get(4).path("currency_code").asText()).isEqualTo("KZT");
+        assertThat(wallets.path("items").get(5).path("currency_code").asText()).isEqualTo("UAH");
+        assertThat(wallets.path("items").get(6).path("currency_code").asText()).isEqualTo("BYN");
+        assertThat(wallets.path("items").get(7).path("currency_code").asText()).isEqualTo("GEL");
         assertThat(wallets.path("items").get(0).path("balance").decimalValue()).isEqualByComparingTo("1000.0000");
         assertThat(wallets.path("items").get(0).path("reserved").decimalValue()).isEqualByComparingTo("250.0000");
         assertThat(wallets.path("items").get(0).path("available").decimalValue()).isEqualByComparingTo("750.0000");

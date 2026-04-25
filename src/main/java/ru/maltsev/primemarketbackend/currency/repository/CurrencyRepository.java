@@ -5,7 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import ru.maltsev.primemarketbackend.currency.domain.Currency;
 
 public interface CurrencyRepository extends JpaRepository<Currency, String> {
-    List<Currency> findAllByActiveTrueOrderByCodeAsc();
+    List<Currency> findAllByActiveTrueOrderBySortOrderAscCodeAsc();
 
     boolean existsByCodeIgnoreCaseAndActiveTrue(String code);
 }

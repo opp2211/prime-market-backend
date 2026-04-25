@@ -17,7 +17,7 @@ public class CurrencyService {
     private final CurrencyRateRepository currencyRateRepository;
 
     public List<CurrencyResponse> getActiveCurrencies() {
-        return currencyRepository.findAllByActiveTrueOrderByCodeAsc()
+        return currencyRepository.findAllByActiveTrueOrderBySortOrderAscCodeAsc()
             .stream()
             .map(CurrencyResponse::from)
             .toList();

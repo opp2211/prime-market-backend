@@ -53,11 +53,9 @@ public class UserAccountService {
             accountsByCurrency.put(account.getCurrencyCode().toUpperCase(Locale.ROOT), account);
         }
 
-        List<WalletItemResponse> items = currencyRepository.findAllByActiveTrueOrderByCodeAsc().stream()
+        List<WalletItemResponse> items = currencyRepository.findAllByActiveTrueOrderBySortOrderAscCodeAsc().stream()
             .map(currency -> toWalletItem(currency, accountsByCurrency.get(currency.getCode().toUpperCase(Locale.ROOT))))
-            .sorted(Comparator
-                .comparing(UserAccountService::isZeroWallet)
-                .thenComparing(WalletItemResponse::currencyCode))
+            .sorted(Comparator.comparing(UserAccountService::isZeroWallet))
             .toList();
 
         return new WalletsResponse(items);

@@ -20,6 +20,9 @@ public class Currency {
     @Column
     private String title;
 
+    @Column(name = "sort_order", nullable = false)
+    private int sortOrder = 0;
+
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
 }

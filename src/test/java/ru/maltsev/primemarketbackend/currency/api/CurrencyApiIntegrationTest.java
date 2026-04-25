@@ -20,6 +20,21 @@ class CurrencyApiIntegrationTest extends AbstractPostgresIntegrationTest {
     private MockMvc mockMvc;
 
     @Test
+    void getCurrenciesReturnsActiveCurrenciesInConfiguredSortOrder() throws Exception {
+        mockMvc.perform(get("/api/currencies"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(8))
+            .andExpect(jsonPath("$[0].code").value("RUB"))
+            .andExpect(jsonPath("$[1].code").value("USD"))
+            .andExpect(jsonPath("$[2].code").value("EUR"))
+            .andExpect(jsonPath("$[3].code").value("CNY"))
+            .andExpect(jsonPath("$[4].code").value("KZT"))
+            .andExpect(jsonPath("$[5].code").value("UAH"))
+            .andExpect(jsonPath("$[6].code").value("BYN"))
+            .andExpect(jsonPath("$[7].code").value("GEL"));
+    }
+
+    @Test
     void getCurrencyRateIsPublicAndReturnsSeededRate() throws Exception {
         mockMvc.perform(get("/api/currency-rates")
                 .queryParam("from", "usd")
