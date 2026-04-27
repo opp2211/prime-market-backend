@@ -4,6 +4,7 @@ import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -12,12 +13,20 @@ import org.springframework.data.repository.query.Param;
 import ru.maltsev.primemarketbackend.withdrawal.domain.PayoutProfile;
 
 public interface PayoutProfileRepository extends JpaRepository<PayoutProfile, Long> {
+    @EntityGraph(attributePaths = "withdrawalMethod")
     List<PayoutProfile> findAllByUserIdAndActiveTrueOrderByDefaultProfileDescCreatedAtDesc(Long userId);
 
+    @EntityGraph(attributePaths = "withdrawalMethod")
     Optional<PayoutProfile> findByPublicIdAndUserIdAndActiveTrue(UUID publicId, Long userId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select pp from PayoutProfile pp where pp.publicId = :publicId and pp.userId = :userId")
+    @Query("""
+        select pp
+        from PayoutProfile pp
+        join fetch pp.withdrawalMethod
+        where pp.publicId = :publicId
+          and pp.userId = :userId
+        """)
     Optional<PayoutProfile> findByPublicIdAndUserIdForUpdate(
         @Param("publicId") UUID publicId,
         @Param("userId") Long userId
