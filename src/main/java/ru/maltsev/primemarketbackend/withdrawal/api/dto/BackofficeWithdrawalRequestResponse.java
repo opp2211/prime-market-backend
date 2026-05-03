@@ -3,8 +3,11 @@ package ru.maltsev.primemarketbackend.withdrawal.api.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import ru.maltsev.primemarketbackend.money.api.dto.MoneyOperationEventResponse;
+import ru.maltsev.primemarketbackend.money.domain.MoneyOperationEvent;
 import ru.maltsev.primemarketbackend.withdrawal.domain.WithdrawalRequest;
 
 public record BackofficeWithdrawalRequestResponse(
@@ -30,9 +33,17 @@ public record BackofficeWithdrawalRequestResponse(
     @JsonProperty("cancelled_at") Instant cancelledAt,
     @JsonProperty("rejected_at") Instant rejectedAt,
     @JsonProperty("created_at") Instant createdAt,
-    @JsonProperty("updated_at") Instant updatedAt
+    @JsonProperty("updated_at") Instant updatedAt,
+    List<MoneyOperationEventResponse> events
 ) {
     public static BackofficeWithdrawalRequestResponse from(WithdrawalRequest request) {
+        return from(request, List.of());
+    }
+
+    public static BackofficeWithdrawalRequestResponse from(
+        WithdrawalRequest request,
+        List<MoneyOperationEvent> events
+    ) {
         return new BackofficeWithdrawalRequestResponse(
             request.getPublicId(),
             request.getUserId(),
@@ -56,7 +67,8 @@ public record BackofficeWithdrawalRequestResponse(
             request.getCancelledAt(),
             request.getRejectedAt(),
             request.getCreatedAt(),
-            request.getUpdatedAt()
+            request.getUpdatedAt(),
+            events.stream().map(MoneyOperationEventResponse::from).toList()
         );
     }
 }

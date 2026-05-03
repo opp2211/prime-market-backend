@@ -72,17 +72,32 @@ public class DepositRequest {
     @Column(name = "details_issued_at")
     private Instant detailsIssuedAt;
 
+    @Column(name = "details_issued_by_user_id")
+    private Long detailsIssuedByUserId;
+
     @Column(name = "user_marked_paid_at")
     private Instant userMarkedPaidAt;
 
     @Column(name = "confirmed_at")
     private Instant confirmedAt;
 
+    @Column(name = "confirmed_by_user_id")
+    private Long confirmedByUserId;
+
+    @Column(name = "confirmation_reference")
+    private String confirmationReference;
+
     @Column(name = "rejected_at")
     private Instant rejectedAt;
 
+    @Column(name = "rejected_by_user_id")
+    private Long rejectedByUserId;
+
     @Column(name = "reject_reason")
     private String rejectReason;
+
+    @Column(name = "operator_comment")
+    private String operatorComment;
 
     @Column(name = "cancelled_at")
     private Instant cancelledAt;
@@ -99,10 +114,12 @@ public class DepositRequest {
         status = DepositRequestStatus.PENDING_DETAILS;
     }
 
-    public void startWaitingPayment(String details) {
+    public void startWaitingPayment(String details, Long actorUserId, String comment) {
         status = DepositRequestStatus.WAITING_PAYMENT;
         paymentDetails = details;
         detailsIssuedAt = Instant.now();
+        detailsIssuedByUserId = actorUserId;
+        operatorComment = normalize(comment);
     }
 
     public void markPaid() {
@@ -110,15 +127,20 @@ public class DepositRequest {
         userMarkedPaidAt = Instant.now();
     }
 
-    public void confirm() {
+    public void confirm(Long actorUserId, String reference, String comment) {
         status = DepositRequestStatus.CONFIRMED;
         confirmedAt = Instant.now();
+        confirmedByUserId = actorUserId;
+        confirmationReference = normalize(reference);
+        operatorComment = normalize(comment);
     }
 
-    public void reject(String reason) {
+    public void reject(Long actorUserId, String reason, String comment) {
         status = DepositRequestStatus.REJECTED;
         rejectedAt = Instant.now();
+        rejectedByUserId = actorUserId;
         rejectReason = reason;
+        operatorComment = normalize(comment);
     }
 
     public void cancel() {
@@ -131,5 +153,13 @@ public class DepositRequest {
         if (publicId == null) {
             publicId = UUID.randomUUID();
         }
+    }
+
+    private String normalize(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

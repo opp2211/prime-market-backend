@@ -45,6 +45,7 @@ class DepositAdminApiIntegrationTest extends AbstractPostgresIntegrationTest {
     void resetState() {
         jdbcTemplate.execute("""
             truncate table
+                money_operation_events,
                 deposit_requests,
                 deposit_methods
             restart identity cascade
@@ -103,6 +104,60 @@ class DepositAdminApiIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(row.path("currency_code").asText()).isEqualTo("RUB");
     }
 
+    @Test
+    void backofficeDepositActionsWriteUnifiedMoneyAuditEventsAndOperatorSnapshot() throws Exception {
+        User user = loadUser("user1@123.123");
+        User support = loadUser("sup1@123.123");
+        long methodId = insertDepositMethod("Manual SBP", "RUB", null);
+
+        JsonNode created = createDepositRequest(user, """
+            {
+              "deposit_method_id": %d,
+              "amount": 1000.0000
+            }
+            """.formatted(methodId));
+        String publicId = created.path("public_id").asText();
+        assertThat(created.path("status").asText()).isEqualTo("PENDING_DETAILS");
+
+        JsonNode issued = issueDepositDetails(support, publicId, """
+            {
+              "payment_details": "T-Bank card 2200 0000 0000 0000",
+              "operator_comment": "Issued personal T-Bank card"
+            }
+            """);
+        assertThat(issued.path("status").asText()).isEqualTo("WAITING_PAYMENT");
+        assertThat(issued.path("details_issued_by_user_id").asLong()).isEqualTo(support.getId());
+        assertThat(issued.path("operator_comment").asText()).isEqualTo("Issued personal T-Bank card");
+
+        markDepositPaid(user, publicId);
+        JsonNode confirmed = confirmDeposit(support, publicId, """
+            {
+              "confirmation_reference": "tbank-incoming-100500",
+              "operator_comment": "Incoming payment matched by amount"
+            }
+            """);
+        assertThat(confirmed.path("status").asText()).isEqualTo("CONFIRMED");
+        assertThat(confirmed.path("confirmed_by_user_id").asLong()).isEqualTo(support.getId());
+        assertThat(confirmed.path("confirmation_reference").asText()).isEqualTo("tbank-incoming-100500");
+        assertThat(confirmed.path("operator_comment").asText()).isEqualTo("Incoming payment matched by amount");
+        assertThat(confirmed.path("events")).hasSize(4);
+        assertThat(confirmed.path("events").get(0).path("event_type").asText()).isEqualTo("DEPOSIT_CREATED");
+        assertThat(confirmed.path("events").get(1).path("event_type").asText()).isEqualTo("DEPOSIT_DETAILS_ISSUED");
+        assertThat(confirmed.path("events").get(1).path("actor_type").asText()).isEqualTo("OPERATOR");
+        assertThat(confirmed.path("events").get(1).path("actor_user_id").asLong()).isEqualTo(support.getId());
+        assertThat(confirmed.path("events").get(3).path("event_type").asText()).isEqualTo("DEPOSIT_CONFIRMED");
+        assertThat(confirmed.path("events").get(3).path("operator_note").asText())
+            .isEqualTo("Incoming payment matched by amount");
+
+        assertThat(loadMoneyEventTypes("DEPOSIT_REQUEST", publicId))
+            .containsExactly(
+                "DEPOSIT_CREATED",
+                "DEPOSIT_DETAILS_ISSUED",
+                "DEPOSIT_USER_MARKED_PAID",
+                "DEPOSIT_CONFIRMED"
+            );
+    }
+
     private User loadUser(String email) {
         return userRepository.findWithRolesByEmailIgnoreCase(email)
             .orElseThrow(() -> new IllegalStateException("User not found: " + email));
@@ -127,6 +182,34 @@ class DepositAdminApiIntegrationTest extends AbstractPostgresIntegrationTest {
         return readBody(result);
     }
 
+    private JsonNode issueDepositDetails(User user, String publicId, String body) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/backoffice/deposit-requests/{publicId}/issue-details", publicId)
+                .with(auth(user))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isOk())
+            .andReturn();
+        return readBody(result);
+    }
+
+    private JsonNode markDepositPaid(User user, String publicId) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/deposit-requests/{publicId}/mark-paid", publicId)
+                .with(auth(user)))
+            .andExpect(status().isOk())
+            .andReturn();
+        return readBody(result);
+    }
+
+    private JsonNode confirmDeposit(User user, String publicId, String body) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/backoffice/deposit-requests/{publicId}/confirm", publicId)
+                .with(auth(user))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isOk())
+            .andReturn();
+        return readBody(result);
+    }
+
     private JsonNode listBackofficeDepositRequests(User user) throws Exception {
         MvcResult result = mockMvc.perform(get("/api/backoffice/deposit-requests").with(auth(user)))
             .andExpect(status().isOk())
@@ -139,6 +222,10 @@ class DepositAdminApiIntegrationTest extends AbstractPostgresIntegrationTest {
     }
 
     private long insertDepositMethod(String title, String currencyCode) {
+        return insertDepositMethod(title, currencyCode, "{\"account\":\"123456\"}");
+    }
+
+    private long insertDepositMethod(String title, String currencyCode, String paymentDetails) {
         Long id = jdbcTemplate.queryForObject(
             """
                 insert into deposit_methods (title, currency_code, payment_details, auto_confirmation, is_active)
@@ -148,11 +235,26 @@ class DepositAdminApiIntegrationTest extends AbstractPostgresIntegrationTest {
             Long.class,
             title,
             currencyCode,
-            "{\"account\":\"123456\"}"
+            paymentDetails
         );
         if (id == null) {
             throw new IllegalStateException("Failed to insert deposit method");
         }
         return id;
+    }
+
+    private java.util.List<String> loadMoneyEventTypes(String operationType, String publicId) {
+        return jdbcTemplate.queryForList(
+            """
+                select event_type
+                from money_operation_events
+                where operation_type = ?
+                  and operation_public_id = ?::uuid
+                order by created_at, id
+                """,
+            String.class,
+            operationType,
+            publicId
+        );
     }
 }

@@ -62,6 +62,7 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
     void resetState() {
         jdbcTemplate.execute("""
             truncate table
+                money_operation_events,
                 notifications,
                 withdrawal_requests,
                 payout_profiles,
@@ -328,6 +329,14 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
             }
             """);
         assertThat(rejected.path("status").asText()).isEqualTo("REJECTED");
+        assertThat(rejected.path("events")).hasSize(3);
+        assertThat(rejected.path("events").get(2).path("event_type").asText()).isEqualTo("WITHDRAWAL_REJECTED");
+        assertThat(rejected.path("events").get(2).path("actor_type").asText()).isEqualTo("OPERATOR");
+        assertThat(rejected.path("events").get(2).path("actor_user_id").asLong()).isEqualTo(support.getId());
+        assertThat(rejected.path("events").get(2).path("public_note").asText()).isEqualTo("Manual review failed");
+        assertThat(rejected.path("events").get(2).path("operator_note").asText()).isEqualTo("Bad requisites");
+        assertThat(loadMoneyEventTypes("WITHDRAWAL_REQUEST", rejectCandidate.path("public_id").asText()))
+            .containsExactly("WITHDRAWAL_CREATED", "WITHDRAWAL_TAKEN", "WITHDRAWAL_REJECTED");
         assertThat(loadReserved(user.getId(), "USD")).isEqualByComparingTo("0.0000");
 
         JsonNode confirmCandidate = createWithdrawal(user, """
@@ -351,6 +360,12 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
             """);
         assertThat(confirmed.path("status").asText()).isEqualTo("COMPLETED");
         assertThat(confirmed.path("actual_payout_amount").decimalValue()).isEqualByComparingTo("590.0000");
+        assertThat(confirmed.path("events")).hasSize(3);
+        assertThat(confirmed.path("events").get(2).path("event_type").asText()).isEqualTo("WITHDRAWAL_CONFIRMED");
+        assertThat(confirmed.path("events").get(2).path("payload").path("actual_payout_amount").decimalValue())
+            .isEqualByComparingTo("590.0000");
+        assertThat(loadMoneyEventTypes("WITHDRAWAL_REQUEST", confirmCandidate.path("public_id").asText()))
+            .containsExactly("WITHDRAWAL_CREATED", "WITHDRAWAL_TAKEN", "WITHDRAWAL_CONFIRMED");
         assertThat(loadReserved(user.getId(), "USD")).isEqualByComparingTo("0.0000");
         assertThat(loadBalance(user.getId(), "USD")).isEqualByComparingTo("400.0000");
         assertThat(loadWithdrawalTxCount(confirmCandidate.path("public_id").asText())).isEqualTo(1);
@@ -637,6 +652,21 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
                 """,
             BigDecimal.class,
             UUID.fromString(withdrawalPublicId)
+        );
+    }
+
+    private java.util.List<String> loadMoneyEventTypes(String operationType, String publicId) {
+        return jdbcTemplate.queryForList(
+            """
+                select event_type
+                from money_operation_events
+                where operation_type = ?
+                  and operation_public_id = ?::uuid
+                order by created_at, id
+                """,
+            String.class,
+            operationType,
+            publicId
         );
     }
 }

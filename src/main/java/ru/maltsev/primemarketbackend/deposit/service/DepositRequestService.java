@@ -1,5 +1,7 @@
 package ru.maltsev.primemarketbackend.deposit.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -18,10 +20,15 @@ import ru.maltsev.primemarketbackend.deposit.domain.DepositRequestStatus;
 import ru.maltsev.primemarketbackend.deposit.repository.DepositMethodRepository;
 import ru.maltsev.primemarketbackend.deposit.repository.DepositRequestRepository;
 import ru.maltsev.primemarketbackend.exception.ApiProblemException;
+import ru.maltsev.primemarketbackend.money.domain.MoneyOperationActorType;
+import ru.maltsev.primemarketbackend.money.domain.MoneyOperationEventType;
+import ru.maltsev.primemarketbackend.money.domain.MoneyOperationType;
+import ru.maltsev.primemarketbackend.money.service.MoneyOperationEventService;
 import ru.maltsev.primemarketbackend.notification.service.NotificationService;
 
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -41,6 +48,8 @@ public class DepositRequestService {
     private final UserAccountTxRepository userAccountTxRepository;
     private final UserAccountService userAccountService;
     private final NotificationService notificationService;
+    private final MoneyOperationEventService moneyOperationEventService;
+    private final ObjectMapper objectMapper;
 
     @Transactional
     public DepositRequest create(Long userId, CreateDepositRequest request) {
@@ -49,17 +58,46 @@ public class DepositRequestService {
                 HttpStatus.NOT_FOUND,
                 "DEPOSIT_METHOD_NOT_FOUND",
                 "Deposit method not found"
-            ));
+        ));
 
         DepositRequest depositRequest = new DepositRequest(userId, method, request.amount());
         String paymentDetails = method.getPaymentDetails();
+        DepositRequestStatus statusBeforeDetails = depositRequest.getStatus();
         if (paymentDetails != null && !paymentDetails.isBlank()) {
-            depositRequest.startWaitingPayment(paymentDetails);
+            depositRequest.startWaitingPayment(paymentDetails, null, null);
         } else {
             depositRequest.startPendingDetails();
         }
 
-        return depositRequestRepository.save(depositRequest);
+        DepositRequest savedRequest = depositRequestRepository.save(depositRequest);
+        record(
+            savedRequest,
+            MoneyOperationEventType.DEPOSIT_CREATED,
+            null,
+            MoneyOperationActorType.USER,
+            userId,
+            null,
+            null,
+            moneyOperationEventService.payload(
+                "amount", savedRequest.getAmount(),
+                "currency_code", savedRequest.getCurrencyCodeSnapshot(),
+                "deposit_method_id", method.getId(),
+                "deposit_method_title", savedRequest.getDepositMethodTitleSnapshot()
+            )
+        );
+        if (paymentDetails != null && !paymentDetails.isBlank()) {
+            record(
+                savedRequest,
+                MoneyOperationEventType.DEPOSIT_DETAILS_ISSUED,
+                statusBeforeDetails,
+                MoneyOperationActorType.SYSTEM,
+                null,
+                null,
+                null,
+                moneyOperationEventService.payload("payment_details", paymentDetails)
+            );
+        }
+        return savedRequest;
     }
 
     public DepositRequest getForUser(UUID publicId, Long userId) {
@@ -101,8 +139,20 @@ public class DepositRequestService {
             return request;
         }
         requireStatus(request, DepositRequestStatus.WAITING_PAYMENT, "mark as paid");
+        DepositRequestStatus statusBefore = request.getStatus();
         request.markPaid();
-        return depositRequestRepository.save(request);
+        DepositRequest savedRequest = depositRequestRepository.save(request);
+        record(
+            savedRequest,
+            MoneyOperationEventType.DEPOSIT_USER_MARKED_PAID,
+            statusBefore,
+            MoneyOperationActorType.USER,
+            userId,
+            null,
+            null,
+            Map.of()
+        );
+        return savedRequest;
     }
 
     @Transactional
@@ -123,12 +173,24 @@ public class DepositRequestService {
                 "Cannot cancel deposit request in status " + request.getStatus()
             );
         }
+        DepositRequestStatus statusBefore = request.getStatus();
         request.cancel();
-        return depositRequestRepository.save(request);
+        DepositRequest savedRequest = depositRequestRepository.save(request);
+        record(
+            savedRequest,
+            MoneyOperationEventType.DEPOSIT_CANCELLED,
+            statusBefore,
+            MoneyOperationActorType.USER,
+            userId,
+            null,
+            null,
+            Map.of()
+        );
+        return savedRequest;
     }
 
     @Transactional
-    public DepositRequest issueDetails(UUID publicId, String paymentDetails) {
+    public DepositRequest issueDetails(UUID publicId, Long actorUserId, String paymentDetails, String operatorComment) {
         DepositRequest request = getByPublicIdForUpdate(publicId);
         requireStatus(request, DepositRequestStatus.PENDING_DETAILS, "issue payment details");
         if (paymentDetails == null || paymentDetails.isBlank()) {
@@ -138,17 +200,31 @@ public class DepositRequestService {
                 "Payment details are required"
             );
         }
-        request.startWaitingPayment(paymentDetails);
-        return depositRequestRepository.save(request);
+        String storedPaymentDetails = normalizePaymentDetailsForStorage(paymentDetails);
+        DepositRequestStatus statusBefore = request.getStatus();
+        request.startWaitingPayment(storedPaymentDetails, actorUserId, operatorComment);
+        DepositRequest savedRequest = depositRequestRepository.save(request);
+        record(
+            savedRequest,
+            MoneyOperationEventType.DEPOSIT_DETAILS_ISSUED,
+            statusBefore,
+            MoneyOperationActorType.OPERATOR,
+            actorUserId,
+            null,
+            operatorComment,
+            moneyOperationEventService.payload("payment_details", storedPaymentDetails)
+        );
+        return savedRequest;
     }
 
     @Transactional
-    public DepositRequest confirm(UUID publicId) {
+    public DepositRequest confirm(UUID publicId, Long actorUserId, String confirmationReference, String operatorComment) {
         DepositRequest request = getByPublicIdForUpdate(publicId);
         if (request.getStatus() == DepositRequestStatus.CONFIRMED) {
             return request;
         }
         requireStatus(request, DepositRequestStatus.PAYMENT_VERIFICATION, "confirm payment");
+        DepositRequestStatus statusBefore = request.getStatus();
 
         UserAccount account = getUserAccountForDeposit(request);
         UserAccountTx tx = new UserAccountTx(
@@ -159,21 +235,46 @@ public class DepositRequestService {
             request.getId()
         );
         userAccountTxRepository.save(tx);
-        request.confirm();
+        request.confirm(actorUserId, confirmationReference, operatorComment);
         DepositRequest confirmedRequest = depositRequestRepository.save(request);
+        record(
+            confirmedRequest,
+            MoneyOperationEventType.DEPOSIT_CONFIRMED,
+            statusBefore,
+            MoneyOperationActorType.OPERATOR,
+            actorUserId,
+            null,
+            operatorComment,
+            moneyOperationEventService.payload(
+                "confirmation_reference", confirmationReference,
+                "credited_amount", request.getAmount(),
+                "currency_code", request.getCurrencyCodeSnapshot()
+            )
+        );
         notificationService.notifyDepositConfirmed(confirmedRequest);
         return confirmedRequest;
     }
 
     @Transactional
-    public DepositRequest reject(UUID publicId, String rejectReason) {
+    public DepositRequest reject(UUID publicId, Long actorUserId, String rejectReason, String operatorComment) {
         DepositRequest request = getByPublicIdForUpdate(publicId);
         if (request.getStatus() == DepositRequestStatus.REJECTED) {
             return request;
         }
         requireStatus(request, DepositRequestStatus.PAYMENT_VERIFICATION, "reject payment");
-        request.reject(rejectReason);
+        DepositRequestStatus statusBefore = request.getStatus();
+        request.reject(actorUserId, rejectReason, operatorComment);
         DepositRequest rejectedRequest = depositRequestRepository.save(request);
+        record(
+            rejectedRequest,
+            MoneyOperationEventType.DEPOSIT_REJECTED,
+            statusBefore,
+            MoneyOperationActorType.OPERATOR,
+            actorUserId,
+            rejectReason,
+            operatorComment,
+            Map.of()
+        );
         notificationService.notifyDepositRejected(rejectedRequest);
         return rejectedRequest;
     }
@@ -205,6 +306,24 @@ public class DepositRequestService {
         return userAccountService.getOrCreateAccount(request.getUserId(), currencyCode);
     }
 
+    private String normalizePaymentDetailsForStorage(String paymentDetails) {
+        String trimmed = paymentDetails.trim();
+        try {
+            objectMapper.readTree(trimmed);
+            return trimmed;
+        } catch (JsonProcessingException ignored) {
+            try {
+                return objectMapper.writeValueAsString(Map.of("value", trimmed));
+            } catch (JsonProcessingException ex) {
+                throw new ApiProblemException(
+                    HttpStatus.BAD_REQUEST,
+                    "PAYMENT_DETAILS_INVALID",
+                    "Payment details cannot be encoded"
+                );
+            }
+        }
+    }
+
     private void requireStatus(DepositRequest request, DepositRequestStatus status, String action) {
         if (request.getStatus() != status) {
             throw new ApiProblemException(
@@ -213,6 +332,31 @@ public class DepositRequestService {
                 "Cannot " + action + " in status " + request.getStatus()
             );
         }
+    }
+
+    private void record(
+        DepositRequest request,
+        MoneyOperationEventType eventType,
+        DepositRequestStatus statusBefore,
+        MoneyOperationActorType actorType,
+        Long actorUserId,
+        String publicNote,
+        String operatorNote,
+        Map<String, Object> payload
+    ) {
+        moneyOperationEventService.record(
+            MoneyOperationType.DEPOSIT_REQUEST,
+            request.getId(),
+            request.getPublicId(),
+            eventType,
+            statusBefore == null ? null : statusBefore.name(),
+            request.getStatus() == null ? null : request.getStatus().name(),
+            actorType,
+            actorUserId,
+            publicNote,
+            operatorNote,
+            payload
+        );
     }
 
     private DepositRequestStatus parseStatus(String status) {

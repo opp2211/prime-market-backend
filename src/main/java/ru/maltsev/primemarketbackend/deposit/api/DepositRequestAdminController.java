@@ -25,10 +25,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import ru.maltsev.primemarketbackend.deposit.api.dto.AdminDepositRequestResponse;
 import ru.maltsev.primemarketbackend.deposit.api.dto.AdminDepositRequestShortResponse;
+import ru.maltsev.primemarketbackend.deposit.api.dto.ConfirmDepositRequest;
 import ru.maltsev.primemarketbackend.deposit.api.dto.IssueDetailsRequest;
 import ru.maltsev.primemarketbackend.deposit.api.dto.RejectDepositRequest;
 import ru.maltsev.primemarketbackend.deposit.domain.DepositRequest;
 import ru.maltsev.primemarketbackend.deposit.service.DepositRequestService;
+import ru.maltsev.primemarketbackend.money.domain.MoneyOperationEvent;
+import ru.maltsev.primemarketbackend.money.domain.MoneyOperationType;
+import ru.maltsev.primemarketbackend.money.service.MoneyOperationEventService;
 import ru.maltsev.primemarketbackend.security.PermissionCodes;
 import ru.maltsev.primemarketbackend.security.user.UserPrincipal;
 
@@ -38,6 +42,7 @@ import ru.maltsev.primemarketbackend.security.user.UserPrincipal;
 @PreAuthorize("hasAuthority('" + PermissionCodes.DEPOSIT_APPROVE + "')")
 public class DepositRequestAdminController {
     private final DepositRequestService depositRequestService;
+    private final MoneyOperationEventService moneyOperationEventService;
 
     @GetMapping
     public ResponseEntity<Page<AdminDepositRequestShortResponse>> list(
@@ -80,7 +85,7 @@ public class DepositRequestAdminController {
         }
 
         DepositRequest depositRequest = depositRequestService.getByPublicIdForAdmin(publicId);
-        return ResponseEntity.ok(AdminDepositRequestResponse.from(depositRequest));
+        return ResponseEntity.ok(AdminDepositRequestResponse.from(depositRequest, eventsFor(depositRequest)));
     }
 
     @PostMapping("/{publicId}/issue-details")
@@ -93,21 +98,32 @@ public class DepositRequestAdminController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        DepositRequest depositRequest = depositRequestService.issueDetails(publicId, request.paymentDetails());
-        return ResponseEntity.ok(AdminDepositRequestResponse.from(depositRequest));
+        DepositRequest depositRequest = depositRequestService.issueDetails(
+            publicId,
+            principal.getUser().getId(),
+            request.paymentDetails(),
+            request.operatorComment()
+        );
+        return ResponseEntity.ok(AdminDepositRequestResponse.from(depositRequest, eventsFor(depositRequest)));
     }
 
     @PostMapping("/{publicId}/confirm")
     public ResponseEntity<AdminDepositRequestResponse> confirm(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID publicId
+        @PathVariable UUID publicId,
+        @RequestBody(required = false) ConfirmDepositRequest request
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        DepositRequest depositRequest = depositRequestService.confirm(publicId);
-        return ResponseEntity.ok(AdminDepositRequestResponse.from(depositRequest));
+        DepositRequest depositRequest = depositRequestService.confirm(
+            publicId,
+            principal.getUser().getId(),
+            request == null ? null : request.confirmationReference(),
+            request == null ? null : request.operatorComment()
+        );
+        return ResponseEntity.ok(AdminDepositRequestResponse.from(depositRequest, eventsFor(depositRequest)));
     }
 
     @PostMapping("/{publicId}/reject")
@@ -120,7 +136,16 @@ public class DepositRequestAdminController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        DepositRequest depositRequest = depositRequestService.reject(publicId, request.rejectReason());
-        return ResponseEntity.ok(AdminDepositRequestResponse.from(depositRequest));
+        DepositRequest depositRequest = depositRequestService.reject(
+            publicId,
+            principal.getUser().getId(),
+            request.rejectReason(),
+            request.operatorComment()
+        );
+        return ResponseEntity.ok(AdminDepositRequestResponse.from(depositRequest, eventsFor(depositRequest)));
+    }
+
+    private List<MoneyOperationEvent> eventsFor(DepositRequest request) {
+        return moneyOperationEventService.list(MoneyOperationType.DEPOSIT_REQUEST, request.getPublicId());
     }
 }

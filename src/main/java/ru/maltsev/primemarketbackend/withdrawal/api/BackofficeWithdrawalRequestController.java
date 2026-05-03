@@ -24,6 +24,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import ru.maltsev.primemarketbackend.money.domain.MoneyOperationEvent;
+import ru.maltsev.primemarketbackend.money.domain.MoneyOperationType;
+import ru.maltsev.primemarketbackend.money.service.MoneyOperationEventService;
 import ru.maltsev.primemarketbackend.security.PermissionCodes;
 import ru.maltsev.primemarketbackend.security.user.UserPrincipal;
 import ru.maltsev.primemarketbackend.withdrawal.api.dto.BackofficeWithdrawalRequestResponse;
@@ -38,6 +41,7 @@ import ru.maltsev.primemarketbackend.withdrawal.service.WithdrawalRequestService
 @PreAuthorize("hasAuthority('" + PermissionCodes.WITHDRAWAL_REQUESTS_VIEW + "')")
 public class BackofficeWithdrawalRequestController {
     private final WithdrawalRequestService withdrawalRequestService;
+    private final MoneyOperationEventService moneyOperationEventService;
 
     @GetMapping
     @Operation(
@@ -75,9 +79,8 @@ public class BackofficeWithdrawalRequestController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        return ResponseEntity.ok(BackofficeWithdrawalRequestResponse.from(
-            withdrawalRequestService.getForBackoffice(publicId)
-        ));
+        WithdrawalRequest request = withdrawalRequestService.getForBackoffice(publicId);
+        return ResponseEntity.ok(BackofficeWithdrawalRequestResponse.from(request, eventsFor(request)));
     }
 
     @PostMapping("/{publicId}/take")
@@ -91,7 +94,7 @@ public class BackofficeWithdrawalRequestController {
         }
 
         WithdrawalRequest request = withdrawalRequestService.take(publicId, principal.getUser().getId());
-        return ResponseEntity.ok(BackofficeWithdrawalRequestResponse.from(request));
+        return ResponseEntity.ok(BackofficeWithdrawalRequestResponse.from(request, eventsFor(request)));
     }
 
     @PostMapping("/{publicId}/reject")
@@ -110,7 +113,10 @@ public class BackofficeWithdrawalRequestController {
             principal.getUser().getId(),
             request
         );
-        return ResponseEntity.ok(BackofficeWithdrawalRequestResponse.from(withdrawalRequest));
+        return ResponseEntity.ok(BackofficeWithdrawalRequestResponse.from(
+            withdrawalRequest,
+            eventsFor(withdrawalRequest)
+        ));
     }
 
     @PostMapping("/{publicId}/confirm")
@@ -129,6 +135,13 @@ public class BackofficeWithdrawalRequestController {
             principal.getUser().getId(),
             request
         );
-        return ResponseEntity.ok(BackofficeWithdrawalRequestResponse.from(withdrawalRequest));
+        return ResponseEntity.ok(BackofficeWithdrawalRequestResponse.from(
+            withdrawalRequest,
+            eventsFor(withdrawalRequest)
+        ));
+    }
+
+    private List<MoneyOperationEvent> eventsFor(WithdrawalRequest request) {
+        return moneyOperationEventService.list(MoneyOperationType.WITHDRAWAL_REQUEST, request.getPublicId());
     }
 }

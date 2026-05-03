@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotNull;
 
 public record IssueDetailsRequest(
-    @JsonProperty("payment_details") @NotNull String paymentDetails
+    @JsonProperty("payment_details") @NotNull String paymentDetails,
+    @JsonProperty("operator_comment") String operatorComment
 ) {
 }

@@ -22,9 +22,16 @@
             "format" : "date-time",
             "type" : "string"
           },
+          "confirmation_reference" : {
+            "type" : "string"
+          },
           "confirmed_at" : {
             "format" : "date-time",
             "type" : "string"
+          },
+          "confirmed_by_user_id" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "created_at" : {
             "format" : "date-time",
@@ -44,6 +51,19 @@
             "format" : "date-time",
             "type" : "string"
           },
+          "details_issued_by_user_id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "events" : {
+            "items" : {
+              "$ref" : "#/components/schemas/MoneyOperationEventResponse"
+            },
+            "type" : "array"
+          },
+          "operator_comment" : {
+            "type" : "string"
+          },
           "payment_details" : {
             "type" : "string"
           },
@@ -57,6 +77,10 @@
           "rejected_at" : {
             "format" : "date-time",
             "type" : "string"
+          },
+          "rejected_by_user_id" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "status" : {
             "enum" : [ "PENDING_DETAILS", "WAITING_PAYMENT", "PAYMENT_VERIFICATION", "CONFIRMED", "REJECTED", "EXPIRED", "CANCELLED" ],
@@ -217,6 +241,12 @@
           "currency_code" : {
             "type" : "string"
           },
+          "events" : {
+            "items" : {
+              "$ref" : "#/components/schemas/MoneyOperationEventResponse"
+            },
+            "type" : "array"
+          },
           "method_note" : {
             "type" : "string"
           },
@@ -373,6 +403,17 @@
           }
         },
         "required" : [ "currentPassword", "newPassword" ],
+        "type" : "object"
+      },
+      "ConfirmDepositRequest" : {
+        "properties" : {
+          "confirmation_reference" : {
+            "type" : "string"
+          },
+          "operator_comment" : {
+            "type" : "string"
+          }
+        },
         "type" : "object"
       },
       "ConfirmEmailChangeRequest" : {
@@ -818,6 +859,9 @@
       },
       "IssueDetailsRequest" : {
         "properties" : {
+          "operator_comment" : {
+            "type" : "string"
+          },
           "payment_details" : {
             "type" : "string"
           }
@@ -1034,6 +1078,55 @@
           },
           "rate" : {
             "type" : "number"
+          }
+        },
+        "type" : "object"
+      },
+      "MoneyOperationEventResponse" : {
+        "properties" : {
+          "actor_type" : {
+            "enum" : [ "USER", "OPERATOR", "SYSTEM" ],
+            "type" : "string"
+          },
+          "actor_user_id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "created_at" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "event_type" : {
+            "enum" : [ "DEPOSIT_CREATED", "DEPOSIT_DETAILS_ISSUED", "DEPOSIT_USER_MARKED_PAID", "DEPOSIT_CONFIRMED", "DEPOSIT_REJECTED", "DEPOSIT_CANCELLED", "WITHDRAWAL_CREATED", "WITHDRAWAL_CANCELLED", "WITHDRAWAL_TAKEN", "WITHDRAWAL_REJECTED", "WITHDRAWAL_CONFIRMED" ],
+            "type" : "string"
+          },
+          "operation_public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "operation_type" : {
+            "enum" : [ "DEPOSIT_REQUEST", "WITHDRAWAL_REQUEST" ],
+            "type" : "string"
+          },
+          "operator_note" : {
+            "type" : "string"
+          },
+          "payload" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "public_note" : {
+            "type" : "string"
+          },
+          "status_after" : {
+            "type" : "string"
+          },
+          "status_before" : {
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -2575,6 +2668,9 @@
       },
       "RejectDepositRequest" : {
         "properties" : {
+          "operator_comment" : {
+            "type" : "string"
+          },
           "reject_reason" : {
             "minLength" : 1,
             "type" : "string"
@@ -3048,6 +3144,15 @@
             "type" : "string"
           }
         } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ConfirmDepositRequest"
+              }
+            }
+          }
+        },
         "responses" : {
           "200" : {
             "content" : {
@@ -3381,6 +3486,15 @@
             "type" : "string"
           }
         } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ConfirmDepositRequest"
+              }
+            }
+          }
+        },
         "responses" : {
           "200" : {
             "content" : {
@@ -4091,6 +4205,14 @@
         "description" : "`gameSlug`, `categorySlug`, `intent`, and `viewerCurrencyCode` are runtime-required even though the controller keeps them optional to preserve the current validation flow. Category filters can be sent as `context.<slug>=<valueSlug>` and `attribute.<slug>=<optionSlug>`.",
         "operationId" : "listOffers",
         "parameters" : [ {
+          "description" : "Optional category context filter, for example `context.platform=pc` or `context.server=europe`.",
+          "in" : "query",
+          "name" : "context.<slug>"
+        }, {
+          "description" : "Optional select/multiselect attribute filter, for example `attribute.currency-type=chaos-orb`.",
+          "in" : "query",
+          "name" : "attribute.<slug>"
+        }, {
           "description" : "Required game slug.",
           "example" : "lineage-2",
           "in" : "query",
@@ -4123,22 +4245,6 @@
           "in" : "query",
           "name" : "viewerCurrencyCode",
           "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        }, {
-          "description" : "Optional category context filter, for example `context.platform=pc` or `context.server=europe`.",
-          "in" : "query",
-          "name" : "context.<slug>",
-          "required" : false,
-          "schema" : {
-            "type" : "string"
-          }
-        }, {
-          "description" : "Optional select/multiselect attribute filter, for example `attribute.currency-type=chaos-orb`.",
-          "in" : "query",
-          "name" : "attribute.<slug>",
-          "required" : false,
           "schema" : {
             "type" : "string"
           }

@@ -21,6 +21,10 @@ import ru.maltsev.primemarketbackend.account.repository.UserAccountRepository;
 import ru.maltsev.primemarketbackend.account.repository.UserAccountTxRepository;
 import ru.maltsev.primemarketbackend.account.service.UserAccountService;
 import ru.maltsev.primemarketbackend.exception.ApiProblemException;
+import ru.maltsev.primemarketbackend.money.domain.MoneyOperationActorType;
+import ru.maltsev.primemarketbackend.money.domain.MoneyOperationEventType;
+import ru.maltsev.primemarketbackend.money.domain.MoneyOperationType;
+import ru.maltsev.primemarketbackend.money.service.MoneyOperationEventService;
 import ru.maltsev.primemarketbackend.notification.service.NotificationService;
 import ru.maltsev.primemarketbackend.withdrawal.api.dto.ConfirmWithdrawalRequest;
 import ru.maltsev.primemarketbackend.withdrawal.api.dto.CreateWithdrawalRequest;
@@ -47,6 +51,7 @@ public class WithdrawalRequestService {
     private final UserAccountRepository userAccountRepository;
     private final UserAccountTxRepository userAccountTxRepository;
     private final NotificationService notificationService;
+    private final MoneyOperationEventService moneyOperationEventService;
 
     @Transactional
     public WithdrawalRequest create(Long userId, CreateWithdrawalRequest request) {
@@ -73,7 +78,24 @@ public class WithdrawalRequestService {
             amount,
             amount
         );
-        return withdrawalRequestRepository.save(withdrawalRequest);
+        WithdrawalRequest savedRequest = withdrawalRequestRepository.save(withdrawalRequest);
+        record(
+            savedRequest,
+            MoneyOperationEventType.WITHDRAWAL_CREATED,
+            null,
+            MoneyOperationActorType.USER,
+            userId,
+            null,
+            null,
+            moneyOperationEventService.payload(
+                "amount", savedRequest.getAmount(),
+                "currency_code", savedRequest.getCurrencyCodeSnapshot(),
+                "withdrawal_method_id", method.getId(),
+                "withdrawal_method_code", method.getCode(),
+                "withdrawal_method_title", method.getTitle()
+            )
+        );
+        return savedRequest;
     }
 
     @Transactional(readOnly = true)
@@ -105,9 +127,21 @@ public class WithdrawalRequestService {
             );
         }
 
+        WithdrawalRequestStatus statusBefore = request.getStatus();
         releaseReservedAmount(request);
         request.cancel(Instant.now());
-        return withdrawalRequestRepository.save(request);
+        WithdrawalRequest savedRequest = withdrawalRequestRepository.save(request);
+        record(
+            savedRequest,
+            MoneyOperationEventType.WITHDRAWAL_CANCELLED,
+            statusBefore,
+            MoneyOperationActorType.USER,
+            userId,
+            null,
+            null,
+            Map.of()
+        );
+        return savedRequest;
     }
 
     @Transactional(readOnly = true)
@@ -138,8 +172,20 @@ public class WithdrawalRequestService {
             );
         }
 
+        WithdrawalRequestStatus statusBefore = request.getStatus();
         request.markProcessing(actorUserId, Instant.now());
-        return withdrawalRequestRepository.save(request);
+        WithdrawalRequest savedRequest = withdrawalRequestRepository.save(request);
+        record(
+            savedRequest,
+            MoneyOperationEventType.WITHDRAWAL_TAKEN,
+            statusBefore,
+            MoneyOperationActorType.OPERATOR,
+            actorUserId,
+            null,
+            null,
+            Map.of()
+        );
+        return savedRequest;
     }
 
     @Transactional
@@ -155,6 +201,7 @@ public class WithdrawalRequestService {
             );
         }
 
+        WithdrawalRequestStatus statusBefore = request.getStatus();
         releaseReservedAmount(request);
         request.reject(
             actorUserId,
@@ -163,6 +210,16 @@ public class WithdrawalRequestService {
             Instant.now()
         );
         WithdrawalRequest rejectedRequest = withdrawalRequestRepository.save(request);
+        record(
+            rejectedRequest,
+            MoneyOperationEventType.WITHDRAWAL_REJECTED,
+            statusBefore,
+            MoneyOperationActorType.OPERATOR,
+            actorUserId,
+            request.getRejectionReason(),
+            request.getOperatorComment(),
+            Map.of()
+        );
         notificationService.notifyWithdrawalRejected(rejectedRequest);
         return rejectedRequest;
     }
@@ -180,6 +237,7 @@ public class WithdrawalRequestService {
             );
         }
 
+        WithdrawalRequestStatus statusBefore = request.getStatus();
         UserAccount account = userAccountRepository.findByIdForUpdate(request.getUserAccountId())
             .orElseThrow(() -> conflict("USER_ACCOUNT_NOT_FOUND", "Withdrawal wallet not found"));
         int updatedRows = userAccountRepository.decreaseReserved(account.getId(), request.getAmount());
@@ -205,6 +263,20 @@ public class WithdrawalRequestService {
             Instant.now()
         );
         WithdrawalRequest confirmedRequest = withdrawalRequestRepository.save(request);
+        record(
+            confirmedRequest,
+            MoneyOperationEventType.WITHDRAWAL_CONFIRMED,
+            statusBefore,
+            MoneyOperationActorType.OPERATOR,
+            actorUserId,
+            null,
+            request.getOperatorComment(),
+            moneyOperationEventService.payload(
+                "debited_amount", request.getAmount(),
+                "actual_payout_amount", request.getActualPayoutAmount(),
+                "currency_code", request.getCurrencyCodeSnapshot()
+            )
+        );
         notificationService.notifyWithdrawalCompleted(confirmedRequest);
         return confirmedRequest;
     }
@@ -268,6 +340,31 @@ public class WithdrawalRequestService {
     private WithdrawalRequest lockRequest(UUID publicId) {
         return withdrawalRequestRepository.findByPublicIdForUpdate(publicId)
             .orElseThrow(() -> notFound("WITHDRAWAL_REQUEST_NOT_FOUND", "Withdrawal request not found"));
+    }
+
+    private void record(
+        WithdrawalRequest request,
+        MoneyOperationEventType eventType,
+        WithdrawalRequestStatus statusBefore,
+        MoneyOperationActorType actorType,
+        Long actorUserId,
+        String publicNote,
+        String operatorNote,
+        Map<String, Object> payload
+    ) {
+        moneyOperationEventService.record(
+            MoneyOperationType.WITHDRAWAL_REQUEST,
+            request.getId(),
+            request.getPublicId(),
+            eventType,
+            statusBefore == null ? null : statusBefore.name(),
+            request.getStatus() == null ? null : request.getStatus().name(),
+            actorType,
+            actorUserId,
+            publicNote,
+            operatorNote,
+            payload
+        );
     }
 
     private WithdrawalRequestStatus parseStatus(String status) {
