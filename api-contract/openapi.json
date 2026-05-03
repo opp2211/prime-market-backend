@@ -139,10 +139,22 @@
           "attributeSlug" : {
             "type" : "string"
           },
+          "attributeTitle" : {
+            "type" : "string"
+          },
           "optionSlug" : {
             "type" : "string"
           },
           "optionTitle" : {
+            "type" : "string"
+          },
+          "valueBoolean" : {
+            "type" : "boolean"
+          },
+          "valueNumber" : {
+            "type" : "number"
+          },
+          "valueText" : {
             "type" : "string"
           }
         },
@@ -4076,7 +4088,7 @@
     },
     "/api/market/offers" : {
       "get" : {
-        "description" : "`gameSlug`, `categorySlug`, `intent`, and `viewerCurrencyCode` are runtime-required even though the controller keeps them optional to preserve the current validation flow.",
+        "description" : "`gameSlug`, `categorySlug`, `intent`, and `viewerCurrencyCode` are runtime-required even though the controller keeps them optional to preserve the current validation flow. Category filters can be sent as `context.<slug>=<valueSlug>` and `attribute.<slug>=<optionSlug>`.",
         "operationId" : "listOffers",
         "parameters" : [ {
           "description" : "Required game slug.",
@@ -4115,36 +4127,17 @@
             "type" : "string"
           }
         }, {
+          "description" : "Optional category context filter, for example `context.platform=pc` or `context.server=europe`.",
           "in" : "query",
-          "name" : "platform",
+          "name" : "context.<slug>",
           "required" : false,
           "schema" : {
             "type" : "string"
           }
         }, {
+          "description" : "Optional select/multiselect attribute filter, for example `attribute.currency-type=chaos-orb`.",
           "in" : "query",
-          "name" : "league",
-          "required" : false,
-          "schema" : {
-            "type" : "string"
-          }
-        }, {
-          "in" : "query",
-          "name" : "mode",
-          "required" : false,
-          "schema" : {
-            "type" : "string"
-          }
-        }, {
-          "in" : "query",
-          "name" : "ruthless",
-          "required" : false,
-          "schema" : {
-            "type" : "string"
-          }
-        }, {
-          "in" : "query",
-          "name" : "currencyType",
+          "name" : "attribute.<slug>",
           "required" : false,
           "schema" : {
             "type" : "string"

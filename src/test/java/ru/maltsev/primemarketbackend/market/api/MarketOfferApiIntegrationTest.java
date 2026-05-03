@@ -225,6 +225,68 @@ class MarketOfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
+    void marketListingSupportsItemCategoryWithDefaultQuantity() throws Exception {
+        User seller = createUser("seller-item-category");
+        long offerId = createActiveItemOffer(seller, "sell", "USD", "2.50", "Mageblood", "Mageblood belt");
+
+        MvcResult result = mockMvc.perform(get("/api/market/offers")
+                .queryParam("gameSlug", "path-of-exile")
+                .queryParam("categorySlug", "items")
+                .queryParam("intent", "buy")
+                .queryParam("viewerCurrencyCode", "RUB")
+                .queryParam("context.platform", "pc"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items.length()").value(1))
+            .andExpect(jsonPath("$.items[0].id").value(offerId))
+            .andExpect(jsonPath("$.items[0].category.slug").value("items"))
+            .andExpect(jsonPath("$.items[0].attributes[0].attributeSlug").value("item-name"))
+            .andExpect(jsonPath("$.items[0].attributes[0].valueText").value("Mageblood"))
+            .andReturn();
+
+        JsonNode item = readBody(result).path("items").get(0);
+        assertThat(item.path("quantity").decimalValue()).isEqualByComparingTo("1");
+        assertThat(item.path("maxTradeQuantity").decimalValue()).isEqualByComparingTo("1");
+        assertThat(item.path("quantityStep").decimalValue()).isEqualByComparingTo("1");
+
+        MvcResult quoteResult = mockMvc.perform(post("/api/market/offers/{offerId}/quote", offerId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(createQuoteRequest(
+                    "buy",
+                    "RUB",
+                    item.path("offerVersion").asLong(),
+                    item.path("price").path("amount").decimalValue().toPlainString()
+                )))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.category.slug").value("items"))
+            .andExpect(jsonPath("$.attributes[0].valueText").value("Mageblood"))
+            .andReturn();
+
+        JsonNode quote = readBody(quoteResult);
+        assertThat(quote.path("quantity").decimalValue()).isEqualByComparingTo("1");
+        assertThat(quote.path("maxTradeQuantity").decimalValue()).isEqualByComparingTo("1");
+        assertThat(quote.path("quantityStep").decimalValue()).isEqualByComparingTo("1");
+    }
+
+    @Test
+    void marketListingFiltersByDynamicAttributeParam() throws Exception {
+        User seller = createUser("seller-service-filter");
+        createActiveServiceOffer(seller, "sell", "USD", "10.00", "boss-carry", "Boss carry");
+        createActiveServiceOffer(seller, "sell", "USD", "8.00", "leveling", "Leveling");
+
+        mockMvc.perform(get("/api/market/offers")
+                .queryParam("gameSlug", "path-of-exile")
+                .queryParam("categorySlug", "services")
+                .queryParam("intent", "buy")
+                .queryParam("viewerCurrencyCode", "RUB")
+                .queryParam("attribute.service-type", "boss-carry"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items.length()").value(1))
+            .andExpect(jsonPath("$.items[0].title").value("Boss carry"))
+            .andExpect(jsonPath("$.items[0].attributes[0].attributeSlug").value("service-type"))
+            .andExpect(jsonPath("$.items[0].attributes[0].optionSlug").value("boss-carry"));
+    }
+
+    @Test
     void marketOfferDetailsUsesViewerToOfferRateForBuyIntent() throws Exception {
         User seller = createUser("seller-details-buy");
         long offerId = createActiveOffer(seller, "sell", "USD", "2.50", "divine-orb", "Sell Divine Orb");
@@ -312,7 +374,7 @@ class MarketOfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
-    void marketOfferDetailsReturns404WhenCategoryIsUnsupported() throws Exception {
+    void marketOfferDetailsSupportsNonCurrencyCategory() throws Exception {
         User seller = createUser("seller-details-items");
         long offerId = createStoredOffer(
             seller,
@@ -328,8 +390,9 @@ class MarketOfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
         mockMvc.perform(get("/api/market/offers/{offerId}", offerId)
                 .queryParam("intent", "buy")
                 .queryParam("viewerCurrencyCode", "RUB"))
-            .andExpect(status().isNotFound())
-            .andExpect(jsonPath("$.code").value("MARKET_OFFER_NOT_FOUND"));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.id").value(offerId))
+            .andExpect(jsonPath("$.category.slug").value("items"));
     }
 
     @Test
@@ -462,6 +525,142 @@ class MarketOfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
               "deliveryMethods": ["f2f", "poe-trade-link"]
             }
             """.formatted(gameId, categoryId, side, title, currencyCode, priceAmount, currencyType);
+    }
+
+    private long createActiveItemOffer(
+        User owner,
+        String side,
+        String currencyCode,
+        String priceAmount,
+        String itemName,
+        String title
+    ) throws Exception {
+        Category category = requireCategory("path-of-exile", "items");
+        MvcResult result = mockMvc.perform(post("/api/offers")
+                .with(auth(owner))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(activeItemOfferRequest(
+                    category.getGame().getId(),
+                    category.getId(),
+                    side,
+                    currencyCode,
+                    priceAmount,
+                    itemName,
+                    title
+                )))
+            .andExpect(status().isCreated())
+            .andReturn();
+        return readBody(result).path("id").asLong();
+    }
+
+    private long createActiveServiceOffer(
+        User owner,
+        String side,
+        String currencyCode,
+        String priceAmount,
+        String serviceType,
+        String title
+    ) throws Exception {
+        Category category = requireCategory("path-of-exile", "services");
+        MvcResult result = mockMvc.perform(post("/api/offers")
+                .with(auth(owner))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(activeServiceOfferRequest(
+                    category.getGame().getId(),
+                    category.getId(),
+                    side,
+                    currencyCode,
+                    priceAmount,
+                    serviceType,
+                    title
+                )))
+            .andExpect(status().isCreated())
+            .andReturn();
+        return readBody(result).path("id").asLong();
+    }
+
+    private String activeItemOfferRequest(
+        Long gameId,
+        Long categoryId,
+        String side,
+        String currencyCode,
+        String priceAmount,
+        String itemName,
+        String title
+    ) {
+        return """
+            {
+              "gameId": %d,
+              "categoryId": %d,
+              "side": "%s",
+              "title": "%s",
+              "description": "Fast trade",
+              "tradeTerms": "Whisper in game",
+              "priceCurrencyCode": "%s",
+              "priceAmount": %s,
+              "status": "active",
+              "contexts": [
+                {"dimensionSlug":"platform","valueSlug":"pc"},
+                {"dimensionSlug":"league","valueSlug":"standard"},
+                {"dimensionSlug":"mode","valueSlug":"softcore"},
+                {"dimensionSlug":"ruthless","valueSlug":"disabled"}
+              ],
+              "attributes": [
+                {"attributeSlug":"item-name","valueText":"%s"}
+              ],
+              "deliveryMethods": ["f2f"]
+            }
+            """.formatted(gameId, categoryId, side, title, currencyCode, priceAmount, itemName);
+    }
+
+    private String activeServiceOfferRequest(
+        Long gameId,
+        Long categoryId,
+        String side,
+        String currencyCode,
+        String priceAmount,
+        String serviceType,
+        String title
+    ) {
+        return """
+            {
+              "gameId": %d,
+              "categoryId": %d,
+              "side": "%s",
+              "title": "%s",
+              "description": "Fast trade",
+              "tradeTerms": "Whisper in game",
+              "priceCurrencyCode": "%s",
+              "priceAmount": %s,
+              "status": "active",
+              "contexts": [
+                {"dimensionSlug":"platform","valueSlug":"pc"},
+                {"dimensionSlug":"league","valueSlug":"standard"},
+                {"dimensionSlug":"mode","valueSlug":"softcore"},
+                {"dimensionSlug":"ruthless","valueSlug":"disabled"}
+              ],
+              "attributes": [
+                {"attributeSlug":"service-type","optionSlug":"%s"}
+              ],
+              "deliveryMethods": ["self-play"]
+            }
+            """.formatted(gameId, categoryId, side, title, currencyCode, priceAmount, serviceType);
+    }
+
+    private String createQuoteRequest(
+        String intent,
+        String viewerCurrencyCode,
+        long listedOfferVersion,
+        String listedUnitPriceAmount
+    ) {
+        return """
+            {
+              "intent": "%s",
+              "viewerCurrencyCode": "%s",
+              "listedOfferVersion": %d,
+              "listedUnitPriceAmount": %s
+            }
+            """.formatted(intent, viewerCurrencyCode, listedOfferVersion, listedUnitPriceAmount);
     }
 
     private JsonNode readBody(MvcResult result) throws Exception {

@@ -65,8 +65,12 @@ public final class OrderReadModelDtos {
 
     public record Attribute(
         String attributeSlug,
+        String attributeTitle,
         String optionSlug,
-        String optionTitle
+        String optionTitle,
+        String valueText,
+        BigDecimal valueNumber,
+        Boolean valueBoolean
     ) {
     }
 

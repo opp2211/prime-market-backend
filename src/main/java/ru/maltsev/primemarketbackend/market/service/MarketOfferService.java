@@ -1,13 +1,21 @@
 package ru.maltsev.primemarketbackend.market.service;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.maltsev.primemarketbackend.attribute.domain.CategoryAttribute;
+import ru.maltsev.primemarketbackend.attribute.domain.CategoryAttributeOption;
+import ru.maltsev.primemarketbackend.attribute.repository.CategoryAttributeOptionRepository;
+import ru.maltsev.primemarketbackend.attribute.repository.CategoryAttributeRepository;
 import ru.maltsev.primemarketbackend.category.domain.Category;
 import ru.maltsev.primemarketbackend.category.repository.CategoryRepository;
+import ru.maltsev.primemarketbackend.context.domain.CategoryContextDimension;
+import ru.maltsev.primemarketbackend.context.repository.CategoryContextDimensionRepository;
 import ru.maltsev.primemarketbackend.currency.repository.CurrencyRepository;
 import ru.maltsev.primemarketbackend.exception.ApiProblemException;
 import ru.maltsev.primemarketbackend.game.repository.GameRepository;
@@ -25,12 +33,14 @@ import ru.maltsev.primemarketbackend.market.repository.MarketOfferSearchCriteria
 @Service
 @RequiredArgsConstructor
 public class MarketOfferService {
-    private static final String SUPPORTED_CATEGORY_SLUG = "currency";
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_SIZE = 20;
 
     private final GameRepository gameRepository;
     private final CategoryRepository categoryRepository;
+    private final CategoryContextDimensionRepository categoryContextDimensionRepository;
+    private final CategoryAttributeRepository categoryAttributeRepository;
+    private final CategoryAttributeOptionRepository categoryAttributeOptionRepository;
     private final CurrencyRepository currencyRepository;
     private final MarketOfferQueryRepository marketOfferQueryRepository;
 
@@ -58,7 +68,8 @@ public class MarketOfferService {
                 "Category not found"
             ));
 
-        validateSupportedCategory(category);
+        Map<String, String> contextFilters = normalizeContextFilters(category.getId(), request.contextFilters());
+        Map<String, String> attributeFilters = normalizeAttributeFilters(category.getId(), request.attributeFilters());
 
         MarketOfferSearchCriteria criteria = new MarketOfferSearchCriteria(
             category.getGame().getId(),
@@ -67,16 +78,13 @@ public class MarketOfferService {
             viewerCurrencyCode,
             intent,
             sort,
-            normalizeOptionalSlug(request.platform()),
-            normalizeOptionalSlug(request.league()),
-            normalizeOptionalSlug(request.mode()),
-            normalizeOptionalSlug(request.ruthless()),
-            normalizeOptionalSlug(request.currencyType()),
+            contextFilters,
+            attributeFilters,
             page,
             size
         );
 
-        MarketOfferPageData pageData = marketOfferQueryRepository.findCurrencyOffers(criteria);
+        MarketOfferPageData pageData = marketOfferQueryRepository.findOffers(criteria);
         List<MarketOfferListResponse.Item> items = pageData.items().stream()
             .map(item -> toResponseItem(item, intent))
             .toList();
@@ -89,7 +97,7 @@ public class MarketOfferService {
         MarketIntent intent = MarketIntent.from(rawIntent);
         String viewerCurrencyCode = requireValidViewerCurrencyCode(rawViewerCurrencyCode);
 
-        MarketOfferRecord offer = marketOfferQueryRepository.findCurrencyOfferById(offerId, intent, viewerCurrencyCode)
+        MarketOfferRecord offer = marketOfferQueryRepository.findOfferById(offerId, intent, viewerCurrencyCode)
             .orElseThrow(() -> new ApiProblemException(
                 HttpStatus.NOT_FOUND,
                 "MARKET_OFFER_NOT_FOUND",
@@ -171,8 +179,12 @@ public class MarketOfferService {
         return attributes.stream()
             .map(attribute -> new MarketOfferListResponse.Attribute(
                 attribute.attributeSlug(),
+                attribute.attributeTitle(),
                 attribute.optionSlug(),
-                attribute.optionTitle()
+                attribute.optionTitle(),
+                attribute.valueText(),
+                attribute.valueNumber(),
+                attribute.valueBoolean()
             ))
             .toList();
     }
@@ -226,14 +238,120 @@ public class MarketOfferService {
         return value.trim().toLowerCase(Locale.ROOT);
     }
 
-    private void validateSupportedCategory(Category category) {
-        if (!SUPPORTED_CATEGORY_SLUG.equals(category.getSlug())) {
-            throw new ApiProblemException(
-                HttpStatus.BAD_REQUEST,
-                "UNSUPPORTED_MARKET_CATEGORY",
-                "Market listing supports only category 'currency'"
-            );
+    private Map<String, String> normalizeContextFilters(Long categoryId, Map<String, String> rawFilters) {
+        if (rawFilters == null || rawFilters.isEmpty()) {
+            return Map.of();
         }
+
+        Map<String, CategoryContextDimension> allowedBySlug = new HashMap<>();
+        for (CategoryContextDimension link : categoryContextDimensionRepository.findActiveByCategoryId(categoryId)) {
+            String slug = normalizeOptionalSlug(link.getContextDimension().getSlug());
+            if (slug != null) {
+                allowedBySlug.put(slug, link);
+            }
+        }
+
+        Map<String, String> normalized = new HashMap<>();
+        for (Map.Entry<String, String> entry : rawFilters.entrySet()) {
+            String slug = normalizeOptionalSlug(entry.getKey());
+            String valueSlug = normalizeOptionalSlug(entry.getValue());
+            if (slug == null || valueSlug == null) {
+                continue;
+            }
+            if (!allowedBySlug.containsKey(slug)) {
+                throw new ApiProblemException(
+                    HttpStatus.BAD_REQUEST,
+                    "INVALID_MARKET_CONTEXT_FILTER",
+                    "Context filter " + slug + " is not allowed for category"
+                );
+            }
+            normalized.put(slug, valueSlug);
+        }
+        return normalized;
+    }
+
+    private Map<String, String> normalizeAttributeFilters(Long categoryId, Map<String, String> rawFilters) {
+        if (rawFilters == null || rawFilters.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<String, CategoryAttribute> allowedBySlug = new HashMap<>();
+        List<CategoryAttribute> attributes = categoryAttributeRepository.findActiveByCategoryId(categoryId);
+        for (CategoryAttribute attribute : attributes) {
+            String slug = normalizeOptionalSlug(attribute.getSlug());
+            if (slug != null) {
+                allowedBySlug.put(slug, attribute);
+            }
+        }
+
+        List<Long> optionAttributeIds = attributes.stream()
+            .filter(attribute -> {
+                String dataType = normalizeDataType(attribute.getDataType());
+                return "select".equals(dataType) || "multiselect".equals(dataType);
+            })
+            .map(CategoryAttribute::getId)
+            .toList();
+        Map<Long, Map<String, CategoryAttributeOption>> optionsByAttributeId =
+            loadAttributeOptions(optionAttributeIds);
+
+        Map<String, String> normalized = new HashMap<>();
+        for (Map.Entry<String, String> entry : rawFilters.entrySet()) {
+            String slug = normalizeOptionalSlug(entry.getKey());
+            String optionSlug = normalizeOptionalSlug(entry.getValue());
+            if (slug == null || optionSlug == null) {
+                continue;
+            }
+            CategoryAttribute attribute = allowedBySlug.get(slug);
+            if (attribute == null) {
+                throw new ApiProblemException(
+                    HttpStatus.BAD_REQUEST,
+                    "INVALID_MARKET_ATTRIBUTE_FILTER",
+                    "Attribute filter " + slug + " is not allowed for category"
+                );
+            }
+            String dataType = normalizeDataType(attribute.getDataType());
+            if (!"select".equals(dataType) && !"multiselect".equals(dataType)) {
+                throw new ApiProblemException(
+                    HttpStatus.BAD_REQUEST,
+                    "INVALID_MARKET_ATTRIBUTE_FILTER",
+                    "Attribute filter " + slug + " must target select attribute"
+                );
+            }
+            Map<String, CategoryAttributeOption> options = optionsByAttributeId.get(attribute.getId());
+            if (options == null || !options.containsKey(optionSlug)) {
+                throw new ApiProblemException(
+                    HttpStatus.BAD_REQUEST,
+                    "INVALID_MARKET_ATTRIBUTE_OPTION",
+                    "Attribute option " + optionSlug + " is not allowed for category"
+                );
+            }
+            normalized.put(slug, optionSlug);
+        }
+        return normalized;
+    }
+
+    private Map<Long, Map<String, CategoryAttributeOption>> loadAttributeOptions(List<Long> attributeIds) {
+        Map<Long, Map<String, CategoryAttributeOption>> optionsByAttributeId = new HashMap<>();
+        if (attributeIds.isEmpty()) {
+            return optionsByAttributeId;
+        }
+        for (CategoryAttributeOption option : categoryAttributeOptionRepository.findActiveByAttributeIds(attributeIds)) {
+            String slug = normalizeOptionalSlug(option.getSlug());
+            if (slug == null) {
+                continue;
+            }
+            optionsByAttributeId
+                .computeIfAbsent(option.getCategoryAttribute().getId(), key -> new HashMap<>())
+                .put(slug, option);
+        }
+        return optionsByAttributeId;
+    }
+
+    private String normalizeDataType(String dataType) {
+        if (dataType == null) {
+            return "";
+        }
+        return dataType.trim().toLowerCase(Locale.ROOT);
     }
 
     private int normalizePage(Integer page) {

@@ -111,7 +111,6 @@ public class MarketOfferQueryRepository {
         join categories c
           on c.id = o.category_id
          and c.is_active = true
-         and lower(c.slug) = 'currency'
         join users u
           on u.id = o.user_id
          and u.is_active = true
@@ -191,8 +190,12 @@ public class MarketOfferQueryRepository {
     private static final RowMapper<MarketOfferAttributeRecord> ATTRIBUTE_ROW_MAPPER = (rs, rowNum) -> new MarketOfferAttributeRecord(
         rs.getLong("offer_id"),
         rs.getString("attribute_slug"),
+        rs.getString("attribute_title"),
         rs.getString("option_slug"),
-        rs.getString("option_title")
+        rs.getString("option_title"),
+        rs.getString("value_text"),
+        rs.getBigDecimal("value_number"),
+        getNullableBoolean(rs, "value_boolean")
     );
     private static final RowMapper<MarketOfferDeliveryMethodRecord> DELIVERY_METHOD_ROW_MAPPER = (rs, rowNum) -> new MarketOfferDeliveryMethodRecord(
         rs.getLong("offer_id"),
@@ -202,7 +205,7 @@ public class MarketOfferQueryRepository {
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
 
-    public MarketOfferPageData findCurrencyOffers(MarketOfferSearchCriteria criteria) {
+    public MarketOfferPageData findOffers(MarketOfferSearchCriteria criteria) {
         SqlFragments sqlFragments = buildSqlFragments(criteria);
         long total = queryTotal(sqlFragments);
         if (total == 0) {
@@ -217,7 +220,7 @@ public class MarketOfferQueryRepository {
         return new MarketOfferPageData(toOfferRecords(rows, criteria.viewerCurrencyCode()), total);
     }
 
-    public Optional<MarketOfferRecord> findCurrencyOfferById(
+    public Optional<MarketOfferRecord> findOfferById(
         Long offerId,
         MarketIntent intent,
         String viewerCurrencyCode
@@ -325,8 +328,12 @@ public class MarketOfferQueryRepository {
             select
                 oav.offer_id,
                 ca.slug as attribute_slug,
+                ca.title as attribute_title,
                 cao.slug as option_slug,
-                cao.title as option_title
+                cao.title as option_title,
+                oav.value_text,
+                oav.value_number,
+                oav.value_boolean
             from offer_attribute_values oav
             join category_attributes ca
               on ca.id = oav.category_attribute_id
@@ -371,11 +378,14 @@ public class MarketOfferQueryRepository {
             .addValue("viewerCurrencyCode", criteria.viewerCurrencyCode());
 
         StringBuilder fromWhere = new StringBuilder(ACTIVE_OFFERS_FROM_WHERE.formatted(rateJoin(criteria.intent())));
-        appendContextFilter(fromWhere, parameters, "platform", criteria.platform());
-        appendContextFilter(fromWhere, parameters, "league", criteria.league());
-        appendContextFilter(fromWhere, parameters, "mode", criteria.mode());
-        appendContextFilter(fromWhere, parameters, "ruthless", criteria.ruthless());
-        appendAttributeFilter(fromWhere, parameters, criteria.currencyType());
+        int contextIndex = 0;
+        for (Map.Entry<String, String> filter : criteria.contextFilters().entrySet()) {
+            appendContextFilter(fromWhere, parameters, contextIndex++, filter.getKey(), filter.getValue());
+        }
+        int attributeIndex = 0;
+        for (Map.Entry<String, String> filter : criteria.attributeFilters().entrySet()) {
+            appendAttributeFilter(fromWhere, parameters, attributeIndex++, filter.getKey(), filter.getValue());
+        }
 
         return new SqlFragments(
             fromWhere.toString(),
@@ -429,6 +439,7 @@ public class MarketOfferQueryRepository {
     private void appendContextFilter(
         StringBuilder fromWhere,
         MapSqlParameterSource parameters,
+        int index,
         String dimensionSlug,
         String valueSlug
     ) {
@@ -436,8 +447,8 @@ public class MarketOfferQueryRepository {
             return;
         }
 
-        String dimensionParameterName = dimensionSlug + "DimensionSlug";
-        String valueParameterName = dimensionSlug + "ValueSlug";
+        String dimensionParameterName = "contextDimensionSlug" + index;
+        String valueParameterName = "contextValueSlug" + index;
         fromWhere.append("""
 
               and exists (
@@ -460,12 +471,16 @@ public class MarketOfferQueryRepository {
     private void appendAttributeFilter(
         StringBuilder fromWhere,
         MapSqlParameterSource parameters,
-        String currencyType
+        int index,
+        String attributeSlug,
+        String optionSlug
     ) {
-        if (currencyType == null) {
+        if (optionSlug == null) {
             return;
         }
 
+        String attributeParameterName = "attributeSlug" + index;
+        String optionParameterName = "attributeOptionSlug" + index;
         fromWhere.append("""
 
               and exists (
@@ -476,11 +491,13 @@ public class MarketOfferQueryRepository {
                   join category_attribute_options cao_filter
                     on cao_filter.id = oav_filter.category_attribute_option_id
                   where oav_filter.offer_id = o.id
-                    and ca_filter.slug = 'currency-type'
-                    and cao_filter.slug = :currencyType
+                    and ca_filter.slug = :%s
+                    and cao_filter.slug = :%s
               )
-            """);
-        parameters.addValue("currencyType", currencyType);
+            """.formatted(attributeParameterName, optionParameterName));
+        parameters
+            .addValue(attributeParameterName, attributeSlug)
+            .addValue(optionParameterName, optionSlug);
     }
 
     private String rateJoin(MarketIntent intent) {
@@ -505,6 +522,11 @@ public class MarketOfferQueryRepository {
     private static Instant getInstant(ResultSet resultSet, String column) throws SQLException {
         Timestamp timestamp = resultSet.getTimestamp(column);
         return timestamp == null ? null : timestamp.toInstant();
+    }
+
+    private static Boolean getNullableBoolean(ResultSet resultSet, String column) throws SQLException {
+        boolean value = resultSet.getBoolean(column);
+        return resultSet.wasNull() ? null : value;
     }
 
     private static <T> Map<Long, List<T>> groupByOfferId(List<T> rows, OfferIdExtractor<T> offerIdExtractor) {
@@ -603,8 +625,12 @@ public class MarketOfferQueryRepository {
     public record MarketOfferAttributeRecord(
         Long offerId,
         String attributeSlug,
+        String attributeTitle,
         String optionSlug,
-        String optionTitle
+        String optionTitle,
+        String valueText,
+        BigDecimal valueNumber,
+        Boolean valueBoolean
     ) {
     }
 

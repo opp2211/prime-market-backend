@@ -36,7 +36,6 @@ import ru.maltsev.primemarketbackend.orderquote.repository.OrderQuoteRepository;
 @Service
 @RequiredArgsConstructor
 public class OrderQuoteService {
-    private static final String SUPPORTED_CATEGORY_SLUG = "currency";
     private static final int DISPLAY_SCALE = 8;
     private static final long QUOTE_TTL_SECONDS = 60L;
 
@@ -192,7 +191,6 @@ public class OrderQuoteService {
         if (!offer.ownerActive()
             || !offer.gameActive()
             || !offer.categoryActive()
-            || !SUPPORTED_CATEGORY_SLUG.equals(offer.categorySlug())
             || !"active".equals(offer.status())
             || offer.publishedAt() == null
             || !intent.offerSide().equals(offer.side())
@@ -260,8 +258,12 @@ public class OrderQuoteService {
         return offerAttributeValueRepository.findAllByOfferId(offerId).stream()
             .map(value -> new MarketOfferListResponse.Attribute(
                 value.getCategoryAttribute().getSlug(),
+                value.getCategoryAttribute().getTitle(),
                 value.getCategoryAttributeOption() == null ? null : value.getCategoryAttributeOption().getSlug(),
-                value.getCategoryAttributeOption() == null ? value.getValueText() : value.getCategoryAttributeOption().getTitle()
+                value.getCategoryAttributeOption() == null ? null : value.getCategoryAttributeOption().getTitle(),
+                value.getValueText(),
+                value.getValueNumber(),
+                value.getValueBoolean()
             ))
             .toList();
     }
@@ -276,6 +278,13 @@ public class OrderQuoteService {
     }
 
     private String requireValidViewerCurrencyCode(String viewerCurrencyCode) {
+        if (viewerCurrencyCode == null || viewerCurrencyCode.isBlank()) {
+            throw new ApiProblemException(
+                HttpStatus.BAD_REQUEST,
+                "VALIDATION_ERROR",
+                "viewerCurrencyCode is required"
+            );
+        }
         String normalized = viewerCurrencyCode.trim().toUpperCase(Locale.ROOT);
         if (!currencyRepository.existsByCodeIgnoreCaseAndActiveTrue(normalized)) {
             throw new ApiProblemException(

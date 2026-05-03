@@ -348,13 +348,13 @@ from categories c
                    ('path-of-exile', 'services', 'trade-terms', true, false, false, null, null, 50),
                    ('path-of-exile', 'services', 'delivery-methods', true, false, true, null, null, 60),
 
-                   -- Path of Exile / donate-packs-coins
-                   ('path-of-exile', 'donate-packs-coins', 'quantity', false, false, false, null, 1, 10),
-                   ('path-of-exile', 'donate-packs-coins', 'min-trade-quantity', false, false, false, null, null, 20),
-                   ('path-of-exile', 'donate-packs-coins', 'max-trade-quantity', false, false, false, null, null, 30),
-                   ('path-of-exile', 'donate-packs-coins', 'quantity-step', false, false, false, null, 1, 40),
-                   ('path-of-exile', 'donate-packs-coins', 'trade-terms', true, false, false, null, null, 50),
-                   ('path-of-exile', 'donate-packs-coins', 'delivery-methods', false, false, true, null, null, 60),
+                   -- Path of Exile / packs
+                   ('path-of-exile', 'packs', 'quantity', false, false, false, null, 1, 10),
+                   ('path-of-exile', 'packs', 'min-trade-quantity', false, false, false, null, null, 20),
+                   ('path-of-exile', 'packs', 'max-trade-quantity', false, false, false, null, null, 30),
+                   ('path-of-exile', 'packs', 'quantity-step', false, false, false, null, 1, 40),
+                   ('path-of-exile', 'packs', 'trade-terms', true, false, false, null, null, 50),
+                   ('path-of-exile', 'packs', 'delivery-methods', false, false, true, null, null, 60),
 
                    -- Albion Online / currency
                    ('albion-online', 'currency', 'quantity', true, true, false, null, null, 10),

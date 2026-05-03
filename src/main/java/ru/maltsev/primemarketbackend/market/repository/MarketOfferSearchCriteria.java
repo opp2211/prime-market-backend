@@ -1,5 +1,6 @@
 package ru.maltsev.primemarketbackend.market.repository;
 
+import java.util.Map;
 import ru.maltsev.primemarketbackend.market.service.MarketIntent;
 import ru.maltsev.primemarketbackend.market.service.MarketPriceSort;
 
@@ -10,11 +11,8 @@ public record MarketOfferSearchCriteria(
     String viewerCurrencyCode,
     MarketIntent intent,
     MarketPriceSort sort,
-    String platform,
-    String league,
-    String mode,
-    String ruthless,
-    String currencyType,
+    Map<String, String> contextFilters,
+    Map<String, String> attributeFilters,
     int page,
     int size
 ) {

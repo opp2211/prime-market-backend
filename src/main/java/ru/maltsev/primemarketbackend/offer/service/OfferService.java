@@ -98,10 +98,14 @@ public class OfferService {
         offer.setMaxTradeQuantity(request.maxTradeQuantity());
         offer.setQuantityStep(request.quantityStep());
 
+        boolean strict = "active".equals(status);
+        if (strict) {
+            applyTradeFieldDefaults(offer);
+        }
+
         validateNumericFields(offer);
         validatePriceCurrency(offer);
 
-        boolean strict = "active".equals(status);
         if (strict) {
             validateTradeFieldsForActive(offer.getCategoryId(), offer, request.deliveryMethods(), null);
             validatePriceForActive(offer);
@@ -242,6 +246,10 @@ public class OfferService {
 
         String targetStatus = offer.getStatus();
         boolean strict = "active".equals(targetStatus);
+
+        if (strict) {
+            applyTradeFieldDefaults(offer);
+        }
 
         validateNumericFields(offer);
         validatePriceCurrency(offer);
@@ -497,37 +505,29 @@ public class OfferService {
     private boolean hasAttributeChanges(Long offerId, List<OfferAttributeRequest> rawAttributes) {
         List<OfferAttributeRequest> requested = normalizeAttributes(rawAttributes);
         List<OfferAttributeValue> existing = offerAttributeValueRepository.findAllByOfferId(offerId);
-        if (requested.size() != existing.size()) {
-            return true;
-        }
-
-        Map<String, AttributeSnapshot> existingBySlug = new HashMap<>();
-        for (OfferAttributeValue value : existing) {
-            existingBySlug.put(
+        List<AttributeSnapshot> existingSnapshots = existing.stream()
+            .map(value -> new AttributeSnapshot(
                 value.getCategoryAttribute().getSlug().toLowerCase(Locale.ROOT),
-                new AttributeSnapshot(
-                    value.getCategoryAttributeOption() == null
-                        ? null
-                        : value.getCategoryAttributeOption().getSlug().toLowerCase(Locale.ROOT),
-                    value.getValueText(),
-                    value.getValueNumber(),
-                    value.getValueBoolean()
-                )
-            );
-        }
-
-        for (OfferAttributeRequest request : requested) {
-            AttributeSnapshot expected = new AttributeSnapshot(
+                value.getCategoryAttributeOption() == null
+                    ? null
+                    : value.getCategoryAttributeOption().getSlug().toLowerCase(Locale.ROOT),
+                value.getValueText(),
+                value.getValueNumber(),
+                value.getValueBoolean()
+            ))
+            .sorted()
+            .toList();
+        List<AttributeSnapshot> requestedSnapshots = requested.stream()
+            .map(request -> new AttributeSnapshot(
+                request.attributeSlug(),
                 request.optionSlug(),
                 request.valueText(),
                 request.valueNumber(),
                 request.valueBoolean()
-            );
-            if (!expected.equals(existingBySlug.get(request.attributeSlug()))) {
-                return true;
-            }
-        }
-        return false;
+            ))
+            .sorted()
+            .toList();
+        return !existingSnapshots.equals(requestedSnapshots);
     }
 
     private boolean hasDeliveryMethodChanges(Long offerId, List<String> rawMethods) {
@@ -625,6 +625,7 @@ public class OfferService {
         }
 
         Set<String> providedSlugs = new HashSet<>();
+        Set<String> uniqueValues = new HashSet<>();
         List<Long> optionAttributeIds = new ArrayList<>();
         for (OfferAttributeRequest attributeRequest : attributes) {
             String attributeSlug = attributeRequest.attributeSlug();
@@ -636,15 +637,24 @@ public class OfferService {
                     "Attribute " + attributeSlug + " is not allowed for category"
                 );
             }
-            if (!providedSlugs.add(attributeSlug)) {
+            String dataType = normalizeDataType(attribute.getDataType());
+            if (!"multiselect".equals(dataType) && providedSlugs.contains(attributeSlug)) {
                 throw new ApiProblemException(
                     HttpStatus.BAD_REQUEST,
                     "DUPLICATE_ATTRIBUTE",
                     "Duplicate attribute " + attributeSlug
                 );
             }
+            providedSlugs.add(attributeSlug);
             validateAttributeValue(attribute, attributeRequest);
-            String dataType = normalizeDataType(attribute.getDataType());
+            String uniqueValueKey = attributeSnapshotKey(attributeRequest);
+            if (!uniqueValues.add(uniqueValueKey)) {
+                throw new ApiProblemException(
+                    HttpStatus.BAD_REQUEST,
+                    "DUPLICATE_ATTRIBUTE",
+                    "Duplicate attribute " + attributeSlug
+                );
+            }
             if ("select".equals(dataType) || "multiselect".equals(dataType)) {
                 optionAttributeIds.add(attribute.getId());
             }
@@ -960,6 +970,36 @@ public class OfferService {
         }
     }
 
+    private void applyTradeFieldDefaults(Offer offer) {
+        Map<String, CategoryTradeFieldConfig> configs = loadTradeFieldConfigs(offer.getCategoryId());
+        if (offer.getQuantity() == null) {
+            offer.setQuantity(defaultNumber(configs.get(FIELD_QUANTITY)));
+        }
+        if (offer.getMinTradeQuantity() == null) {
+            offer.setMinTradeQuantity(defaultNumber(configs.get(FIELD_MIN_TRADE_QUANTITY)));
+        }
+        if (offer.getMaxTradeQuantity() == null) {
+            offer.setMaxTradeQuantity(defaultNumber(configs.get(FIELD_MAX_TRADE_QUANTITY)));
+        }
+        if (offer.getQuantityStep() == null) {
+            offer.setQuantityStep(defaultNumber(configs.get(FIELD_QUANTITY_STEP)));
+        }
+        if (offer.getTradeTerms() == null) {
+            offer.setTradeTerms(defaultText(configs.get(FIELD_TRADE_TERMS)));
+        }
+    }
+
+    private BigDecimal defaultNumber(CategoryTradeFieldConfig config) {
+        return config == null ? null : config.getDefaultValueNumber();
+    }
+
+    private String defaultText(CategoryTradeFieldConfig config) {
+        if (config == null || config.getDefaultValueText() == null) {
+            return null;
+        }
+        return normalizeNullableText(config.getDefaultValueText());
+    }
+
     private void validateTradeFieldsForActive(
         Long categoryId,
         Offer offer,
@@ -1239,6 +1279,16 @@ public class OfferService {
         return slug.trim().toLowerCase(Locale.ROOT);
     }
 
+    private String attributeSnapshotKey(OfferAttributeRequest request) {
+        return new AttributeSnapshot(
+            request.attributeSlug(),
+            request.optionSlug(),
+            request.valueText(),
+            request.valueNumber(),
+            request.valueBoolean()
+        ).sortKey();
+    }
+
     private boolean numbersEqual(BigDecimal left, BigDecimal right) {
         if (left == null || right == null) {
             return left == null && right == null;
@@ -1247,10 +1297,25 @@ public class OfferService {
     }
 
     private record AttributeSnapshot(
+        String attributeSlug,
         String optionSlug,
         String valueText,
         BigDecimal valueNumber,
         Boolean valueBoolean
-    ) {
+    ) implements Comparable<AttributeSnapshot> {
+        @Override
+        public int compareTo(AttributeSnapshot other) {
+            return sortKey().compareTo(other.sortKey());
+        }
+
+        String sortKey() {
+            return List.of(
+                Objects.toString(attributeSlug, ""),
+                Objects.toString(optionSlug, ""),
+                Objects.toString(valueText, ""),
+                Objects.toString(valueNumber, ""),
+                Objects.toString(valueBoolean, "")
+            ).toString();
+        }
     }
 }
