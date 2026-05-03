@@ -24,7 +24,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import ru.maltsev.primemarketbackend.deposit.api.dto.CreateDepositRequest;
 import ru.maltsev.primemarketbackend.deposit.api.dto.DepositRequestResponse;
+import ru.maltsev.primemarketbackend.deposit.domain.DepositPaymentInstruction;
 import ru.maltsev.primemarketbackend.deposit.domain.DepositRequest;
+import ru.maltsev.primemarketbackend.deposit.repository.DepositPaymentInstructionRepository;
 import ru.maltsev.primemarketbackend.deposit.service.DepositRequestService;
 import ru.maltsev.primemarketbackend.security.user.UserPrincipal;
 
@@ -33,6 +35,7 @@ import ru.maltsev.primemarketbackend.security.user.UserPrincipal;
 @RequiredArgsConstructor
 public class DepositRequestController {
     private final DepositRequestService depositRequestService;
+    private final DepositPaymentInstructionRepository depositPaymentInstructionRepository;
 
     @PostMapping
     @ApiResponse(
@@ -49,7 +52,8 @@ public class DepositRequestController {
         }
 
         DepositRequest depositRequest = depositRequestService.create(principal.getUser().getId(), request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(DepositRequestResponse.from(depositRequest));
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(DepositRequestResponse.from(depositRequest, paymentInstructionFor(depositRequest)));
     }
 
     @GetMapping
@@ -94,7 +98,7 @@ public class DepositRequestController {
         }
 
         DepositRequest depositRequest = depositRequestService.getForUser(publicId, principal.getUser().getId());
-        return ResponseEntity.ok(DepositRequestResponse.from(depositRequest));
+        return ResponseEntity.ok(DepositRequestResponse.from(depositRequest, paymentInstructionFor(depositRequest)));
     }
 
     @PostMapping("/{publicId}/mark-paid")
@@ -107,7 +111,7 @@ public class DepositRequestController {
         }
 
         DepositRequest depositRequest = depositRequestService.markPaid(publicId, principal.getUser().getId());
-        return ResponseEntity.ok(DepositRequestResponse.from(depositRequest));
+        return ResponseEntity.ok(DepositRequestResponse.from(depositRequest, paymentInstructionFor(depositRequest)));
     }
 
     @PostMapping("/{publicId}/cancel")
@@ -120,6 +124,10 @@ public class DepositRequestController {
         }
 
         DepositRequest depositRequest = depositRequestService.cancel(publicId, principal.getUser().getId());
-        return ResponseEntity.ok(DepositRequestResponse.from(depositRequest));
+        return ResponseEntity.ok(DepositRequestResponse.from(depositRequest, paymentInstructionFor(depositRequest)));
+    }
+
+    private DepositPaymentInstruction paymentInstructionFor(DepositRequest request) {
+        return depositPaymentInstructionRepository.findByDepositRequestId(request.getId()).orElse(null);
     }
 }

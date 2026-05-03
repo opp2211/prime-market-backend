@@ -23,7 +23,9 @@ import ru.maltsev.primemarketbackend.account.repository.UserAccountRepository;
 import ru.maltsev.primemarketbackend.account.repository.UserAccountTxCriteriaRepository;
 import ru.maltsev.primemarketbackend.account.repository.UserAccountTxReadRow;
 import ru.maltsev.primemarketbackend.currency.domain.Currency;
+import ru.maltsev.primemarketbackend.currency.domain.UserCurrencyConversion;
 import ru.maltsev.primemarketbackend.currency.repository.CurrencyRepository;
+import ru.maltsev.primemarketbackend.currency.repository.UserCurrencyConversionRepository;
 import ru.maltsev.primemarketbackend.deposit.domain.DepositRequest;
 import ru.maltsev.primemarketbackend.deposit.repository.DepositRequestRepository;
 import ru.maltsev.primemarketbackend.order.domain.Order;
@@ -41,6 +43,7 @@ public class UserAccountService {
     private final UserAccountRepository userAccountRepository;
     private final UserAccountTxCriteriaRepository userAccountTxCriteriaRepository;
     private final CurrencyRepository currencyRepository;
+    private final UserCurrencyConversionRepository userCurrencyConversionRepository;
     private final DepositRequestRepository depositRequestRepository;
     private final WithdrawalRequestRepository withdrawalRequestRepository;
     private final OrderRepository orderRepository;
@@ -144,6 +147,10 @@ public class UserAccountService {
             .filter(row -> row.refType() != null && row.refType().startsWith("ORDER_"))
             .map(UserAccountTxReadRow::refId)
             .collect(java.util.stream.Collectors.toSet());
+        Set<Long> conversionIds = rows.stream()
+            .filter(row -> "USER_CURRENCY_CONVERSION".equals(row.refType()))
+            .map(UserAccountTxReadRow::refId)
+            .collect(java.util.stream.Collectors.toSet());
 
         Map<Long, DepositRequest> depositsById = new HashMap<>();
         depositRequestRepository.findAllById(depositIds).forEach(request -> depositsById.put(request.getId(), request));
@@ -154,8 +161,11 @@ public class UserAccountService {
 
         Map<Long, Order> ordersById = new HashMap<>();
         orderRepository.findAllById(orderIds).forEach(order -> ordersById.put(order.getId(), order));
+        Map<Long, UserCurrencyConversion> conversionsById = new HashMap<>();
+        userCurrencyConversionRepository.findAllById(conversionIds)
+            .forEach(conversion -> conversionsById.put(conversion.getId(), conversion));
 
-        return new TransactionReferenceContext(depositsById, withdrawalsById, ordersById);
+        return new TransactionReferenceContext(depositsById, withdrawalsById, ordersById, conversionsById);
     }
 
     private WalletTransactionResponse toWalletTransaction(
@@ -191,6 +201,16 @@ public class UserAccountService {
             }
             return "Withdrawal";
         }
+        if ("USER_CURRENCY_CONVERSION".equals(row.refType())) {
+            UserCurrencyConversion conversion = context.conversionsById().get(row.refId());
+            if (conversion != null) {
+                return "Currency conversion %s to %s".formatted(
+                    conversion.getFromCurrencyCode(),
+                    conversion.getToCurrencyCode()
+                );
+            }
+            return "Currency conversion";
+        }
         return switch (row.txType()) {
             case "ORDER_SETTLEMENT_DEBIT" -> "Order settlement debit";
             case "ORDER_SELLER_PAYOUT" -> "Order seller payout";
@@ -211,6 +231,10 @@ public class UserAccountService {
             Order order = context.ordersById().get(row.refId());
             return order == null ? null : order.getPublicId();
         }
+        if ("USER_CURRENCY_CONVERSION".equals(row.refType())) {
+            UserCurrencyConversion conversion = context.conversionsById().get(row.refId());
+            return conversion == null ? null : conversion.getPublicId();
+        }
         return null;
     }
 
@@ -225,7 +249,8 @@ public class UserAccountService {
     private record TransactionReferenceContext(
         Map<Long, DepositRequest> depositsById,
         Map<Long, WithdrawalRequest> withdrawalsById,
-        Map<Long, Order> ordersById
+        Map<Long, Order> ordersById,
+        Map<Long, UserCurrencyConversion> conversionsById
     ) {
     }
 }

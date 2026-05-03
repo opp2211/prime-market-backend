@@ -17,4 +17,11 @@ public class DepositMethodService {
             .map(DepositMethodResponse::from)
             .toList();
     }
+
+    public List<DepositMethodResponse> getAllDepositMethods() {
+        return depositMethodRepository.findAllByOrderByCurrencyCodeAscIdAsc()
+            .stream()
+            .map(DepositMethodResponse::from)
+            .toList();
+    }
 }

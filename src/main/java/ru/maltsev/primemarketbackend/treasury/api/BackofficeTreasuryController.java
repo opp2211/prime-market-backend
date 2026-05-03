@@ -27,10 +27,12 @@ import ru.maltsev.primemarketbackend.treasury.api.dto.CreateTreasuryAccountReque
 import ru.maltsev.primemarketbackend.treasury.api.dto.CreateTreasuryTransactionRequest;
 import ru.maltsev.primemarketbackend.treasury.api.dto.CreateTreasuryTransferRequest;
 import ru.maltsev.primemarketbackend.treasury.api.dto.TreasuryAccountResponse;
+import ru.maltsev.primemarketbackend.treasury.api.dto.TreasuryExposureResponse;
 import ru.maltsev.primemarketbackend.treasury.api.dto.TreasuryTransactionResponse;
 import ru.maltsev.primemarketbackend.treasury.api.dto.TreasuryTransferResponse;
 import ru.maltsev.primemarketbackend.treasury.api.dto.UpdateTreasuryAccountRequest;
 import ru.maltsev.primemarketbackend.treasury.domain.TreasuryTransaction;
+import ru.maltsev.primemarketbackend.treasury.service.TreasuryExposureService;
 import ru.maltsev.primemarketbackend.treasury.service.TreasuryService;
 
 @RestController
@@ -39,6 +41,7 @@ import ru.maltsev.primemarketbackend.treasury.service.TreasuryService;
 @PreAuthorize("hasAuthority('" + PermissionCodes.TREASURY_VIEW + "')")
 public class BackofficeTreasuryController {
     private final TreasuryService treasuryService;
+    private final TreasuryExposureService treasuryExposureService;
 
     @GetMapping("/accounts")
     public ResponseEntity<List<TreasuryAccountResponse>> listAccounts(
@@ -91,6 +94,16 @@ public class BackofficeTreasuryController {
         }
         return ResponseEntity.ok(treasuryService.listTransactions(accountPublicId, pageable)
             .map(TreasuryTransactionResponse::from));
+    }
+
+    @GetMapping("/exposure")
+    public ResponseEntity<TreasuryExposureResponse> exposure(
+        @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(treasuryExposureService.buildExposureReport());
     }
 
     @PostMapping("/transactions")

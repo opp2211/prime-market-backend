@@ -26,16 +26,22 @@ import ru.maltsev.primemarketbackend.money.domain.MoneyOperationEventType;
 import ru.maltsev.primemarketbackend.money.domain.MoneyOperationType;
 import ru.maltsev.primemarketbackend.money.service.MoneyOperationEventService;
 import ru.maltsev.primemarketbackend.notification.service.NotificationService;
+import ru.maltsev.primemarketbackend.treasury.domain.TreasuryAccount;
 import ru.maltsev.primemarketbackend.treasury.domain.TreasuryTransaction;
+import ru.maltsev.primemarketbackend.treasury.repository.TreasuryAccountRepository;
 import ru.maltsev.primemarketbackend.treasury.service.TreasuryService;
 import ru.maltsev.primemarketbackend.withdrawal.api.dto.ConfirmWithdrawalRequest;
+import ru.maltsev.primemarketbackend.withdrawal.api.dto.CreateWithdrawalPayoutPlanRequest;
 import ru.maltsev.primemarketbackend.withdrawal.api.dto.CreateWithdrawalRequest;
 import ru.maltsev.primemarketbackend.withdrawal.api.dto.RejectWithdrawalRequest;
 import ru.maltsev.primemarketbackend.withdrawal.domain.PayoutProfile;
 import ru.maltsev.primemarketbackend.withdrawal.domain.WithdrawalMethod;
+import ru.maltsev.primemarketbackend.withdrawal.domain.WithdrawalPayoutPlan;
+import ru.maltsev.primemarketbackend.withdrawal.domain.WithdrawalPayoutPlanStatus;
 import ru.maltsev.primemarketbackend.withdrawal.domain.WithdrawalRequest;
 import ru.maltsev.primemarketbackend.withdrawal.domain.WithdrawalRequestStatus;
 import ru.maltsev.primemarketbackend.withdrawal.repository.WithdrawalMethodRepository;
+import ru.maltsev.primemarketbackend.withdrawal.repository.WithdrawalPayoutPlanRepository;
 import ru.maltsev.primemarketbackend.withdrawal.repository.WithdrawalRequestRepository;
 
 @Service
@@ -55,6 +61,8 @@ public class WithdrawalRequestService {
     private final NotificationService notificationService;
     private final MoneyOperationEventService moneyOperationEventService;
     private final TreasuryService treasuryService;
+    private final TreasuryAccountRepository treasuryAccountRepository;
+    private final WithdrawalPayoutPlanRepository withdrawalPayoutPlanRepository;
 
     @Transactional
     public WithdrawalRequest create(Long userId, CreateWithdrawalRequest request) {
@@ -192,6 +200,87 @@ public class WithdrawalRequestService {
     }
 
     @Transactional
+    public WithdrawalRequest planPayout(
+        UUID publicId,
+        Long actorUserId,
+        CreateWithdrawalPayoutPlanRequest payload
+    ) {
+        WithdrawalRequest request = lockRequest(publicId);
+        if (!(request.isOpen() || request.isProcessing())) {
+            throw conflict(
+                "INVALID_STATUS",
+                "Cannot plan payout for withdrawal request in status " + request.getStatus()
+            );
+        }
+
+        TreasuryAccount treasuryAccount = treasuryAccountRepository.findByPublicIdForUpdate(
+            payload.treasuryAccountPublicId()
+        ).orElseThrow(() -> notFound("TREASURY_ACCOUNT_NOT_FOUND", "Treasury account not found"));
+        if (!treasuryAccount.isActive()) {
+            throw conflict("TREASURY_ACCOUNT_INACTIVE", "Treasury account is inactive");
+        }
+
+        BigDecimal plannedUserAmount = payload.plannedUserAmount() == null
+            ? request.getActualPayoutAmount()
+            : normalizeMoney(payload.plannedUserAmount());
+        BigDecimal treasuryAmount = payload.treasuryAmount() == null
+            ? resolveSameCurrencyTreasuryAmount(treasuryAccount, plannedUserAmount, request.getCurrencyCodeSnapshot())
+            : normalizeMoney(payload.treasuryAmount());
+
+        WithdrawalRequestStatus statusBefore = request.getStatus();
+        if (request.isOpen()) {
+            request.markProcessing(actorUserId, Instant.now());
+        }
+
+        WithdrawalPayoutPlan plan = withdrawalPayoutPlanRepository.findByWithdrawalRequestId(request.getId())
+            .orElse(null);
+        if (plan == null) {
+            plan = new WithdrawalPayoutPlan(
+                request,
+                treasuryAccount,
+                plannedUserAmount,
+                request.getCurrencyCodeSnapshot(),
+                treasuryAmount,
+                actorUserId,
+                payload.externalReference(),
+                payload.operatorComment()
+            );
+        } else {
+            plan.replace(
+                treasuryAccount,
+                plannedUserAmount,
+                treasuryAmount,
+                actorUserId,
+                payload.externalReference(),
+                payload.operatorComment()
+            );
+        }
+        WithdrawalPayoutPlan savedPlan = withdrawalPayoutPlanRepository.saveAndFlush(plan);
+        request.attachPayoutPlan(savedPlan);
+        WithdrawalRequest savedRequest = withdrawalRequestRepository.save(request);
+        record(
+            savedRequest,
+            MoneyOperationEventType.WITHDRAWAL_PAYOUT_PLANNED,
+            statusBefore,
+            MoneyOperationActorType.OPERATOR,
+            actorUserId,
+            null,
+            normalizeOptional(payload.operatorComment()),
+            moneyOperationEventService.payload(
+                "payout_plan_public_id", savedPlan.getPublicId(),
+                "treasury_account_public_id", treasuryAccount.getPublicId(),
+                "treasury_account_code", treasuryAccount.getCode(),
+                "planned_user_amount", plannedUserAmount,
+                "user_currency_code", request.getCurrencyCodeSnapshot(),
+                "treasury_amount", treasuryAmount,
+                "treasury_currency_code", treasuryAccount.getCurrencyCode(),
+                "external_reference", normalizeOptional(payload.externalReference())
+            )
+        );
+        return savedRequest;
+    }
+
+    @Transactional
     public WithdrawalRequest reject(UUID publicId, Long actorUserId, RejectWithdrawalRequest payload) {
         WithdrawalRequest request = lockRequest(publicId);
         if (request.isRejected()) {
@@ -259,15 +348,35 @@ public class WithdrawalRequestService {
         BigDecimal actualPayoutAmount = payload == null || payload.actualPayoutAmount() == null
             ? request.getActualPayoutAmount()
             : normalizeMoney(payload.actualPayoutAmount());
+        WithdrawalPayoutPlan payoutPlan = withdrawalPayoutPlanRepository.findByWithdrawalRequestId(request.getId())
+            .orElse(null);
+        UUID resolvedTreasuryAccountPublicId = payload == null ? null : payload.treasuryAccountPublicId();
+        BigDecimal resolvedTreasuryAmount = payload == null ? null : payload.treasuryAmount();
+        String resolvedTreasuryExternalReference = payload == null ? null : payload.treasuryExternalReference();
+        String resolvedOperatorComment = payload == null ? null : normalizeOptional(payload.operatorComment());
+        if (payoutPlan != null && payoutPlan.getStatus() == WithdrawalPayoutPlanStatus.PLANNED) {
+            if (resolvedTreasuryAccountPublicId == null) {
+                resolvedTreasuryAccountPublicId = payoutPlan.getTreasuryAccount().getPublicId();
+            }
+            if (resolvedTreasuryAmount == null) {
+                resolvedTreasuryAmount = payoutPlan.getTreasuryAmount();
+            }
+            if (resolvedTreasuryExternalReference == null) {
+                resolvedTreasuryExternalReference = payoutPlan.getExternalReference();
+            }
+            if (resolvedOperatorComment == null) {
+                resolvedOperatorComment = payoutPlan.getOperatorComment();
+            }
+        }
         TreasuryTransaction treasuryTransaction = treasuryService.recordWithdrawalOut(
-            payload == null ? null : payload.treasuryAccountPublicId(),
-            payload == null ? null : payload.treasuryAmount(),
+            resolvedTreasuryAccountPublicId,
+            resolvedTreasuryAmount,
             actualPayoutAmount,
             request.getCurrencyCodeSnapshot(),
             request.getId(),
             request.getPublicId(),
-            payload == null ? null : payload.treasuryExternalReference(),
-            payload == null ? null : normalizeOptional(payload.operatorComment()),
+            resolvedTreasuryExternalReference,
+            resolvedOperatorComment,
             actorUserId,
             moneyOperationEventService.payload(
                 "user_debited_amount", request.getAmount(),
@@ -281,10 +390,14 @@ public class WithdrawalRequestService {
         request.confirm(
             actorUserId,
             actualPayoutAmount,
-            payload == null ? null : normalizeOptional(payload.operatorComment()),
+            resolvedOperatorComment,
             Instant.now()
         );
         request.attachTreasuryTransaction(treasuryTransaction);
+        if (payoutPlan != null && payoutPlan.getStatus() == WithdrawalPayoutPlanStatus.PLANNED) {
+            payoutPlan.complete(Instant.now());
+            withdrawalPayoutPlanRepository.save(payoutPlan);
+        }
         WithdrawalRequest confirmedRequest = withdrawalRequestRepository.save(request);
         Map<String, Object> eventPayload = moneyOperationEventService.payload(
             "debited_amount", request.getAmount(),
@@ -292,6 +405,7 @@ public class WithdrawalRequestService {
             "currency_code", request.getCurrencyCodeSnapshot()
         );
         appendTreasuryPayload(eventPayload, treasuryTransaction);
+        appendPayoutPlanPayload(eventPayload, payoutPlan);
         record(
             confirmedRequest,
             MoneyOperationEventType.WITHDRAWAL_CONFIRMED,
@@ -367,6 +481,19 @@ public class WithdrawalRequestService {
             .orElseThrow(() -> notFound("WITHDRAWAL_REQUEST_NOT_FOUND", "Withdrawal request not found"));
     }
 
+    private BigDecimal resolveSameCurrencyTreasuryAmount(
+        TreasuryAccount treasuryAccount,
+        BigDecimal plannedUserAmount,
+        String requestCurrencyCode
+    ) {
+        if (!treasuryAccount.getCurrencyCode().equalsIgnoreCase(requestCurrencyCode)) {
+            throw validationError(
+                "treasury_amount is required when treasury account currency differs from withdrawal currency"
+            );
+        }
+        return plannedUserAmount;
+    }
+
     private void record(
         WithdrawalRequest request,
         MoneyOperationEventType eventType,
@@ -401,6 +528,16 @@ public class WithdrawalRequestService {
         payload.put("treasury_account_code", transaction.getTreasuryAccount().getCode());
         payload.put("treasury_amount", transaction.getAmount());
         payload.put("treasury_currency_code", transaction.getTreasuryAccount().getCurrencyCode());
+    }
+
+    private void appendPayoutPlanPayload(Map<String, Object> payload, WithdrawalPayoutPlan payoutPlan) {
+        if (payoutPlan == null) {
+            return;
+        }
+        payload.put("payout_plan_public_id", payoutPlan.getPublicId());
+        payload.put("payout_plan_status", payoutPlan.getStatus().name());
+        payload.put("planned_treasury_amount", payoutPlan.getTreasuryAmount());
+        payload.put("planned_treasury_currency_code", payoutPlan.getTreasuryCurrencyCodeSnapshot());
     }
 
     private WithdrawalRequestStatus parseStatus(String status) {

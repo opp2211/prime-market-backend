@@ -28,7 +28,9 @@ import ru.maltsev.primemarketbackend.deposit.api.dto.AdminDepositRequestShortRes
 import ru.maltsev.primemarketbackend.deposit.api.dto.ConfirmDepositRequest;
 import ru.maltsev.primemarketbackend.deposit.api.dto.IssueDetailsRequest;
 import ru.maltsev.primemarketbackend.deposit.api.dto.RejectDepositRequest;
+import ru.maltsev.primemarketbackend.deposit.domain.DepositPaymentInstruction;
 import ru.maltsev.primemarketbackend.deposit.domain.DepositRequest;
+import ru.maltsev.primemarketbackend.deposit.repository.DepositPaymentInstructionRepository;
 import ru.maltsev.primemarketbackend.deposit.service.DepositRequestService;
 import ru.maltsev.primemarketbackend.money.domain.MoneyOperationEvent;
 import ru.maltsev.primemarketbackend.money.domain.MoneyOperationType;
@@ -46,6 +48,7 @@ public class DepositRequestAdminController {
     private final DepositRequestService depositRequestService;
     private final MoneyOperationEventService moneyOperationEventService;
     private final TreasuryService treasuryService;
+    private final DepositPaymentInstructionRepository depositPaymentInstructionRepository;
 
     @GetMapping
     public ResponseEntity<Page<AdminDepositRequestShortResponse>> list(
@@ -91,7 +94,8 @@ public class DepositRequestAdminController {
         return ResponseEntity.ok(AdminDepositRequestResponse.from(
             depositRequest,
             eventsFor(depositRequest),
-            treasuryTransactionsFor(depositRequest)
+            treasuryTransactionsFor(depositRequest),
+            paymentInstructionFor(depositRequest)
         ));
     }
 
@@ -109,12 +113,17 @@ public class DepositRequestAdminController {
             publicId,
             principal.getUser().getId(),
             request.paymentDetails(),
+            request.depositPaymentRoutePublicId(),
+            request.treasuryAccountPublicId(),
+            request.treasuryAmount(),
+            request.expiresAt(),
             request.operatorComment()
         );
         return ResponseEntity.ok(AdminDepositRequestResponse.from(
             depositRequest,
             eventsFor(depositRequest),
-            treasuryTransactionsFor(depositRequest)
+            treasuryTransactionsFor(depositRequest),
+            paymentInstructionFor(depositRequest)
         ));
     }
 
@@ -140,7 +149,8 @@ public class DepositRequestAdminController {
         return ResponseEntity.ok(AdminDepositRequestResponse.from(
             depositRequest,
             eventsFor(depositRequest),
-            treasuryTransactionsFor(depositRequest)
+            treasuryTransactionsFor(depositRequest),
+            paymentInstructionFor(depositRequest)
         ));
     }
 
@@ -163,7 +173,8 @@ public class DepositRequestAdminController {
         return ResponseEntity.ok(AdminDepositRequestResponse.from(
             depositRequest,
             eventsFor(depositRequest),
-            treasuryTransactionsFor(depositRequest)
+            treasuryTransactionsFor(depositRequest),
+            paymentInstructionFor(depositRequest)
         ));
     }
 
@@ -173,5 +184,9 @@ public class DepositRequestAdminController {
 
     private List<TreasuryTransaction> treasuryTransactionsFor(DepositRequest request) {
         return treasuryService.listOperationTransactions(MoneyOperationType.DEPOSIT_REQUEST, request.getPublicId());
+    }
+
+    private DepositPaymentInstruction paymentInstructionFor(DepositRequest request) {
+        return depositPaymentInstructionRepository.findByDepositRequestId(request.getId()).orElse(null);
     }
 }

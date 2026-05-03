@@ -22,6 +22,7 @@ public record AdminDepositRequestResponse(
     @JsonProperty("deposit_method_title") String depositMethodTitle,
     DepositRequestStatus status,
     @JsonProperty("payment_details") String paymentDetails,
+    @JsonProperty("payment_instruction") DepositPaymentInstructionResponse paymentInstruction,
     @JsonProperty("details_issued_at") Instant detailsIssuedAt,
     @JsonProperty("details_issued_by_user_id") Long detailsIssuedByUserId,
     @JsonProperty("user_marked_paid_at") Instant userMarkedPaidAt,
@@ -53,6 +54,15 @@ public record AdminDepositRequestResponse(
         List<MoneyOperationEvent> events,
         List<TreasuryTransaction> treasuryTransactions
     ) {
+        return from(request, events, treasuryTransactions, null);
+    }
+
+    public static AdminDepositRequestResponse from(
+        DepositRequest request,
+        List<MoneyOperationEvent> events,
+        List<TreasuryTransaction> treasuryTransactions,
+        ru.maltsev.primemarketbackend.deposit.domain.DepositPaymentInstruction paymentInstruction
+    ) {
         return new AdminDepositRequestResponse(
             request.getPublicId(),
             request.getUserId(),
@@ -62,6 +72,7 @@ public record AdminDepositRequestResponse(
             request.getDepositMethodTitleSnapshot(),
             request.getStatus(),
             request.getPaymentDetails(),
+            DepositPaymentInstructionResponse.from(paymentInstruction),
             request.getDetailsIssuedAt(),
             request.getDetailsIssuedByUserId(),
             request.getUserMarkedPaidAt(),

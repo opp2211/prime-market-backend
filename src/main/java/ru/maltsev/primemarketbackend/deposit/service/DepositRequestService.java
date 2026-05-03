@@ -1,6 +1,8 @@
 package ru.maltsev.primemarketbackend.deposit.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -15,9 +17,13 @@ import ru.maltsev.primemarketbackend.account.service.UserAccountService;
 import ru.maltsev.primemarketbackend.deposit.api.dto.AdminDepositRequestShortResponse;
 import ru.maltsev.primemarketbackend.deposit.api.dto.CreateDepositRequest;
 import ru.maltsev.primemarketbackend.deposit.domain.DepositMethod;
+import ru.maltsev.primemarketbackend.deposit.domain.DepositPaymentInstruction;
+import ru.maltsev.primemarketbackend.deposit.domain.DepositPaymentRoute;
 import ru.maltsev.primemarketbackend.deposit.domain.DepositRequest;
 import ru.maltsev.primemarketbackend.deposit.domain.DepositRequestStatus;
 import ru.maltsev.primemarketbackend.deposit.repository.DepositMethodRepository;
+import ru.maltsev.primemarketbackend.deposit.repository.DepositPaymentInstructionRepository;
+import ru.maltsev.primemarketbackend.deposit.repository.DepositPaymentRouteRepository;
 import ru.maltsev.primemarketbackend.deposit.repository.DepositRequestRepository;
 import ru.maltsev.primemarketbackend.exception.ApiProblemException;
 import ru.maltsev.primemarketbackend.money.domain.MoneyOperationActorType;
@@ -25,10 +31,14 @@ import ru.maltsev.primemarketbackend.money.domain.MoneyOperationEventType;
 import ru.maltsev.primemarketbackend.money.domain.MoneyOperationType;
 import ru.maltsev.primemarketbackend.money.service.MoneyOperationEventService;
 import ru.maltsev.primemarketbackend.notification.service.NotificationService;
+import ru.maltsev.primemarketbackend.treasury.domain.TreasuryAccount;
 import ru.maltsev.primemarketbackend.treasury.domain.TreasuryTransaction;
+import ru.maltsev.primemarketbackend.treasury.repository.TreasuryAccountRepository;
 import ru.maltsev.primemarketbackend.treasury.service.TreasuryService;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +58,10 @@ public class DepositRequestService {
 
     private final DepositRequestRepository depositRequestRepository;
     private final DepositMethodRepository depositMethodRepository;
+    private final DepositPaymentRouteService depositPaymentRouteService;
+    private final DepositPaymentRouteRepository depositPaymentRouteRepository;
+    private final DepositPaymentInstructionRepository depositPaymentInstructionRepository;
+    private final TreasuryAccountRepository treasuryAccountRepository;
     private final UserAccountTxRepository userAccountTxRepository;
     private final UserAccountService userAccountService;
     private final NotificationService notificationService;
@@ -65,14 +79,6 @@ public class DepositRequestService {
         ));
 
         DepositRequest depositRequest = new DepositRequest(userId, method, request.amount());
-        String paymentDetails = method.getPaymentDetails();
-        DepositRequestStatus statusBeforeDetails = depositRequest.getStatus();
-        if (paymentDetails != null && !paymentDetails.isBlank()) {
-            depositRequest.startWaitingPayment(paymentDetails, null, null);
-        } else {
-            depositRequest.startPendingDetails();
-        }
-
         DepositRequest savedRequest = depositRequestRepository.save(depositRequest);
         record(
             savedRequest,
@@ -89,19 +95,60 @@ public class DepositRequestService {
                 "deposit_method_title", savedRequest.getDepositMethodTitleSnapshot()
             )
         );
-        if (paymentDetails != null && !paymentDetails.isBlank()) {
-            record(
+        DepositPaymentRoute route = depositPaymentRouteService.selectRoute(method, request.amount());
+        if (route != null) {
+            DepositRequestStatus statusBeforeDetails = savedRequest.getStatus();
+            DepositPaymentInstruction instruction = createPaymentInstruction(
                 savedRequest,
+                route,
+                route.getTreasuryAccount(),
+                route.getPaymentDetails(),
+                null,
+                null,
+                null
+            );
+            DepositRequest instructedRequest = depositRequestRepository.save(savedRequest);
+            record(
+                instructedRequest,
                 MoneyOperationEventType.DEPOSIT_DETAILS_ISSUED,
                 statusBeforeDetails,
                 MoneyOperationActorType.SYSTEM,
                 null,
                 null,
                 null,
-                moneyOperationEventService.payload("payment_details", paymentDetails)
+                detailsIssuedPayload(instruction)
             );
+            return instructedRequest;
         }
-        return savedRequest;
+
+        String paymentDetails = method.getPaymentDetails();
+        if (paymentDetails != null && !paymentDetails.isBlank()) {
+            DepositRequestStatus statusBeforeDetails = savedRequest.getStatus();
+            Map<String, Object> details = normalizePaymentDetailsForMap(paymentDetails);
+            DepositPaymentInstruction instruction = createPaymentInstruction(
+                savedRequest,
+                null,
+                null,
+                details,
+                null,
+                null,
+                null
+            );
+            DepositRequest instructedRequest = depositRequestRepository.save(savedRequest);
+            record(
+                instructedRequest,
+                MoneyOperationEventType.DEPOSIT_DETAILS_ISSUED,
+                statusBeforeDetails,
+                MoneyOperationActorType.SYSTEM,
+                null,
+                null,
+                null,
+                detailsIssuedPayload(instruction)
+            );
+            return instructedRequest;
+        }
+        savedRequest.startPendingDetails();
+        return depositRequestRepository.save(savedRequest);
     }
 
     public DepositRequest getForUser(UUID publicId, Long userId) {
@@ -194,19 +241,81 @@ public class DepositRequestService {
     }
 
     @Transactional
-    public DepositRequest issueDetails(UUID publicId, Long actorUserId, String paymentDetails, String operatorComment) {
+    public DepositRequest issueDetails(
+        UUID publicId,
+        Long actorUserId,
+        String paymentDetails,
+        UUID routePublicId,
+        UUID treasuryAccountPublicId,
+        BigDecimal treasuryAmount,
+        Instant expiresAt,
+        String operatorComment
+    ) {
         DepositRequest request = getByPublicIdForUpdate(publicId);
         requireStatus(request, DepositRequestStatus.PENDING_DETAILS, "issue payment details");
-        if (paymentDetails == null || paymentDetails.isBlank()) {
-            throw new ApiProblemException(
-                HttpStatus.BAD_REQUEST,
-                "PAYMENT_DETAILS_REQUIRED",
-                "Payment details are required"
-            );
-        }
-        String storedPaymentDetails = normalizePaymentDetailsForStorage(paymentDetails);
         DepositRequestStatus statusBefore = request.getStatus();
-        request.startWaitingPayment(storedPaymentDetails, actorUserId, operatorComment);
+
+        DepositPaymentRoute route = null;
+        TreasuryAccount treasuryAccount = null;
+        Map<String, Object> details;
+        if (routePublicId != null) {
+            route = depositPaymentRouteRepository.findByPublicId(routePublicId)
+                .orElseThrow(() -> new ApiProblemException(
+                    HttpStatus.NOT_FOUND,
+                    "DEPOSIT_PAYMENT_ROUTE_NOT_FOUND",
+                    "Deposit payment route not found"
+                ));
+            if (!route.getDepositMethod().getId().equals(request.getDepositMethod().getId())) {
+                throw validationError("Deposit payment route does not match request method");
+            }
+            if (!route.isActive() || !route.getTreasuryAccount().isActive()) {
+                throw new ApiProblemException(
+                    HttpStatus.CONFLICT,
+                    "DEPOSIT_PAYMENT_ROUTE_INACTIVE",
+                    "Deposit payment route is inactive"
+                );
+            }
+            if (!route.accepts(request.getAmount())) {
+                throw validationError("Deposit payment route does not accept request amount");
+            }
+            treasuryAccount = route.getTreasuryAccount();
+            details = route.getPaymentDetails();
+        } else {
+            if (paymentDetails == null || paymentDetails.isBlank()) {
+                throw new ApiProblemException(
+                    HttpStatus.BAD_REQUEST,
+                    "PAYMENT_DETAILS_REQUIRED",
+                    "Payment details are required"
+                );
+            }
+            details = normalizePaymentDetailsForMap(paymentDetails);
+            if (treasuryAccountPublicId != null) {
+                treasuryAccount = treasuryAccountRepository.findByPublicId(treasuryAccountPublicId)
+                    .orElseThrow(() -> new ApiProblemException(
+                        HttpStatus.NOT_FOUND,
+                        "TREASURY_ACCOUNT_NOT_FOUND",
+                        "Treasury account not found"
+                    ));
+                if (!treasuryAccount.isActive()) {
+                    throw new ApiProblemException(
+                        HttpStatus.CONFLICT,
+                        "TREASURY_ACCOUNT_INACTIVE",
+                        "Treasury account is inactive"
+                    );
+                }
+            }
+        }
+
+        DepositPaymentInstruction instruction = createPaymentInstruction(
+            request,
+            route,
+            treasuryAccount,
+            details,
+            treasuryAmount,
+            expiresAt,
+            actorUserId,
+            operatorComment
+        );
         DepositRequest savedRequest = depositRequestRepository.save(request);
         record(
             savedRequest,
@@ -216,7 +325,7 @@ public class DepositRequestService {
             actorUserId,
             null,
             operatorComment,
-            moneyOperationEventService.payload("payment_details", storedPaymentDetails)
+            detailsIssuedPayload(instruction)
         );
         return savedRequest;
     }
@@ -237,6 +346,8 @@ public class DepositRequestService {
         }
         requireStatus(request, DepositRequestStatus.PAYMENT_VERIFICATION, "confirm payment");
         DepositRequestStatus statusBefore = request.getStatus();
+        DepositPaymentInstruction instruction = depositPaymentInstructionRepository.findByDepositRequestId(request.getId())
+            .orElse(null);
 
         UserAccount account = getUserAccountForDeposit(request);
         UserAccountTx tx = new UserAccountTx(
@@ -247,9 +358,19 @@ public class DepositRequestService {
             request.getId()
         );
         userAccountTxRepository.save(tx);
+        UUID resolvedTreasuryAccountPublicId = treasuryAccountPublicId;
+        BigDecimal resolvedTreasuryAmount = treasuryAmount;
+        if (instruction != null) {
+            if (resolvedTreasuryAccountPublicId == null && instruction.getTreasuryAccount() != null) {
+                resolvedTreasuryAccountPublicId = instruction.getTreasuryAccount().getPublicId();
+            }
+            if (resolvedTreasuryAmount == null) {
+                resolvedTreasuryAmount = instruction.getTreasuryAmount();
+            }
+        }
         TreasuryTransaction treasuryTransaction = treasuryService.recordDepositIn(
-            treasuryAccountPublicId,
-            treasuryAmount,
+            resolvedTreasuryAccountPublicId,
+            resolvedTreasuryAmount,
             request.getAmount(),
             request.getCurrencyCodeSnapshot(),
             request.getId(),
@@ -266,6 +387,10 @@ public class DepositRequestService {
         );
         request.confirm(actorUserId, confirmationReference, operatorComment);
         request.attachTreasuryTransaction(treasuryTransaction);
+        if (instruction != null) {
+            instruction.markUsed();
+            depositPaymentInstructionRepository.save(instruction);
+        }
         DepositRequest confirmedRequest = depositRequestRepository.save(request);
         Map<String, Object> payload = moneyOperationEventService.payload(
             "confirmation_reference", confirmationReference,
@@ -273,6 +398,7 @@ public class DepositRequestService {
             "currency_code", request.getCurrencyCodeSnapshot()
         );
         appendTreasuryPayload(payload, treasuryTransaction);
+        appendInstructionPayload(payload, instruction);
         record(
             confirmedRequest,
             MoneyOperationEventType.DEPOSIT_CONFIRMED,
@@ -338,22 +464,106 @@ public class DepositRequestService {
         return userAccountService.getOrCreateAccount(request.getUserId(), currencyCode);
     }
 
-    private String normalizePaymentDetailsForStorage(String paymentDetails) {
-        String trimmed = paymentDetails.trim();
-        try {
-            objectMapper.readTree(trimmed);
-            return trimmed;
-        } catch (JsonProcessingException ignored) {
-            try {
-                return objectMapper.writeValueAsString(Map.of("value", trimmed));
-            } catch (JsonProcessingException ex) {
-                throw new ApiProblemException(
-                    HttpStatus.BAD_REQUEST,
-                    "PAYMENT_DETAILS_INVALID",
-                    "Payment details cannot be encoded"
-                );
-            }
+    private DepositPaymentInstruction createPaymentInstruction(
+        DepositRequest request,
+        DepositPaymentRoute route,
+        TreasuryAccount treasuryAccount,
+        Map<String, Object> paymentDetails,
+        BigDecimal treasuryAmount,
+        Instant expiresAt,
+        Long actorUserId
+    ) {
+        return createPaymentInstruction(
+            request,
+            route,
+            treasuryAccount,
+            paymentDetails,
+            treasuryAmount,
+            expiresAt,
+            actorUserId,
+            null
+        );
+    }
+
+    private DepositPaymentInstruction createPaymentInstruction(
+        DepositRequest request,
+        DepositPaymentRoute route,
+        TreasuryAccount treasuryAccount,
+        Map<String, Object> paymentDetails,
+        BigDecimal treasuryAmount,
+        Instant expiresAt,
+        Long actorUserId,
+        String operatorComment
+    ) {
+        BigDecimal normalizedTreasuryAmount = treasuryAmount == null ? null : normalizePositiveMoney(treasuryAmount);
+        if (normalizedTreasuryAmount == null && treasuryAccount != null
+            && treasuryAccount.getCurrencyCode().equalsIgnoreCase(request.getCurrencyCodeSnapshot())) {
+            normalizedTreasuryAmount = request.getAmount();
         }
+        DepositPaymentInstruction instruction = depositPaymentInstructionRepository.saveAndFlush(
+            new DepositPaymentInstruction(
+                request,
+                route,
+                treasuryAccount,
+                paymentDetails,
+                request.getAmount(),
+                request.getCurrencyCodeSnapshot(),
+                normalizedTreasuryAmount,
+                treasuryAccount == null ? null : treasuryAccount.getCurrencyCode(),
+                expiresAt,
+                actorUserId,
+                operatorComment
+            )
+        );
+        request.startWaitingPayment(paymentDetailsToStorage(paymentDetails), actorUserId, operatorComment);
+        request.attachPaymentInstruction(instruction);
+        return instruction;
+    }
+
+    private Map<String, Object> normalizePaymentDetailsForMap(String paymentDetails) {
+        String trimmed = paymentDetails == null ? "" : paymentDetails.trim();
+        if (trimmed.isEmpty()) {
+            return Map.of();
+        }
+        try {
+            JsonNode node = objectMapper.readTree(trimmed);
+            if (node.isObject()) {
+                return objectMapper.convertValue(node, new TypeReference<Map<String, Object>>() {
+                });
+            }
+            if (node.isArray()) {
+                return Map.of("items", objectMapper.convertValue(node, List.class));
+            }
+            if (node.isTextual()) {
+                return Map.of("value", node.asText());
+            }
+            return Map.of("value", node.toString());
+        } catch (JsonProcessingException ignored) {
+            return Map.of("value", trimmed);
+        }
+    }
+
+    private String paymentDetailsToStorage(Map<String, Object> paymentDetails) {
+        try {
+            return objectMapper.writeValueAsString(
+                paymentDetails == null ? Map.of() : paymentDetails
+            );
+        } catch (JsonProcessingException ex) {
+            throw new ApiProblemException(
+                HttpStatus.BAD_REQUEST,
+                "PAYMENT_DETAILS_INVALID",
+                "Payment details cannot be encoded"
+            );
+        }
+    }
+
+    private Map<String, Object> detailsIssuedPayload(DepositPaymentInstruction instruction) {
+        Map<String, Object> payload = moneyOperationEventService.payload(
+            "payment_details", instruction.getPaymentDetailsSnapshot(),
+            "payment_instruction_public_id", instruction.getPublicId()
+        );
+        appendInstructionPayload(payload, instruction);
+        return payload;
     }
 
     private void appendTreasuryPayload(Map<String, Object> payload, TreasuryTransaction transaction) {
@@ -365,6 +575,37 @@ public class DepositRequestService {
         payload.put("treasury_account_code", transaction.getTreasuryAccount().getCode());
         payload.put("treasury_amount", transaction.getAmount());
         payload.put("treasury_currency_code", transaction.getTreasuryAccount().getCurrencyCode());
+    }
+
+    private void appendInstructionPayload(Map<String, Object> payload, DepositPaymentInstruction instruction) {
+        if (instruction == null) {
+            return;
+        }
+        payload.put("payment_instruction_public_id", instruction.getPublicId());
+        if (instruction.getDepositPaymentRoute() != null) {
+            payload.put("deposit_payment_route_public_id", instruction.getDepositPaymentRoute().getPublicId());
+        }
+        if (instruction.getTreasuryAccount() != null) {
+            payload.put("instruction_treasury_account_public_id", instruction.getTreasuryAccount().getPublicId());
+            payload.put("instruction_treasury_account_code", instruction.getTreasuryAccount().getCode());
+        }
+        payload.put("instruction_treasury_amount", instruction.getTreasuryAmount());
+        payload.put("instruction_treasury_currency_code", instruction.getTreasuryCurrencyCodeSnapshot());
+    }
+
+    private BigDecimal normalizePositiveMoney(BigDecimal amount) {
+        if (amount == null) {
+            return null;
+        }
+        try {
+            BigDecimal normalized = amount.setScale(4, RoundingMode.UNNECESSARY);
+            if (normalized.signum() <= 0) {
+                throw validationError("Amount must be positive");
+            }
+            return normalized;
+        } catch (ArithmeticException ex) {
+            throw validationError("Amount scale must be 4 or less");
+        }
     }
 
     private String firstNonBlank(String left, String right) {
@@ -388,6 +629,10 @@ public class DepositRequestService {
                 "Cannot " + action + " in status " + request.getStatus()
             );
         }
+    }
+
+    private ApiProblemException validationError(String detail) {
+        return new ApiProblemException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", detail);
     }
 
     private void record(

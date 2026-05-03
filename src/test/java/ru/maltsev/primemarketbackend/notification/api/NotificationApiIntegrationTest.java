@@ -74,6 +74,7 @@ class NotificationApiIntegrationTest extends AbstractPostgresIntegrationTest {
         jdbcTemplate.execute("""
             truncate table
                 notifications,
+                platform_account_transactions,
                 platform_account_txs,
                 platform_accounts,
                 user_account_hold_allocations,

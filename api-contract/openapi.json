@@ -67,6 +67,9 @@
           "payment_details" : {
             "type" : "string"
           },
+          "payment_instruction" : {
+            "$ref" : "#/components/schemas/DepositPaymentInstructionResponse"
+          },
           "public_id" : {
             "format" : "uuid",
             "type" : "string"
@@ -270,6 +273,9 @@
           },
           "operator_comment" : {
             "type" : "string"
+          },
+          "payout_plan" : {
+            "$ref" : "#/components/schemas/WithdrawalPayoutPlanResponse"
           },
           "payout_profile_public_id" : {
             "format" : "uuid",
@@ -554,6 +560,61 @@
         },
         "type" : "object"
       },
+      "CreateCurrencyConversionRequest" : {
+        "properties" : {
+          "from_amount" : {
+            "minimum" : 1.0E-4,
+            "type" : "number"
+          },
+          "from_currency_code" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "to_currency_code" : {
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "from_currency_code", "to_currency_code" ],
+        "type" : "object"
+      },
+      "CreateDepositPaymentRouteRequest" : {
+        "properties" : {
+          "deposit_method_id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "is_active" : {
+            "type" : "boolean"
+          },
+          "max_amount" : {
+            "type" : "number"
+          },
+          "min_amount" : {
+            "type" : "number"
+          },
+          "note" : {
+            "type" : "string"
+          },
+          "payment_details" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "priority" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "treasury_account_public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "required" : [ "deposit_method_id", "title", "treasury_account_public_id" ],
+        "type" : "object"
+      },
       "CreateDepositRequest" : {
         "properties" : {
           "amount" : {
@@ -638,6 +699,30 @@
           }
         },
         "required" : [ "requisites", "title", "withdrawal_method_id" ],
+        "type" : "object"
+      },
+      "CreatePlatformAccountAdjustmentRequest" : {
+        "properties" : {
+          "amount" : {
+            "type" : "number"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "metadata" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "platform_account_public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "transaction_type" : {
+            "enum" : [ "FX_IN", "FX_OUT", "FEE", "ROUNDING", "ADJUSTMENT", "MANUAL" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "amount", "platform_account_public_id", "transaction_type" ],
         "type" : "object"
       },
       "CreateTreasuryAccountRequest" : {
@@ -737,6 +822,30 @@
         "required" : [ "from_account_public_id", "from_amount", "to_account_public_id", "to_amount" ],
         "type" : "object"
       },
+      "CreateWithdrawalPayoutPlanRequest" : {
+        "properties" : {
+          "external_reference" : {
+            "type" : "string"
+          },
+          "operator_comment" : {
+            "type" : "string"
+          },
+          "planned_user_amount" : {
+            "minimum" : 1.0E-4,
+            "type" : "number"
+          },
+          "treasury_account_public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "treasury_amount" : {
+            "minimum" : 1.0E-4,
+            "type" : "number"
+          }
+        },
+        "required" : [ "treasury_account_public_id" ],
+        "type" : "object"
+      },
       "CreateWithdrawalRequest" : {
         "properties" : {
           "amount" : {
@@ -767,6 +876,40 @@
           }
         },
         "required" : [ "amount", "currency_code", "withdrawal_method_id" ],
+        "type" : "object"
+      },
+      "CurrencyConversionResponse" : {
+        "properties" : {
+          "created_at" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "from_amount" : {
+            "type" : "number"
+          },
+          "from_currency_code" : {
+            "type" : "string"
+          },
+          "public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "rate" : {
+            "type" : "number"
+          },
+          "rate_source" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "to_amount" : {
+            "type" : "number"
+          },
+          "to_currency_code" : {
+            "type" : "string"
+          }
+        },
         "type" : "object"
       },
       "CurrencyRateResponse" : {
@@ -817,11 +960,135 @@
           "auto_confirmation" : {
             "type" : "boolean"
           },
+          "currency_code" : {
+            "type" : "string"
+          },
           "id" : {
             "format" : "int64",
             "type" : "integer"
           },
           "title" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "DepositPaymentInstructionResponse" : {
+        "properties" : {
+          "amount" : {
+            "type" : "number"
+          },
+          "currency_code" : {
+            "type" : "string"
+          },
+          "deposit_payment_route_public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "expires_at" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "issued_at" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "issued_by_user_id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "operator_comment" : {
+            "type" : "string"
+          },
+          "payment_details" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "ACTIVE", "USED", "CANCELLED" ],
+            "type" : "string"
+          },
+          "treasury_account_code" : {
+            "type" : "string"
+          },
+          "treasury_account_public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "treasury_account_title" : {
+            "type" : "string"
+          },
+          "treasury_amount" : {
+            "type" : "number"
+          },
+          "treasury_currency_code" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "DepositPaymentRouteResponse" : {
+        "properties" : {
+          "created_at" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "deposit_currency_code" : {
+            "type" : "string"
+          },
+          "deposit_method_id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "deposit_method_title" : {
+            "type" : "string"
+          },
+          "is_active" : {
+            "type" : "boolean"
+          },
+          "max_amount" : {
+            "type" : "number"
+          },
+          "min_amount" : {
+            "type" : "number"
+          },
+          "note" : {
+            "type" : "string"
+          },
+          "payment_details" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "priority" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "treasury_account_code" : {
+            "type" : "string"
+          },
+          "treasury_account_public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "treasury_account_title" : {
+            "type" : "string"
+          },
+          "treasury_currency_code" : {
+            "type" : "string"
+          },
+          "updated_at" : {
+            "format" : "date-time",
             "type" : "string"
           }
         },
@@ -860,6 +1127,9 @@
           },
           "payment_details" : {
             "type" : "string"
+          },
+          "payment_instruction" : {
+            "$ref" : "#/components/schemas/DepositPaymentInstructionResponse"
           },
           "public_id" : {
             "format" : "uuid",
@@ -1006,14 +1276,29 @@
       },
       "IssueDetailsRequest" : {
         "properties" : {
+          "deposit_payment_route_public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "expires_at" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
           "operator_comment" : {
             "type" : "string"
           },
           "payment_details" : {
             "type" : "string"
+          },
+          "treasury_account_public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "treasury_amount" : {
+            "minimum" : 1.0E-4,
+            "type" : "number"
           }
         },
-        "required" : [ "payment_details" ],
         "type" : "object"
       },
       "JsonNode" : { },
@@ -1244,7 +1529,7 @@
             "type" : "string"
           },
           "event_type" : {
-            "enum" : [ "DEPOSIT_CREATED", "DEPOSIT_DETAILS_ISSUED", "DEPOSIT_USER_MARKED_PAID", "DEPOSIT_CONFIRMED", "DEPOSIT_REJECTED", "DEPOSIT_CANCELLED", "WITHDRAWAL_CREATED", "WITHDRAWAL_CANCELLED", "WITHDRAWAL_TAKEN", "WITHDRAWAL_REJECTED", "WITHDRAWAL_CONFIRMED" ],
+            "enum" : [ "DEPOSIT_CREATED", "DEPOSIT_DETAILS_ISSUED", "DEPOSIT_USER_MARKED_PAID", "DEPOSIT_CONFIRMED", "DEPOSIT_REJECTED", "DEPOSIT_CANCELLED", "WITHDRAWAL_CREATED", "WITHDRAWAL_CANCELLED", "WITHDRAWAL_TAKEN", "WITHDRAWAL_PAYOUT_PLANNED", "WITHDRAWAL_REJECTED", "WITHDRAWAL_CONFIRMED" ],
             "type" : "string"
           },
           "operation_public_id" : {
@@ -2601,6 +2886,52 @@
         },
         "type" : "object"
       },
+      "PagePlatformAccountTransactionResponse" : {
+        "properties" : {
+          "content" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PlatformAccountTransactionResponse"
+            },
+            "type" : "array"
+          },
+          "empty" : {
+            "type" : "boolean"
+          },
+          "first" : {
+            "type" : "boolean"
+          },
+          "last" : {
+            "type" : "boolean"
+          },
+          "number" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "numberOfElements" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "pageable" : {
+            "$ref" : "#/components/schemas/PageableObject"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "sort" : {
+            "$ref" : "#/components/schemas/SortObject"
+          },
+          "totalElements" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "PageTreasuryTransactionResponse" : {
         "properties" : {
           "content" : {
@@ -2840,6 +3171,94 @@
         },
         "type" : "object"
       },
+      "PlatformAccountResponse" : {
+        "properties" : {
+          "account_code" : {
+            "enum" : [ "FX_DESK", "FEES", "ROUNDING", "ADJUSTMENTS", "EQUITY" ],
+            "type" : "string"
+          },
+          "balance" : {
+            "type" : "number"
+          },
+          "created_at" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "currency_code" : {
+            "type" : "string"
+          },
+          "is_active" : {
+            "type" : "boolean"
+          },
+          "note" : {
+            "type" : "string"
+          },
+          "public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "updated_at" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PlatformAccountTransactionResponse" : {
+        "properties" : {
+          "actor_user_id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "amount" : {
+            "type" : "number"
+          },
+          "created_at" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "currency_code" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "group_public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "metadata" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "platform_account_code" : {
+            "type" : "string"
+          },
+          "platform_account_public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "ref_public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "ref_type" : {
+            "type" : "string"
+          },
+          "transaction_type" : {
+            "enum" : [ "FX_IN", "FX_OUT", "FEE", "ROUNDING", "ADJUSTMENT", "MANUAL" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "RegisterRequest" : {
         "properties" : {
           "email" : {
@@ -3016,6 +3435,50 @@
         },
         "type" : "object"
       },
+      "TreasuryExposureResponse" : {
+        "properties" : {
+          "generatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "rows" : {
+            "items" : {
+              "$ref" : "#/components/schemas/TreasuryExposureRowResponse"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "TreasuryExposureRowResponse" : {
+        "properties" : {
+          "currency_code" : {
+            "type" : "string"
+          },
+          "difference" : {
+            "type" : "number"
+          },
+          "expected_treasury_balance" : {
+            "type" : "number"
+          },
+          "platform_balance" : {
+            "type" : "number"
+          },
+          "treasury_balance" : {
+            "type" : "number"
+          },
+          "user_available" : {
+            "type" : "number"
+          },
+          "user_balance" : {
+            "type" : "number"
+          },
+          "user_reserved" : {
+            "type" : "number"
+          }
+        },
+        "type" : "object"
+      },
       "TreasuryTransactionResponse" : {
         "properties" : {
           "actor_user_id" : {
@@ -3094,6 +3557,38 @@
           "count" : {
             "format" : "int64",
             "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "UpdateDepositPaymentRouteRequest" : {
+        "properties" : {
+          "is_active" : {
+            "type" : "boolean"
+          },
+          "max_amount" : {
+            "type" : "number"
+          },
+          "min_amount" : {
+            "type" : "number"
+          },
+          "note" : {
+            "type" : "string"
+          },
+          "payment_details" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "priority" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "treasury_account_public_id" : {
+            "format" : "uuid",
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -3284,6 +3779,63 @@
         },
         "type" : "object"
       },
+      "WithdrawalPayoutPlanResponse" : {
+        "properties" : {
+          "cancelled_at" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "completed_at" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "external_reference" : {
+            "type" : "string"
+          },
+          "operator_comment" : {
+            "type" : "string"
+          },
+          "planned_at" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "planned_by_user_id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "planned_user_amount" : {
+            "type" : "number"
+          },
+          "public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "PLANNED", "COMPLETED", "CANCELLED" ],
+            "type" : "string"
+          },
+          "treasury_account_code" : {
+            "type" : "string"
+          },
+          "treasury_account_public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "treasury_account_title" : {
+            "type" : "string"
+          },
+          "treasury_amount" : {
+            "type" : "number"
+          },
+          "treasury_currency_code" : {
+            "type" : "string"
+          },
+          "user_currency_code" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "WithdrawalRequestResponse" : {
         "properties" : {
           "actual_payout_amount" : {
@@ -3374,7 +3926,7 @@
   "paths" : {
     "/api/admin/deposit-requests" : {
       "get" : {
-        "operationId" : "list_6",
+        "operationId" : "list_7",
         "parameters" : [ {
           "description" : "Canonical multi-value status filter. Supports repeated `status` params and comma-separated values in a single parameter.",
           "example" : "PENDING_DETAILS,WAITING_PAYMENT",
@@ -3714,9 +4266,130 @@
         "tags" : [ "auth-controller" ]
       }
     },
+    "/api/backoffice/deposit-methods" : {
+      "get" : {
+        "operationId" : "list_8",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/DepositMethodResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "backoffice-deposit-method-controller" ]
+      }
+    },
+    "/api/backoffice/deposit-payment-routes" : {
+      "get" : {
+        "operationId" : "list_3",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "deposit_method_id",
+          "required" : false,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "active_only",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/DepositPaymentRouteResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "backoffice-deposit-payment-route-controller" ]
+      },
+      "post" : {
+        "operationId" : "create_4",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateDepositPaymentRouteRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DepositPaymentRouteResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "backoffice-deposit-payment-route-controller" ]
+      }
+    },
+    "/api/backoffice/deposit-payment-routes/{publicId}" : {
+      "patch" : {
+        "operationId" : "update_2",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "publicId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateDepositPaymentRouteRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DepositPaymentRouteResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "backoffice-deposit-payment-route-controller" ]
+      }
+    },
     "/api/backoffice/deposit-requests" : {
       "get" : {
-        "operationId" : "list_5",
+        "operationId" : "list_6",
         "parameters" : [ {
           "description" : "Canonical multi-value status filter. Supports repeated `status` params and comma-separated values in a single parameter.",
           "example" : "PENDING_DETAILS,WAITING_PAYMENT",
@@ -3933,6 +4606,104 @@
         "tags" : [ "backoffice-order-dispute-controller" ]
       }
     },
+    "/api/backoffice/platform-accounts" : {
+      "get" : {
+        "operationId" : "listAccounts_1",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/PlatformAccountResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "backoffice-platform-account-controller" ]
+      }
+    },
+    "/api/backoffice/platform-accounts/transactions" : {
+      "get" : {
+        "operationId" : "listTransactions_1",
+        "parameters" : [ {
+          "description" : "Zero-based page index (0..N)",
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "minimum" : 0,
+            "type" : "integer"
+          }
+        }, {
+          "description" : "The size of the page to be returned",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 30,
+            "minimum" : 1,
+            "type" : "integer"
+          }
+        }, {
+          "description" : "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "default" : [ "createdAt,DESC" ],
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PagePlatformAccountTransactionResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "backoffice-platform-account-controller" ]
+      },
+      "post" : {
+        "operationId" : "createAdjustment",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreatePlatformAccountAdjustmentRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PlatformAccountTransactionResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "backoffice-platform-account-controller" ]
+      }
+    },
     "/api/backoffice/treasury/accounts" : {
       "get" : {
         "operationId" : "listAccounts",
@@ -4016,6 +4787,24 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/TreasuryAccountResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "backoffice-treasury-controller" ]
+      }
+    },
+    "/api/backoffice/treasury/exposure" : {
+      "get" : {
+        "operationId" : "exposure",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TreasuryExposureResponse"
                 }
               }
             },
@@ -4141,7 +4930,7 @@
     "/api/backoffice/withdrawal-requests" : {
       "get" : {
         "description" : "Supports the canonical multi-value `status` filter plus standard pageable query params `page`, `size`, and `sort`. For multiple statuses use repeated `status` params or a single comma-separated value. `statuses` and `currency_code` are not supported.",
-        "operationId" : "list_4",
+        "operationId" : "list_5",
         "parameters" : [ {
           "description" : "Canonical multi-value status filter. Supports repeated `status` params and comma-separated values in a single parameter.",
           "example" : "OPEN,PROCESSING",
@@ -4267,6 +5056,43 @@
         "tags" : [ "backoffice-withdrawal-request-controller" ]
       }
     },
+    "/api/backoffice/withdrawal-requests/{publicId}/payout-plan" : {
+      "post" : {
+        "operationId" : "planPayout",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "publicId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateWithdrawalPayoutPlanRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BackofficeWithdrawalRequestResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "backoffice-withdrawal-request-controller" ]
+      }
+    },
     "/api/backoffice/withdrawal-requests/{publicId}/reject" : {
       "post" : {
         "operationId" : "reject_1",
@@ -4350,6 +5176,34 @@
           }
         },
         "tags" : [ "currency-controller" ]
+      }
+    },
+    "/api/currency-conversions" : {
+      "post" : {
+        "operationId" : "convert",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateCurrencyConversionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CurrencyConversionResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "currency-conversion-controller" ]
       }
     },
     "/api/currency-rates" : {
@@ -4984,7 +5838,7 @@
     },
     "/api/notifications" : {
       "get" : {
-        "operationId" : "list_3",
+        "operationId" : "list_4",
         "parameters" : [ {
           "in" : "query",
           "name" : "isRead",

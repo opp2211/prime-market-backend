@@ -45,6 +45,10 @@ class TreasuryBackofficeIntegrationTest extends AbstractPostgresIntegrationTest 
     void resetState() {
         jdbcTemplate.execute("""
             truncate table
+                platform_account_transactions,
+                withdrawal_payout_plans,
+                deposit_payment_instructions,
+                deposit_payment_routes,
                 treasury_transactions,
                 treasury_accounts
             restart identity cascade

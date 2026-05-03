@@ -106,6 +106,9 @@ public class DepositRequest {
     @Column(name = "treasury_transaction_id")
     private Long treasuryTransactionId;
 
+    @Column(name = "payment_instruction_id")
+    private Long paymentInstructionId;
+
     @Column(name = "cancelled_at")
     private Instant cancelledAt;
 
@@ -148,6 +151,13 @@ public class DepositRequest {
         }
         treasuryAccountId = transaction.getTreasuryAccount().getId();
         treasuryTransactionId = transaction.getId();
+    }
+
+    public void attachPaymentInstruction(DepositPaymentInstruction instruction) {
+        if (instruction == null) {
+            return;
+        }
+        paymentInstructionId = instruction.getId();
     }
 
     public void reject(Long actorUserId, String reason, String comment) {

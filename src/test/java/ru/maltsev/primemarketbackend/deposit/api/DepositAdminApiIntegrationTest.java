@@ -45,11 +45,16 @@ class DepositAdminApiIntegrationTest extends AbstractPostgresIntegrationTest {
     void resetState() {
         jdbcTemplate.execute("""
             truncate table
+                deposit_payment_instructions,
+                deposit_payment_routes,
                 treasury_transactions,
                 treasury_accounts,
                 money_operation_events,
+                notifications,
                 deposit_requests,
-                deposit_methods
+                deposit_methods,
+                user_account_txs,
+                user_accounts
             restart identity cascade
             """);
     }
@@ -168,6 +173,48 @@ class DepositAdminApiIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(loadTreasuryBalance(treasuryAccountPublicId)).isEqualByComparingTo("1000.0000");
     }
 
+    @Test
+    void depositPaymentRouteAutoIssuesInstructionAndConfirmUsesLinkedTreasuryAccount() throws Exception {
+        User user = loadUser("user1@123.123");
+        User support = loadUser("sup1@123.123");
+        long methodId = insertDepositMethod("SBP route", "RUB", null);
+        String treasuryAccountPublicId = insertTreasuryAccount("tbank-route-rub", "T-Bank route RUB", "RUB");
+        insertDepositPaymentRoute(methodId, treasuryAccountPublicId, """
+            {
+              "bank": "T-Bank",
+              "phone": "+79990001122",
+              "recipient": "Operator"
+            }
+            """);
+
+        JsonNode created = createDepositRequest(user, """
+            {
+              "deposit_method_id": %d,
+              "amount": 1500.0000
+            }
+            """.formatted(methodId));
+
+        assertThat(created.path("status").asText()).isEqualTo("WAITING_PAYMENT");
+        assertThat(created.path("payment_instruction").path("treasury_account_public_id").asText())
+            .isEqualTo(treasuryAccountPublicId);
+        assertThat(created.path("payment_instruction").path("payment_details").path("bank").asText())
+            .isEqualTo("T-Bank");
+
+        markDepositPaid(user, created.path("public_id").asText());
+        JsonNode confirmed = confirmDeposit(support, created.path("public_id").asText(), """
+            {
+              "confirmation_reference": "route-bank-statement-1"
+            }
+            """);
+
+        assertThat(confirmed.path("status").asText()).isEqualTo("CONFIRMED");
+        assertThat(confirmed.path("payment_instruction").path("status").asText()).isEqualTo("USED");
+        assertThat(confirmed.path("treasury_transactions")).hasSize(1);
+        assertThat(confirmed.path("treasury_transactions").get(0).path("amount").decimalValue())
+            .isEqualByComparingTo("1500.0000");
+        assertThat(loadTreasuryBalance(treasuryAccountPublicId)).isEqualByComparingTo("1500.0000");
+    }
+
     private User loadUser(String email) {
         return userRepository.findWithRolesByEmailIgnoreCase(email)
             .orElseThrow(() -> new IllegalStateException("User not found: " + email));
@@ -284,6 +331,32 @@ class DepositAdminApiIntegrationTest extends AbstractPostgresIntegrationTest {
             throw new IllegalStateException("Failed to insert treasury account");
         }
         return publicId.toString();
+    }
+
+    private void insertDepositPaymentRoute(long methodId, String treasuryAccountPublicId, String paymentDetails) {
+        jdbcTemplate.update(
+            """
+                insert into deposit_payment_routes (
+                    deposit_method_id,
+                    treasury_account_id,
+                    title,
+                    payment_details,
+                    priority,
+                    is_active
+                )
+                values (
+                    ?,
+                    (select id from treasury_accounts where public_id = ?::uuid),
+                    'Default route',
+                    ?::jsonb,
+                    10,
+                    true
+                )
+                """,
+            methodId,
+            treasuryAccountPublicId,
+            paymentDetails
+        );
     }
 
     private java.math.BigDecimal loadTreasuryBalance(String publicId) {

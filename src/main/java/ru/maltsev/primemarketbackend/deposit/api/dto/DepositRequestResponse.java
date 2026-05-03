@@ -16,6 +16,7 @@ public record DepositRequestResponse(
     @JsonProperty("deposit_method_title") String depositMethodTitle,
     DepositRequestStatus status,
     @JsonProperty("payment_details") String paymentDetails,
+    @JsonProperty("payment_instruction") DepositPaymentInstructionResponse paymentInstruction,
     @JsonProperty("details_issued_at") Instant detailsIssuedAt,
     @JsonProperty("user_marked_paid_at") Instant userMarkedPaidAt,
     @JsonProperty("confirmed_at") Instant confirmedAt,
@@ -26,6 +27,13 @@ public record DepositRequestResponse(
     @JsonProperty("updated_at") Instant updatedAt
 ) {
     public static DepositRequestResponse from(DepositRequest request) {
+        return from(request, null);
+    }
+
+    public static DepositRequestResponse from(
+        DepositRequest request,
+        ru.maltsev.primemarketbackend.deposit.domain.DepositPaymentInstruction paymentInstruction
+    ) {
         return new DepositRequestResponse(
             request.getPublicId(),
             request.getAmount(),
@@ -34,6 +42,7 @@ public record DepositRequestResponse(
             request.getDepositMethodTitleSnapshot(),
             request.getStatus(),
             request.getPaymentDetails(),
+            DepositPaymentInstructionResponse.from(paymentInstruction),
             request.getDetailsIssuedAt(),
             request.getUserMarkedPaidAt(),
             request.getConfirmedAt(),

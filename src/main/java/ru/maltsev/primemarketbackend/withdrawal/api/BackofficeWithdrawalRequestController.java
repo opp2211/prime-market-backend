@@ -33,8 +33,11 @@ import ru.maltsev.primemarketbackend.treasury.domain.TreasuryTransaction;
 import ru.maltsev.primemarketbackend.treasury.service.TreasuryService;
 import ru.maltsev.primemarketbackend.withdrawal.api.dto.BackofficeWithdrawalRequestResponse;
 import ru.maltsev.primemarketbackend.withdrawal.api.dto.ConfirmWithdrawalRequest;
+import ru.maltsev.primemarketbackend.withdrawal.api.dto.CreateWithdrawalPayoutPlanRequest;
 import ru.maltsev.primemarketbackend.withdrawal.api.dto.RejectWithdrawalRequest;
+import ru.maltsev.primemarketbackend.withdrawal.domain.WithdrawalPayoutPlan;
 import ru.maltsev.primemarketbackend.withdrawal.domain.WithdrawalRequest;
+import ru.maltsev.primemarketbackend.withdrawal.repository.WithdrawalPayoutPlanRepository;
 import ru.maltsev.primemarketbackend.withdrawal.service.WithdrawalRequestService;
 
 @RestController
@@ -45,6 +48,7 @@ public class BackofficeWithdrawalRequestController {
     private final WithdrawalRequestService withdrawalRequestService;
     private final MoneyOperationEventService moneyOperationEventService;
     private final TreasuryService treasuryService;
+    private final WithdrawalPayoutPlanRepository withdrawalPayoutPlanRepository;
 
     @GetMapping
     @Operation(
@@ -86,7 +90,8 @@ public class BackofficeWithdrawalRequestController {
         return ResponseEntity.ok(BackofficeWithdrawalRequestResponse.from(
             request,
             eventsFor(request),
-            treasuryTransactionsFor(request)
+            treasuryTransactionsFor(request),
+            payoutPlanFor(request)
         ));
     }
 
@@ -104,7 +109,32 @@ public class BackofficeWithdrawalRequestController {
         return ResponseEntity.ok(BackofficeWithdrawalRequestResponse.from(
             request,
             eventsFor(request),
-            treasuryTransactionsFor(request)
+            treasuryTransactionsFor(request),
+            payoutPlanFor(request)
+        ));
+    }
+
+    @PostMapping("/{publicId}/payout-plan")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.WITHDRAWAL_REQUESTS_TAKE + "')")
+    public ResponseEntity<BackofficeWithdrawalRequestResponse> planPayout(
+        @AuthenticationPrincipal UserPrincipal principal,
+        @PathVariable UUID publicId,
+        @Valid @RequestBody CreateWithdrawalPayoutPlanRequest request
+    ) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        WithdrawalRequest withdrawalRequest = withdrawalRequestService.planPayout(
+            publicId,
+            principal.getUser().getId(),
+            request
+        );
+        return ResponseEntity.ok(BackofficeWithdrawalRequestResponse.from(
+            withdrawalRequest,
+            eventsFor(withdrawalRequest),
+            treasuryTransactionsFor(withdrawalRequest),
+            payoutPlanFor(withdrawalRequest)
         ));
     }
 
@@ -127,7 +157,8 @@ public class BackofficeWithdrawalRequestController {
         return ResponseEntity.ok(BackofficeWithdrawalRequestResponse.from(
             withdrawalRequest,
             eventsFor(withdrawalRequest),
-            treasuryTransactionsFor(withdrawalRequest)
+            treasuryTransactionsFor(withdrawalRequest),
+            payoutPlanFor(withdrawalRequest)
         ));
     }
 
@@ -150,7 +181,8 @@ public class BackofficeWithdrawalRequestController {
         return ResponseEntity.ok(BackofficeWithdrawalRequestResponse.from(
             withdrawalRequest,
             eventsFor(withdrawalRequest),
-            treasuryTransactionsFor(withdrawalRequest)
+            treasuryTransactionsFor(withdrawalRequest),
+            payoutPlanFor(withdrawalRequest)
         ));
     }
 
@@ -160,5 +192,9 @@ public class BackofficeWithdrawalRequestController {
 
     private List<TreasuryTransaction> treasuryTransactionsFor(WithdrawalRequest request) {
         return treasuryService.listOperationTransactions(MoneyOperationType.WITHDRAWAL_REQUEST, request.getPublicId());
+    }
+
+    private WithdrawalPayoutPlan payoutPlanFor(WithdrawalRequest request) {
+        return withdrawalPayoutPlanRepository.findByWithdrawalRequestId(request.getId()).orElse(null);
     }
 }

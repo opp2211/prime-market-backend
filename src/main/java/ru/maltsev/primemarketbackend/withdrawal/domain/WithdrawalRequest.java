@@ -111,6 +111,9 @@ public class WithdrawalRequest {
     @Column(name = "treasury_transaction_id")
     private Long treasuryTransactionId;
 
+    @Column(name = "payout_plan_id")
+    private Long payoutPlanId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     @Generated(event = EventType.INSERT)
     private Instant createdAt;
@@ -195,6 +198,13 @@ public class WithdrawalRequest {
         }
         treasuryAccountId = transaction.getTreasuryAccount().getId();
         treasuryTransactionId = transaction.getId();
+    }
+
+    public void attachPayoutPlan(WithdrawalPayoutPlan plan) {
+        if (plan == null) {
+            return;
+        }
+        payoutPlanId = plan.getId();
     }
 
     @PrePersist

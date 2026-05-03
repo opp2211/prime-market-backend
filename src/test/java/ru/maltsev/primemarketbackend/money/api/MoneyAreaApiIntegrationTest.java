@@ -62,6 +62,13 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
     void resetState() {
         jdbcTemplate.execute("""
             truncate table
+                platform_account_transactions,
+                platform_account_txs,
+                platform_accounts,
+                user_currency_conversions,
+                withdrawal_payout_plans,
+                deposit_payment_instructions,
+                deposit_payment_routes,
                 treasury_transactions,
                 treasury_accounts,
                 money_operation_events,
@@ -698,6 +705,178 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(loadTreasuryBalance(treasuryAccountPublicId)).isEqualByComparingTo("-33.6400");
         assertThat(confirmed.path("events").get(2).path("payload").path("treasury_amount").decimalValue())
             .isEqualByComparingTo("-33.6400");
+    }
+
+    @Test
+    void withdrawalPayoutPlanCanDriveTreasuryMovementOnConfirm() throws Exception {
+        User user = loadUser("user1@123.123");
+        User support = loadUser("sup1@123.123");
+        fundWallet(user, "RUB", "5000.0000");
+        long methodId = loadWithdrawalMethodId("SBP", "RUB");
+        String treasuryAccountPublicId = insertTreasuryAccount("tbank-rub-payouts", "T-Bank RUB payouts", "RUB");
+
+        JsonNode created = createWithdrawal(user, """
+            {
+              "currency_code": "RUB",
+              "withdrawal_method_id": %d,
+              "amount": 2600.0000,
+              "requisites": {
+                "phoneNumber": "+79990001122",
+                "bankName": "T-Bank",
+                "recipientName": "Ivan Ivanov"
+              }
+            }
+            """.formatted(methodId));
+
+        JsonNode planned = planWithdrawalPayout(support, created.path("public_id").asText(), """
+            {
+              "treasury_account_public_id": "%s",
+              "planned_user_amount": 2600.0000,
+              "external_reference": "bank-payment-draft-1"
+            }
+            """.formatted(treasuryAccountPublicId));
+        assertThat(planned.path("status").asText()).isEqualTo("PROCESSING");
+        assertThat(planned.path("payout_plan").path("status").asText()).isEqualTo("PLANNED");
+        assertThat(planned.path("payout_plan").path("treasury_amount").decimalValue())
+            .isEqualByComparingTo("2600.0000");
+
+        JsonNode confirmed = confirmWithdrawal(support, created.path("public_id").asText(), """
+            {
+              "actual_payout_amount": 2600.0000
+            }
+            """);
+        assertThat(confirmed.path("status").asText()).isEqualTo("COMPLETED");
+        assertThat(confirmed.path("payout_plan").path("status").asText()).isEqualTo("COMPLETED");
+        assertThat(confirmed.path("treasury_transactions")).hasSize(1);
+        assertThat(confirmed.path("treasury_transactions").get(0).path("amount").decimalValue())
+            .isEqualByComparingTo("-2600.0000");
+    }
+
+    @Test
+    void userCurrencyConversionCreatesFxDeskPlatformPositionAndExposureReportBalances() throws Exception {
+        User user = loadUser("user1@123.123");
+        User support = loadUser("sup1@123.123");
+        fundWallet(user, "RUB", "1000.0000");
+        String treasuryAccountPublicId = insertTreasuryAccount("cash-rub-main", "Cash RUB main", "RUB");
+        insertTreasuryTransaction(treasuryAccountPublicId, "1000.0000");
+        upsertCurrencyRate("RUB", "USD", "0.01000000");
+
+        JsonNode conversion = convertCurrency(user, """
+            {
+              "from_currency_code": "RUB",
+              "to_currency_code": "USD",
+              "from_amount": 100.0000
+            }
+            """);
+        assertThat(conversion.path("from_amount").decimalValue()).isEqualByComparingTo("100.0000");
+        assertThat(conversion.path("to_amount").decimalValue()).isEqualByComparingTo("1.0000");
+
+        assertThat(loadBalance(user.getId(), "RUB")).isEqualByComparingTo("900.0000");
+        assertThat(loadBalance(user.getId(), "USD")).isEqualByComparingTo("1.0000");
+        assertThat(loadPlatformBalance("FX_DESK", "RUB")).isEqualByComparingTo("100.0000");
+        assertThat(loadPlatformBalance("FX_DESK", "USD")).isEqualByComparingTo("-1.0000");
+
+        JsonNode exposure = loadTreasuryExposure(support);
+        JsonNode rub = findExposureRow(exposure, "RUB");
+        JsonNode usd = findExposureRow(exposure, "USD");
+        assertThat(rub.path("treasury_balance").decimalValue()).isEqualByComparingTo("1000.0000");
+        assertThat(rub.path("user_balance").decimalValue()).isEqualByComparingTo("900.0000");
+        assertThat(rub.path("platform_balance").decimalValue()).isEqualByComparingTo("100.0000");
+        assertThat(rub.path("difference").decimalValue()).isEqualByComparingTo("0.0000");
+        assertThat(usd.path("user_balance").decimalValue()).isEqualByComparingTo("1.0000");
+        assertThat(usd.path("platform_balance").decimalValue()).isEqualByComparingTo("-1.0000");
+        assertThat(usd.path("difference").decimalValue()).isEqualByComparingTo("0.0000");
+    }
+
+    private JsonNode planWithdrawalPayout(User user, String publicId, String body) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/backoffice/withdrawal-requests/{publicId}/payout-plan", publicId)
+                .with(auth(user))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isOk())
+            .andReturn();
+        return readBody(result);
+    }
+
+    private JsonNode convertCurrency(User user, String body) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/currency-conversions")
+                .with(auth(user))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isCreated())
+            .andReturn();
+        return readBody(result);
+    }
+
+    private JsonNode loadTreasuryExposure(User user) throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/backoffice/treasury/exposure").with(auth(user)))
+            .andExpect(status().isOk())
+            .andReturn();
+        return readBody(result);
+    }
+
+    private JsonNode findExposureRow(JsonNode exposure, String currencyCode) {
+        for (JsonNode row : exposure.path("rows")) {
+            if (currencyCode.equals(row.path("currency_code").asText())) {
+                return row;
+            }
+        }
+        throw new AssertionError("Exposure row not found for currency: " + currencyCode);
+    }
+
+    private void insertTreasuryTransaction(String treasuryAccountPublicId, String amount) {
+        jdbcTemplate.update(
+            """
+                insert into treasury_transactions (
+                    treasury_account_id,
+                    amount,
+                    transaction_type,
+                    operation_public_id,
+                    description,
+                    external_reference
+                )
+                values (
+                    (select id from treasury_accounts where public_id = ?::uuid),
+                    ?,
+                    'ADJUSTMENT',
+                    gen_random_uuid(),
+                    'Initial test balance',
+                    'test-balance'
+                )
+                """,
+            treasuryAccountPublicId,
+            new BigDecimal(amount)
+        );
+    }
+
+    private void upsertCurrencyRate(String fromCurrencyCode, String toCurrencyCode, String rate) {
+        jdbcTemplate.update(
+            """
+                insert into currency_rates (from_currency_code, to_currency_code, rate, source)
+                values (?, ?, ?, 'manual')
+                on conflict (from_currency_code, to_currency_code)
+                do update set rate = excluded.rate,
+                              source = excluded.source,
+                              updated_at = now()
+                """,
+            fromCurrencyCode,
+            toCurrencyCode,
+            new BigDecimal(rate)
+        );
+    }
+
+    private BigDecimal loadPlatformBalance(String accountCode, String currencyCode) {
+        return jdbcTemplate.queryForObject(
+            """
+                select balance
+                from platform_accounts
+                where account_code = ?
+                  and currency_code = ?
+                """,
+            BigDecimal.class,
+            accountCode,
+            currencyCode
+        );
     }
 
     private java.util.List<String> loadMoneyEventTypes(String operationType, String publicId) {

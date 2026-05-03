@@ -96,6 +96,7 @@ class OrderApiIntegrationTest extends AbstractPostgresIntegrationTest {
     void resetState() {
         jdbcTemplate.execute("""
             truncate table
+                platform_account_transactions,
                 platform_account_txs,
                 platform_accounts,
                 user_account_hold_allocations,

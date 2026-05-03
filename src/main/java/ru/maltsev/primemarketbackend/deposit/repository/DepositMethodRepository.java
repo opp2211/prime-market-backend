@@ -8,5 +8,7 @@ import ru.maltsev.primemarketbackend.deposit.domain.DepositMethod;
 public interface DepositMethodRepository extends JpaRepository<DepositMethod, Long> {
     List<DepositMethod> findAllByCurrencyCodeAndActiveTrueOrderByIdAsc(String currencyCode);
 
+    List<DepositMethod> findAllByOrderByCurrencyCodeAscIdAsc();
+
     Optional<DepositMethod> findByIdAndActiveTrue(Long id);
 }

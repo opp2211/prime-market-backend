@@ -31,6 +31,7 @@ public record BackofficeWithdrawalRequestResponse(
     @JsonProperty("rejection_reason") String rejectionReason,
     @JsonProperty("treasury_account_id") Long treasuryAccountId,
     @JsonProperty("treasury_transaction_id") Long treasuryTransactionId,
+    @JsonProperty("payout_plan") WithdrawalPayoutPlanResponse payoutPlan,
     @JsonProperty("opened_at") Instant openedAt,
     @JsonProperty("processing_at") Instant processingAt,
     @JsonProperty("completed_at") Instant completedAt,
@@ -57,6 +58,15 @@ public record BackofficeWithdrawalRequestResponse(
         List<MoneyOperationEvent> events,
         List<TreasuryTransaction> treasuryTransactions
     ) {
+        return from(request, events, treasuryTransactions, null);
+    }
+
+    public static BackofficeWithdrawalRequestResponse from(
+        WithdrawalRequest request,
+        List<MoneyOperationEvent> events,
+        List<TreasuryTransaction> treasuryTransactions,
+        ru.maltsev.primemarketbackend.withdrawal.domain.WithdrawalPayoutPlan payoutPlan
+    ) {
         return new BackofficeWithdrawalRequestResponse(
             request.getPublicId(),
             request.getUserId(),
@@ -76,6 +86,7 @@ public record BackofficeWithdrawalRequestResponse(
             request.getRejectionReason(),
             request.getTreasuryAccountId(),
             request.getTreasuryTransactionId(),
+            WithdrawalPayoutPlanResponse.from(payoutPlan),
             request.getOpenedAt(),
             request.getProcessingAt(),
             request.getCompletedAt(),
