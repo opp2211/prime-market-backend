@@ -23,6 +23,7 @@ import org.hibernate.annotations.Generated;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.generator.EventType;
 import org.hibernate.type.SqlTypes;
+import ru.maltsev.primemarketbackend.treasury.domain.TreasuryTransaction;
 
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -99,6 +100,12 @@ public class DepositRequest {
     @Column(name = "operator_comment")
     private String operatorComment;
 
+    @Column(name = "treasury_account_id")
+    private Long treasuryAccountId;
+
+    @Column(name = "treasury_transaction_id")
+    private Long treasuryTransactionId;
+
     @Column(name = "cancelled_at")
     private Instant cancelledAt;
 
@@ -133,6 +140,14 @@ public class DepositRequest {
         confirmedByUserId = actorUserId;
         confirmationReference = normalize(reference);
         operatorComment = normalize(comment);
+    }
+
+    public void attachTreasuryTransaction(TreasuryTransaction transaction) {
+        if (transaction == null) {
+            return;
+        }
+        treasuryAccountId = transaction.getTreasuryAccount().getId();
+        treasuryTransactionId = transaction.getId();
     }
 
     public void reject(Long actorUserId, String reason, String comment) {

@@ -86,6 +86,20 @@
             "enum" : [ "PENDING_DETAILS", "WAITING_PAYMENT", "PAYMENT_VERIFICATION", "CONFIRMED", "REJECTED", "EXPIRED", "CANCELLED" ],
             "type" : "string"
           },
+          "treasury_account_id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "treasury_transaction_id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "treasury_transactions" : {
+            "items" : {
+              "$ref" : "#/components/schemas/TreasuryTransactionResponse"
+            },
+            "type" : "array"
+          },
           "updated_at" : {
             "format" : "date-time",
             "type" : "string"
@@ -287,6 +301,20 @@
           "status" : {
             "type" : "string"
           },
+          "treasury_account_id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "treasury_transaction_id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "treasury_transactions" : {
+            "items" : {
+              "$ref" : "#/components/schemas/TreasuryTransactionResponse"
+            },
+            "type" : "array"
+          },
           "updated_at" : {
             "format" : "date-time",
             "type" : "string"
@@ -412,6 +440,17 @@
           },
           "operator_comment" : {
             "type" : "string"
+          },
+          "treasury_account_public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "treasury_amount" : {
+            "minimum" : 1.0E-4,
+            "type" : "number"
+          },
+          "treasury_external_reference" : {
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -443,6 +482,17 @@
             "type" : "number"
           },
           "operator_comment" : {
+            "type" : "string"
+          },
+          "treasury_account_public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "treasury_amount" : {
+            "minimum" : 1.0E-4,
+            "type" : "number"
+          },
+          "treasury_external_reference" : {
             "type" : "string"
           }
         },
@@ -588,6 +638,103 @@
           }
         },
         "required" : [ "requisites", "title", "withdrawal_method_id" ],
+        "type" : "object"
+      },
+      "CreateTreasuryAccountRequest" : {
+        "properties" : {
+          "account_type" : {
+            "enum" : [ "BANK_CARD", "BANK_ACCOUNT", "CRYPTO_WALLET", "EXCHANGE_ACCOUNT", "P2P_DROP", "CASH", "OTHER" ],
+            "type" : "string"
+          },
+          "code" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "currency_code" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "details" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "is_active" : {
+            "type" : "boolean"
+          },
+          "note" : {
+            "type" : "string"
+          },
+          "title" : {
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "account_type", "code", "currency_code", "title" ],
+        "type" : "object"
+      },
+      "CreateTreasuryTransactionRequest" : {
+        "properties" : {
+          "amount" : {
+            "type" : "number"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "external_reference" : {
+            "type" : "string"
+          },
+          "metadata" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "operator_comment" : {
+            "type" : "string"
+          },
+          "transaction_type" : {
+            "enum" : [ "DEPOSIT_IN", "WITHDRAWAL_OUT", "MANUAL_IN", "MANUAL_OUT", "ADJUSTMENT", "TRANSFER_IN", "TRANSFER_OUT" ],
+            "type" : "string"
+          },
+          "treasury_account_public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "required" : [ "amount", "transaction_type", "treasury_account_public_id" ],
+        "type" : "object"
+      },
+      "CreateTreasuryTransferRequest" : {
+        "properties" : {
+          "description" : {
+            "type" : "string"
+          },
+          "external_reference" : {
+            "type" : "string"
+          },
+          "from_account_public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "from_amount" : {
+            "minimum" : 1.0E-4,
+            "type" : "number"
+          },
+          "metadata" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "operator_comment" : {
+            "type" : "string"
+          },
+          "to_account_public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "to_amount" : {
+            "minimum" : 1.0E-4,
+            "type" : "number"
+          }
+        },
+        "required" : [ "from_account_public_id", "from_amount", "to_account_public_id", "to_amount" ],
         "type" : "object"
       },
       "CreateWithdrawalRequest" : {
@@ -2454,6 +2601,52 @@
         },
         "type" : "object"
       },
+      "PageTreasuryTransactionResponse" : {
+        "properties" : {
+          "content" : {
+            "items" : {
+              "$ref" : "#/components/schemas/TreasuryTransactionResponse"
+            },
+            "type" : "array"
+          },
+          "empty" : {
+            "type" : "boolean"
+          },
+          "first" : {
+            "type" : "boolean"
+          },
+          "last" : {
+            "type" : "boolean"
+          },
+          "number" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "numberOfElements" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "pageable" : {
+            "$ref" : "#/components/schemas/PageableObject"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "sort" : {
+            "$ref" : "#/components/schemas/SortObject"
+          },
+          "totalElements" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "PageWalletTransactionResponse" : {
         "properties" : {
           "content" : {
@@ -2780,6 +2973,122 @@
         },
         "type" : "object"
       },
+      "TreasuryAccountResponse" : {
+        "properties" : {
+          "account_type" : {
+            "enum" : [ "BANK_CARD", "BANK_ACCOUNT", "CRYPTO_WALLET", "EXCHANGE_ACCOUNT", "P2P_DROP", "CASH", "OTHER" ],
+            "type" : "string"
+          },
+          "balance" : {
+            "type" : "number"
+          },
+          "code" : {
+            "type" : "string"
+          },
+          "created_at" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "currency_code" : {
+            "type" : "string"
+          },
+          "details" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "is_active" : {
+            "type" : "boolean"
+          },
+          "note" : {
+            "type" : "string"
+          },
+          "public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "updated_at" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "TreasuryTransactionResponse" : {
+        "properties" : {
+          "actor_user_id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "amount" : {
+            "type" : "number"
+          },
+          "created_at" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "currency_code" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "external_reference" : {
+            "type" : "string"
+          },
+          "group_public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "metadata" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "operation_public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "operation_type" : {
+            "enum" : [ "DEPOSIT_REQUEST", "WITHDRAWAL_REQUEST" ],
+            "type" : "string"
+          },
+          "operator_comment" : {
+            "type" : "string"
+          },
+          "public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "transaction_type" : {
+            "enum" : [ "DEPOSIT_IN", "WITHDRAWAL_OUT", "MANUAL_IN", "MANUAL_OUT", "ADJUSTMENT", "TRANSFER_IN", "TRANSFER_OUT" ],
+            "type" : "string"
+          },
+          "treasury_account_code" : {
+            "type" : "string"
+          },
+          "treasury_account_public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "treasury_account_title" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "TreasuryTransferResponse" : {
+        "properties" : {
+          "incoming" : {
+            "$ref" : "#/components/schemas/TreasuryTransactionResponse"
+          },
+          "outgoing" : {
+            "$ref" : "#/components/schemas/TreasuryTransactionResponse"
+          }
+        },
+        "type" : "object"
+      },
       "UnreadNotificationsCountResponse" : {
         "properties" : {
           "count" : {
@@ -2794,6 +3103,28 @@
           "requisites" : {
             "additionalProperties" : { },
             "type" : "object"
+          },
+          "title" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "UpdateTreasuryAccountRequest" : {
+        "properties" : {
+          "account_type" : {
+            "enum" : [ "BANK_CARD", "BANK_ACCOUNT", "CRYPTO_WALLET", "EXCHANGE_ACCOUNT", "P2P_DROP", "CASH", "OTHER" ],
+            "type" : "string"
+          },
+          "details" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "is_active" : {
+            "type" : "boolean"
+          },
+          "note" : {
+            "type" : "string"
           },
           "title" : {
             "type" : "string"
@@ -3600,6 +3931,211 @@
           }
         },
         "tags" : [ "backoffice-order-dispute-controller" ]
+      }
+    },
+    "/api/backoffice/treasury/accounts" : {
+      "get" : {
+        "operationId" : "listAccounts",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "active_only",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/TreasuryAccountResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "backoffice-treasury-controller" ]
+      },
+      "post" : {
+        "operationId" : "createAccount",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateTreasuryAccountRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TreasuryAccountResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "backoffice-treasury-controller" ]
+      }
+    },
+    "/api/backoffice/treasury/accounts/{publicId}" : {
+      "patch" : {
+        "operationId" : "updateAccount",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "publicId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateTreasuryAccountRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TreasuryAccountResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "backoffice-treasury-controller" ]
+      }
+    },
+    "/api/backoffice/treasury/transactions" : {
+      "get" : {
+        "operationId" : "listTransactions",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "account_public_id",
+          "required" : false,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "description" : "Zero-based page index (0..N)",
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "minimum" : 0,
+            "type" : "integer"
+          }
+        }, {
+          "description" : "The size of the page to be returned",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 30,
+            "minimum" : 1,
+            "type" : "integer"
+          }
+        }, {
+          "description" : "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "default" : [ "createdAt,DESC" ],
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageTreasuryTransactionResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "backoffice-treasury-controller" ]
+      },
+      "post" : {
+        "operationId" : "createTransaction",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateTreasuryTransactionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TreasuryTransactionResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "backoffice-treasury-controller" ]
+      }
+    },
+    "/api/backoffice/treasury/transfers" : {
+      "post" : {
+        "operationId" : "createTransfer",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateTreasuryTransferRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TreasuryTransferResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "backoffice-treasury-controller" ]
       }
     },
     "/api/backoffice/withdrawal-requests" : {

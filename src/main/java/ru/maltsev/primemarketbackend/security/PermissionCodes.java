@@ -14,6 +14,8 @@ public final class PermissionCodes {
     public static final String WITHDRAWAL_REQUESTS_TAKE = "WITHDRAWAL_REQUESTS_TAKE";
     public static final String WITHDRAWAL_REQUESTS_REJECT = "WITHDRAWAL_REQUESTS_REJECT";
     public static final String WITHDRAWAL_REQUESTS_CONFIRM = "WITHDRAWAL_REQUESTS_CONFIRM";
+    public static final String TREASURY_VIEW = "TREASURY_VIEW";
+    public static final String TREASURY_MANAGE = "TREASURY_MANAGE";
 
     private PermissionCodes() {
     }

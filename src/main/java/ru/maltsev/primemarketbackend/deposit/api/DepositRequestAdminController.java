@@ -35,6 +35,8 @@ import ru.maltsev.primemarketbackend.money.domain.MoneyOperationType;
 import ru.maltsev.primemarketbackend.money.service.MoneyOperationEventService;
 import ru.maltsev.primemarketbackend.security.PermissionCodes;
 import ru.maltsev.primemarketbackend.security.user.UserPrincipal;
+import ru.maltsev.primemarketbackend.treasury.domain.TreasuryTransaction;
+import ru.maltsev.primemarketbackend.treasury.service.TreasuryService;
 
 @RestController
 @RequestMapping({"/api/admin/deposit-requests", "/api/backoffice/deposit-requests"})
@@ -43,6 +45,7 @@ import ru.maltsev.primemarketbackend.security.user.UserPrincipal;
 public class DepositRequestAdminController {
     private final DepositRequestService depositRequestService;
     private final MoneyOperationEventService moneyOperationEventService;
+    private final TreasuryService treasuryService;
 
     @GetMapping
     public ResponseEntity<Page<AdminDepositRequestShortResponse>> list(
@@ -85,7 +88,11 @@ public class DepositRequestAdminController {
         }
 
         DepositRequest depositRequest = depositRequestService.getByPublicIdForAdmin(publicId);
-        return ResponseEntity.ok(AdminDepositRequestResponse.from(depositRequest, eventsFor(depositRequest)));
+        return ResponseEntity.ok(AdminDepositRequestResponse.from(
+            depositRequest,
+            eventsFor(depositRequest),
+            treasuryTransactionsFor(depositRequest)
+        ));
     }
 
     @PostMapping("/{publicId}/issue-details")
@@ -104,7 +111,11 @@ public class DepositRequestAdminController {
             request.paymentDetails(),
             request.operatorComment()
         );
-        return ResponseEntity.ok(AdminDepositRequestResponse.from(depositRequest, eventsFor(depositRequest)));
+        return ResponseEntity.ok(AdminDepositRequestResponse.from(
+            depositRequest,
+            eventsFor(depositRequest),
+            treasuryTransactionsFor(depositRequest)
+        ));
     }
 
     @PostMapping("/{publicId}/confirm")
@@ -121,9 +132,16 @@ public class DepositRequestAdminController {
             publicId,
             principal.getUser().getId(),
             request == null ? null : request.confirmationReference(),
-            request == null ? null : request.operatorComment()
+            request == null ? null : request.operatorComment(),
+            request == null ? null : request.treasuryAccountPublicId(),
+            request == null ? null : request.treasuryAmount(),
+            request == null ? null : request.treasuryExternalReference()
         );
-        return ResponseEntity.ok(AdminDepositRequestResponse.from(depositRequest, eventsFor(depositRequest)));
+        return ResponseEntity.ok(AdminDepositRequestResponse.from(
+            depositRequest,
+            eventsFor(depositRequest),
+            treasuryTransactionsFor(depositRequest)
+        ));
     }
 
     @PostMapping("/{publicId}/reject")
@@ -142,10 +160,18 @@ public class DepositRequestAdminController {
             request.rejectReason(),
             request.operatorComment()
         );
-        return ResponseEntity.ok(AdminDepositRequestResponse.from(depositRequest, eventsFor(depositRequest)));
+        return ResponseEntity.ok(AdminDepositRequestResponse.from(
+            depositRequest,
+            eventsFor(depositRequest),
+            treasuryTransactionsFor(depositRequest)
+        ));
     }
 
     private List<MoneyOperationEvent> eventsFor(DepositRequest request) {
         return moneyOperationEventService.list(MoneyOperationType.DEPOSIT_REQUEST, request.getPublicId());
+    }
+
+    private List<TreasuryTransaction> treasuryTransactionsFor(DepositRequest request) {
+        return treasuryService.listOperationTransactions(MoneyOperationType.DEPOSIT_REQUEST, request.getPublicId());
     }
 }

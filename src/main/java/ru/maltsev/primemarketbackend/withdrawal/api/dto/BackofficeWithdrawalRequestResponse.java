@@ -8,6 +8,8 @@ import java.util.Map;
 import java.util.UUID;
 import ru.maltsev.primemarketbackend.money.api.dto.MoneyOperationEventResponse;
 import ru.maltsev.primemarketbackend.money.domain.MoneyOperationEvent;
+import ru.maltsev.primemarketbackend.treasury.api.dto.TreasuryTransactionResponse;
+import ru.maltsev.primemarketbackend.treasury.domain.TreasuryTransaction;
 import ru.maltsev.primemarketbackend.withdrawal.domain.WithdrawalRequest;
 
 public record BackofficeWithdrawalRequestResponse(
@@ -27,6 +29,8 @@ public record BackofficeWithdrawalRequestResponse(
     @JsonProperty("processed_by_user_id") Long processedByUserId,
     @JsonProperty("operator_comment") String operatorComment,
     @JsonProperty("rejection_reason") String rejectionReason,
+    @JsonProperty("treasury_account_id") Long treasuryAccountId,
+    @JsonProperty("treasury_transaction_id") Long treasuryTransactionId,
     @JsonProperty("opened_at") Instant openedAt,
     @JsonProperty("processing_at") Instant processingAt,
     @JsonProperty("completed_at") Instant completedAt,
@@ -34,7 +38,8 @@ public record BackofficeWithdrawalRequestResponse(
     @JsonProperty("rejected_at") Instant rejectedAt,
     @JsonProperty("created_at") Instant createdAt,
     @JsonProperty("updated_at") Instant updatedAt,
-    List<MoneyOperationEventResponse> events
+    List<MoneyOperationEventResponse> events,
+    @JsonProperty("treasury_transactions") List<TreasuryTransactionResponse> treasuryTransactions
 ) {
     public static BackofficeWithdrawalRequestResponse from(WithdrawalRequest request) {
         return from(request, List.of());
@@ -43,6 +48,14 @@ public record BackofficeWithdrawalRequestResponse(
     public static BackofficeWithdrawalRequestResponse from(
         WithdrawalRequest request,
         List<MoneyOperationEvent> events
+    ) {
+        return from(request, events, List.of());
+    }
+
+    public static BackofficeWithdrawalRequestResponse from(
+        WithdrawalRequest request,
+        List<MoneyOperationEvent> events,
+        List<TreasuryTransaction> treasuryTransactions
     ) {
         return new BackofficeWithdrawalRequestResponse(
             request.getPublicId(),
@@ -61,6 +74,8 @@ public record BackofficeWithdrawalRequestResponse(
             request.getProcessedByUserId(),
             request.getOperatorComment(),
             request.getRejectionReason(),
+            request.getTreasuryAccountId(),
+            request.getTreasuryTransactionId(),
             request.getOpenedAt(),
             request.getProcessingAt(),
             request.getCompletedAt(),
@@ -68,7 +83,8 @@ public record BackofficeWithdrawalRequestResponse(
             request.getRejectedAt(),
             request.getCreatedAt(),
             request.getUpdatedAt(),
-            events.stream().map(MoneyOperationEventResponse::from).toList()
+            events.stream().map(MoneyOperationEventResponse::from).toList(),
+            treasuryTransactions.stream().map(TreasuryTransactionResponse::from).toList()
         );
     }
 }

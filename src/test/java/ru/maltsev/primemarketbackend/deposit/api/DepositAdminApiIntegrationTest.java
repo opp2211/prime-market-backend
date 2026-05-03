@@ -45,6 +45,8 @@ class DepositAdminApiIntegrationTest extends AbstractPostgresIntegrationTest {
     void resetState() {
         jdbcTemplate.execute("""
             truncate table
+                treasury_transactions,
+                treasury_accounts,
                 money_operation_events,
                 deposit_requests,
                 deposit_methods
@@ -129,17 +131,24 @@ class DepositAdminApiIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(issued.path("details_issued_by_user_id").asLong()).isEqualTo(support.getId());
         assertThat(issued.path("operator_comment").asText()).isEqualTo("Issued personal T-Bank card");
 
+        String treasuryAccountPublicId = insertTreasuryAccount("tbank-rub-deposits", "T-Bank RUB deposits", "RUB");
         markDepositPaid(user, publicId);
         JsonNode confirmed = confirmDeposit(support, publicId, """
             {
               "confirmation_reference": "tbank-incoming-100500",
-              "operator_comment": "Incoming payment matched by amount"
+              "operator_comment": "Incoming payment matched by amount",
+              "treasury_account_public_id": "%s"
             }
-            """);
+            """.formatted(treasuryAccountPublicId));
         assertThat(confirmed.path("status").asText()).isEqualTo("CONFIRMED");
         assertThat(confirmed.path("confirmed_by_user_id").asLong()).isEqualTo(support.getId());
         assertThat(confirmed.path("confirmation_reference").asText()).isEqualTo("tbank-incoming-100500");
         assertThat(confirmed.path("operator_comment").asText()).isEqualTo("Incoming payment matched by amount");
+        assertThat(confirmed.path("treasury_transactions")).hasSize(1);
+        assertThat(confirmed.path("treasury_transactions").get(0).path("amount").decimalValue())
+            .isEqualByComparingTo("1000.0000");
+        assertThat(confirmed.path("treasury_transactions").get(0).path("treasury_account_code").asText())
+            .isEqualTo("TBANK-RUB-DEPOSITS");
         assertThat(confirmed.path("events")).hasSize(4);
         assertThat(confirmed.path("events").get(0).path("event_type").asText()).isEqualTo("DEPOSIT_CREATED");
         assertThat(confirmed.path("events").get(1).path("event_type").asText()).isEqualTo("DEPOSIT_DETAILS_ISSUED");
@@ -156,6 +165,7 @@ class DepositAdminApiIntegrationTest extends AbstractPostgresIntegrationTest {
                 "DEPOSIT_USER_MARKED_PAID",
                 "DEPOSIT_CONFIRMED"
             );
+        assertThat(loadTreasuryBalance(treasuryAccountPublicId)).isEqualByComparingTo("1000.0000");
     }
 
     private User loadUser(String email) {
@@ -254,6 +264,32 @@ class DepositAdminApiIntegrationTest extends AbstractPostgresIntegrationTest {
                 """,
             String.class,
             operationType,
+            publicId
+        );
+    }
+
+    private String insertTreasuryAccount(String code, String title, String currencyCode) {
+        java.util.UUID publicId = jdbcTemplate.queryForObject(
+            """
+                insert into treasury_accounts (code, title, currency_code, account_type)
+                values (?, ?, ?, 'BANK_CARD')
+                returning public_id
+                """,
+            java.util.UUID.class,
+            code.toUpperCase(java.util.Locale.ROOT),
+            title,
+            currencyCode
+        );
+        if (publicId == null) {
+            throw new IllegalStateException("Failed to insert treasury account");
+        }
+        return publicId.toString();
+    }
+
+    private java.math.BigDecimal loadTreasuryBalance(String publicId) {
+        return jdbcTemplate.queryForObject(
+            "select balance from treasury_accounts where public_id = ?::uuid",
+            java.math.BigDecimal.class,
             publicId
         );
     }

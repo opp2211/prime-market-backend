@@ -26,6 +26,8 @@ import ru.maltsev.primemarketbackend.money.domain.MoneyOperationEventType;
 import ru.maltsev.primemarketbackend.money.domain.MoneyOperationType;
 import ru.maltsev.primemarketbackend.money.service.MoneyOperationEventService;
 import ru.maltsev.primemarketbackend.notification.service.NotificationService;
+import ru.maltsev.primemarketbackend.treasury.domain.TreasuryTransaction;
+import ru.maltsev.primemarketbackend.treasury.service.TreasuryService;
 import ru.maltsev.primemarketbackend.withdrawal.api.dto.ConfirmWithdrawalRequest;
 import ru.maltsev.primemarketbackend.withdrawal.api.dto.CreateWithdrawalRequest;
 import ru.maltsev.primemarketbackend.withdrawal.api.dto.RejectWithdrawalRequest;
@@ -52,6 +54,7 @@ public class WithdrawalRequestService {
     private final UserAccountTxRepository userAccountTxRepository;
     private final NotificationService notificationService;
     private final MoneyOperationEventService moneyOperationEventService;
+    private final TreasuryService treasuryService;
 
     @Transactional
     public WithdrawalRequest create(Long userId, CreateWithdrawalRequest request) {
@@ -256,13 +259,39 @@ public class WithdrawalRequestService {
         BigDecimal actualPayoutAmount = payload == null || payload.actualPayoutAmount() == null
             ? request.getActualPayoutAmount()
             : normalizeMoney(payload.actualPayoutAmount());
+        TreasuryTransaction treasuryTransaction = treasuryService.recordWithdrawalOut(
+            payload == null ? null : payload.treasuryAccountPublicId(),
+            payload == null ? null : payload.treasuryAmount(),
+            actualPayoutAmount,
+            request.getCurrencyCodeSnapshot(),
+            request.getId(),
+            request.getPublicId(),
+            payload == null ? null : payload.treasuryExternalReference(),
+            payload == null ? null : normalizeOptional(payload.operatorComment()),
+            actorUserId,
+            moneyOperationEventService.payload(
+                "user_debited_amount", request.getAmount(),
+                "actual_payout_amount", actualPayoutAmount,
+                "user_currency_code", request.getCurrencyCodeSnapshot(),
+                "withdrawal_method_id", request.getWithdrawalMethod().getId(),
+                "withdrawal_method_code", request.getWithdrawalMethodCodeSnapshot(),
+                "withdrawal_method_title", request.getWithdrawalMethodTitleSnapshot()
+            )
+        );
         request.confirm(
             actorUserId,
             actualPayoutAmount,
             payload == null ? null : normalizeOptional(payload.operatorComment()),
             Instant.now()
         );
+        request.attachTreasuryTransaction(treasuryTransaction);
         WithdrawalRequest confirmedRequest = withdrawalRequestRepository.save(request);
+        Map<String, Object> eventPayload = moneyOperationEventService.payload(
+            "debited_amount", request.getAmount(),
+            "actual_payout_amount", request.getActualPayoutAmount(),
+            "currency_code", request.getCurrencyCodeSnapshot()
+        );
+        appendTreasuryPayload(eventPayload, treasuryTransaction);
         record(
             confirmedRequest,
             MoneyOperationEventType.WITHDRAWAL_CONFIRMED,
@@ -271,11 +300,7 @@ public class WithdrawalRequestService {
             actorUserId,
             null,
             request.getOperatorComment(),
-            moneyOperationEventService.payload(
-                "debited_amount", request.getAmount(),
-                "actual_payout_amount", request.getActualPayoutAmount(),
-                "currency_code", request.getCurrencyCodeSnapshot()
-            )
+            eventPayload
         );
         notificationService.notifyWithdrawalCompleted(confirmedRequest);
         return confirmedRequest;
@@ -365,6 +390,17 @@ public class WithdrawalRequestService {
             operatorNote,
             payload
         );
+    }
+
+    private void appendTreasuryPayload(Map<String, Object> payload, TreasuryTransaction transaction) {
+        if (transaction == null) {
+            return;
+        }
+        payload.put("treasury_transaction_public_id", transaction.getPublicId());
+        payload.put("treasury_account_public_id", transaction.getTreasuryAccount().getPublicId());
+        payload.put("treasury_account_code", transaction.getTreasuryAccount().getCode());
+        payload.put("treasury_amount", transaction.getAmount());
+        payload.put("treasury_currency_code", transaction.getTreasuryAccount().getCurrencyCode());
     }
 
     private WithdrawalRequestStatus parseStatus(String status) {

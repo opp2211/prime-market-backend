@@ -25,7 +25,10 @@ import ru.maltsev.primemarketbackend.money.domain.MoneyOperationEventType;
 import ru.maltsev.primemarketbackend.money.domain.MoneyOperationType;
 import ru.maltsev.primemarketbackend.money.service.MoneyOperationEventService;
 import ru.maltsev.primemarketbackend.notification.service.NotificationService;
+import ru.maltsev.primemarketbackend.treasury.domain.TreasuryTransaction;
+import ru.maltsev.primemarketbackend.treasury.service.TreasuryService;
 
+import java.math.BigDecimal;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +52,7 @@ public class DepositRequestService {
     private final UserAccountService userAccountService;
     private final NotificationService notificationService;
     private final MoneyOperationEventService moneyOperationEventService;
+    private final TreasuryService treasuryService;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -218,7 +222,15 @@ public class DepositRequestService {
     }
 
     @Transactional
-    public DepositRequest confirm(UUID publicId, Long actorUserId, String confirmationReference, String operatorComment) {
+    public DepositRequest confirm(
+        UUID publicId,
+        Long actorUserId,
+        String confirmationReference,
+        String operatorComment,
+        UUID treasuryAccountPublicId,
+        BigDecimal treasuryAmount,
+        String treasuryExternalReference
+    ) {
         DepositRequest request = getByPublicIdForUpdate(publicId);
         if (request.getStatus() == DepositRequestStatus.CONFIRMED) {
             return request;
@@ -235,8 +247,32 @@ public class DepositRequestService {
             request.getId()
         );
         userAccountTxRepository.save(tx);
+        TreasuryTransaction treasuryTransaction = treasuryService.recordDepositIn(
+            treasuryAccountPublicId,
+            treasuryAmount,
+            request.getAmount(),
+            request.getCurrencyCodeSnapshot(),
+            request.getId(),
+            request.getPublicId(),
+            firstNonBlank(treasuryExternalReference, confirmationReference),
+            operatorComment,
+            actorUserId,
+            moneyOperationEventService.payload(
+                "user_amount", request.getAmount(),
+                "user_currency_code", request.getCurrencyCodeSnapshot(),
+                "deposit_method_id", request.getDepositMethod().getId(),
+                "deposit_method_title", request.getDepositMethodTitleSnapshot()
+            )
+        );
         request.confirm(actorUserId, confirmationReference, operatorComment);
+        request.attachTreasuryTransaction(treasuryTransaction);
         DepositRequest confirmedRequest = depositRequestRepository.save(request);
+        Map<String, Object> payload = moneyOperationEventService.payload(
+            "confirmation_reference", confirmationReference,
+            "credited_amount", request.getAmount(),
+            "currency_code", request.getCurrencyCodeSnapshot()
+        );
+        appendTreasuryPayload(payload, treasuryTransaction);
         record(
             confirmedRequest,
             MoneyOperationEventType.DEPOSIT_CONFIRMED,
@@ -245,11 +281,7 @@ public class DepositRequestService {
             actorUserId,
             null,
             operatorComment,
-            moneyOperationEventService.payload(
-                "confirmation_reference", confirmationReference,
-                "credited_amount", request.getAmount(),
-                "currency_code", request.getCurrencyCodeSnapshot()
-            )
+            payload
         );
         notificationService.notifyDepositConfirmed(confirmedRequest);
         return confirmedRequest;
@@ -322,6 +354,30 @@ public class DepositRequestService {
                 );
             }
         }
+    }
+
+    private void appendTreasuryPayload(Map<String, Object> payload, TreasuryTransaction transaction) {
+        if (transaction == null) {
+            return;
+        }
+        payload.put("treasury_transaction_public_id", transaction.getPublicId());
+        payload.put("treasury_account_public_id", transaction.getTreasuryAccount().getPublicId());
+        payload.put("treasury_account_code", transaction.getTreasuryAccount().getCode());
+        payload.put("treasury_amount", transaction.getAmount());
+        payload.put("treasury_currency_code", transaction.getTreasuryAccount().getCurrencyCode());
+    }
+
+    private String firstNonBlank(String left, String right) {
+        String normalizedLeft = normalizeOptional(left);
+        return normalizedLeft == null ? normalizeOptional(right) : normalizedLeft;
+    }
+
+    private String normalizeOptional(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private void requireStatus(DepositRequest request, DepositRequestStatus status, String action) {

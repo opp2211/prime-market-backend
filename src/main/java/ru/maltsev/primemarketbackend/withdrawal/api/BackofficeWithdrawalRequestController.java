@@ -29,6 +29,8 @@ import ru.maltsev.primemarketbackend.money.domain.MoneyOperationType;
 import ru.maltsev.primemarketbackend.money.service.MoneyOperationEventService;
 import ru.maltsev.primemarketbackend.security.PermissionCodes;
 import ru.maltsev.primemarketbackend.security.user.UserPrincipal;
+import ru.maltsev.primemarketbackend.treasury.domain.TreasuryTransaction;
+import ru.maltsev.primemarketbackend.treasury.service.TreasuryService;
 import ru.maltsev.primemarketbackend.withdrawal.api.dto.BackofficeWithdrawalRequestResponse;
 import ru.maltsev.primemarketbackend.withdrawal.api.dto.ConfirmWithdrawalRequest;
 import ru.maltsev.primemarketbackend.withdrawal.api.dto.RejectWithdrawalRequest;
@@ -42,6 +44,7 @@ import ru.maltsev.primemarketbackend.withdrawal.service.WithdrawalRequestService
 public class BackofficeWithdrawalRequestController {
     private final WithdrawalRequestService withdrawalRequestService;
     private final MoneyOperationEventService moneyOperationEventService;
+    private final TreasuryService treasuryService;
 
     @GetMapping
     @Operation(
@@ -80,7 +83,11 @@ public class BackofficeWithdrawalRequestController {
         }
 
         WithdrawalRequest request = withdrawalRequestService.getForBackoffice(publicId);
-        return ResponseEntity.ok(BackofficeWithdrawalRequestResponse.from(request, eventsFor(request)));
+        return ResponseEntity.ok(BackofficeWithdrawalRequestResponse.from(
+            request,
+            eventsFor(request),
+            treasuryTransactionsFor(request)
+        ));
     }
 
     @PostMapping("/{publicId}/take")
@@ -94,7 +101,11 @@ public class BackofficeWithdrawalRequestController {
         }
 
         WithdrawalRequest request = withdrawalRequestService.take(publicId, principal.getUser().getId());
-        return ResponseEntity.ok(BackofficeWithdrawalRequestResponse.from(request, eventsFor(request)));
+        return ResponseEntity.ok(BackofficeWithdrawalRequestResponse.from(
+            request,
+            eventsFor(request),
+            treasuryTransactionsFor(request)
+        ));
     }
 
     @PostMapping("/{publicId}/reject")
@@ -115,7 +126,8 @@ public class BackofficeWithdrawalRequestController {
         );
         return ResponseEntity.ok(BackofficeWithdrawalRequestResponse.from(
             withdrawalRequest,
-            eventsFor(withdrawalRequest)
+            eventsFor(withdrawalRequest),
+            treasuryTransactionsFor(withdrawalRequest)
         ));
     }
 
@@ -137,11 +149,16 @@ public class BackofficeWithdrawalRequestController {
         );
         return ResponseEntity.ok(BackofficeWithdrawalRequestResponse.from(
             withdrawalRequest,
-            eventsFor(withdrawalRequest)
+            eventsFor(withdrawalRequest),
+            treasuryTransactionsFor(withdrawalRequest)
         ));
     }
 
     private List<MoneyOperationEvent> eventsFor(WithdrawalRequest request) {
         return moneyOperationEventService.list(MoneyOperationType.WITHDRAWAL_REQUEST, request.getPublicId());
+    }
+
+    private List<TreasuryTransaction> treasuryTransactionsFor(WithdrawalRequest request) {
+        return treasuryService.listOperationTransactions(MoneyOperationType.WITHDRAWAL_REQUEST, request.getPublicId());
     }
 }

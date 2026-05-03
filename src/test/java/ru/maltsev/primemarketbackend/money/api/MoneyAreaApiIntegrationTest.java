@@ -62,6 +62,8 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
     void resetState() {
         jdbcTemplate.execute("""
             truncate table
+                treasury_transactions,
+                treasury_accounts,
                 money_operation_events,
                 notifications,
                 withdrawal_requests,
@@ -655,6 +657,49 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
         );
     }
 
+    @Test
+    void withdrawalConfirmCanRecordCrossCurrencyTreasuryPayout() throws Exception {
+        User user = loadUser("user1@123.123");
+        User support = loadUser("sup1@123.123");
+        fundWallet(user, "RUB", "3000.0000");
+        long methodId = loadWithdrawalMethodId("SBP", "RUB");
+        String treasuryAccountPublicId = insertTreasuryAccount("bybit-usd-p2p", "Bybit USD P2P", "USD");
+
+        JsonNode created = createWithdrawal(user, """
+            {
+              "currency_code": "RUB",
+              "withdrawal_method_id": %d,
+              "amount": 2600.0000,
+              "requisites": {
+                "phoneNumber": "+79990001122",
+                "bankName": "T-Bank",
+                "recipientName": "Ivan Ivanov"
+              }
+            }
+            """.formatted(methodId));
+        takeWithdrawal(support, created.path("public_id").asText());
+
+        JsonNode confirmed = confirmWithdrawal(support, created.path("public_id").asText(), """
+            {
+              "actual_payout_amount": 2600.0000,
+              "operator_comment": "Paid via P2P USDT equivalent",
+              "treasury_account_public_id": "%s",
+              "treasury_amount": 33.6400,
+              "treasury_external_reference": "bybit-p2p-order-1"
+            }
+            """.formatted(treasuryAccountPublicId));
+
+        assertThat(confirmed.path("status").asText()).isEqualTo("COMPLETED");
+        assertThat(confirmed.path("treasury_transactions")).hasSize(1);
+        JsonNode treasuryTx = confirmed.path("treasury_transactions").get(0);
+        assertThat(treasuryTx.path("amount").decimalValue()).isEqualByComparingTo("-33.6400");
+        assertThat(treasuryTx.path("currency_code").asText()).isEqualTo("USD");
+        assertThat(treasuryTx.path("operation_type").asText()).isEqualTo("WITHDRAWAL_REQUEST");
+        assertThat(loadTreasuryBalance(treasuryAccountPublicId)).isEqualByComparingTo("-33.6400");
+        assertThat(confirmed.path("events").get(2).path("payload").path("treasury_amount").decimalValue())
+            .isEqualByComparingTo("-33.6400");
+    }
+
     private java.util.List<String> loadMoneyEventTypes(String operationType, String publicId) {
         return jdbcTemplate.queryForList(
             """
@@ -666,6 +711,32 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
                 """,
             String.class,
             operationType,
+            publicId
+        );
+    }
+
+    private String insertTreasuryAccount(String code, String title, String currencyCode) {
+        UUID publicId = jdbcTemplate.queryForObject(
+            """
+                insert into treasury_accounts (code, title, currency_code, account_type)
+                values (?, ?, ?, 'EXCHANGE_ACCOUNT')
+                returning public_id
+                """,
+            UUID.class,
+            code.toUpperCase(java.util.Locale.ROOT),
+            title,
+            currencyCode
+        );
+        if (publicId == null) {
+            throw new IllegalStateException("Failed to insert treasury account");
+        }
+        return publicId.toString();
+    }
+
+    private BigDecimal loadTreasuryBalance(String publicId) {
+        return jdbcTemplate.queryForObject(
+            "select balance from treasury_accounts where public_id = ?::uuid",
+            BigDecimal.class,
             publicId
         );
     }

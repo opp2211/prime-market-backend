@@ -25,6 +25,7 @@ import org.hibernate.annotations.Generated;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.generator.EventType;
 import org.hibernate.type.SqlTypes;
+import ru.maltsev.primemarketbackend.treasury.domain.TreasuryTransaction;
 
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -104,6 +105,12 @@ public class WithdrawalRequest {
     @Column(name = "processed_by_user_id")
     private Long processedByUserId;
 
+    @Column(name = "treasury_account_id")
+    private Long treasuryAccountId;
+
+    @Column(name = "treasury_transaction_id")
+    private Long treasuryTransactionId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     @Generated(event = EventType.INSERT)
     private Instant createdAt;
@@ -180,6 +187,14 @@ public class WithdrawalRequest {
         this.operatorComment = operatorComment;
         this.completedAt = now;
         this.processedByUserId = Objects.requireNonNullElse(this.processedByUserId, actorUserId);
+    }
+
+    public void attachTreasuryTransaction(TreasuryTransaction transaction) {
+        if (transaction == null) {
+            return;
+        }
+        treasuryAccountId = transaction.getTreasuryAccount().getId();
+        treasuryTransactionId = transaction.getId();
     }
 
     @PrePersist
