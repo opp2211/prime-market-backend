@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import ru.maltsev.primemarketbackend.account.api.dto.WalletTransactionResponse;
+import ru.maltsev.primemarketbackend.account.api.dto.WalletWorkSummaryResponse;
 import ru.maltsev.primemarketbackend.account.api.dto.WalletsResponse;
 import ru.maltsev.primemarketbackend.account.service.UserAccountService;
 import ru.maltsev.primemarketbackend.security.user.UserPrincipal;
@@ -40,6 +41,18 @@ public class UserAccountController {
 
         Long userId = principal.getUser().getId();
         return ResponseEntity.ok(userAccountService.getWallets(userId));
+    }
+
+    @GetMapping("/me/work-summary")
+    public ResponseEntity<WalletWorkSummaryResponse> getMyWorkSummary(
+        @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        Long userId = principal.getUser().getId();
+        return ResponseEntity.ok(userAccountService.getWalletWorkSummary(userId));
     }
 
     @GetMapping("/me/txs")

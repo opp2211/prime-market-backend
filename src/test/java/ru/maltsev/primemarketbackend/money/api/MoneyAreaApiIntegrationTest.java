@@ -117,6 +117,47 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
+    void walletWorkSummaryShowsReservedWithdrawalsAndPendingDeposits() throws Exception {
+        User user = loadUser("user1@123.123");
+        fundWallet(user, "USD", "1000.0000");
+        long withdrawalMethodId = loadWithdrawalMethodId("BINANCE_UID", "USD");
+        long depositMethodId = insertDepositMethod("Bank transfer", "USD");
+
+        JsonNode withdrawal = createWithdrawal(user, """
+            {
+              "currency_code": "USD",
+              "withdrawal_method_id": %d,
+              "amount": 250.0000,
+              "requisites": {
+                "uid": "778899"
+              }
+            }
+            """.formatted(withdrawalMethodId));
+        JsonNode deposit = createDepositRequest(user, """
+            {
+              "deposit_method_id": %d,
+              "amount": 150.0000
+            }
+            """.formatted(depositMethodId));
+
+        JsonNode summary = getWalletWorkSummary(user);
+
+        assertThat(summary.path("reserves")).hasSize(1);
+        assertThat(summary.path("reserves").get(0).path("source_type").asText()).isEqualTo("WITHDRAWAL_REQUEST");
+        assertThat(summary.path("reserves").get(0).path("ref_public_id").asText())
+            .isEqualTo(withdrawal.path("public_id").asText());
+        assertThat(summary.path("reserves").get(0).path("amount").decimalValue()).isEqualByComparingTo("250.0000");
+        assertThat(summary.path("reserves").get(0).path("currency_code").asText()).isEqualTo("USD");
+
+        assertThat(summary.path("pending_deposits")).hasSize(1);
+        assertThat(summary.path("pending_deposits").get(0).path("source_type").asText()).isEqualTo("DEPOSIT_REQUEST");
+        assertThat(summary.path("pending_deposits").get(0).path("ref_public_id").asText())
+            .isEqualTo(deposit.path("public_id").asText());
+        assertThat(summary.path("pending_deposits").get(0).path("amount").decimalValue()).isEqualByComparingTo("150.0000");
+        assertThat(summary.path("pending_deposits").get(0).path("currency_code").asText()).isEqualTo("USD");
+    }
+
+    @Test
     void payoutProfilesCrudDefaultAndOwnershipChecksWork() throws Exception {
         User user = loadUser("user1@123.123");
         User otherUser = loadUser("user2@123.123");
@@ -440,6 +481,13 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
 
     private JsonNode getWallets(User user) throws Exception {
         MvcResult result = mockMvc.perform(get("/api/wallets/me").with(auth(user)))
+            .andExpect(status().isOk())
+            .andReturn();
+        return readBody(result);
+    }
+
+    private JsonNode getWalletWorkSummary(User user) throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/wallets/me/work-summary").with(auth(user)))
             .andExpect(status().isOk())
             .andReturn();
         return readBody(result);

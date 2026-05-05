@@ -1,6 +1,8 @@
 package ru.maltsev.primemarketbackend.withdrawal.repository;
 
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -35,6 +37,11 @@ public interface WithdrawalRequestRepository extends JpaRepository<WithdrawalReq
         Long userId,
         WithdrawalRequestStatus status,
         Pageable pageable
+    );
+
+    List<WithdrawalRequest> findTop10ByUserIdAndStatusInOrderByCreatedAtDesc(
+        Long userId,
+        Collection<WithdrawalRequestStatus> statuses
     );
 
     Page<WithdrawalRequest> findAllByStatusInOrderByCreatedAtDesc(

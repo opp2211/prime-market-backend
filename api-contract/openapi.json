@@ -3740,6 +3740,58 @@
         },
         "type" : "object"
       },
+      "WalletWorkItemResponse" : {
+        "properties" : {
+          "amount" : {
+            "type" : "number"
+          },
+          "created_at" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "currency_code" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "ref_id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "ref_public_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "source_type" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "WalletWorkSummaryResponse" : {
+        "properties" : {
+          "pending_deposits" : {
+            "items" : {
+              "$ref" : "#/components/schemas/WalletWorkItemResponse"
+            },
+            "type" : "array"
+          },
+          "reserves" : {
+            "items" : {
+              "$ref" : "#/components/schemas/WalletWorkItemResponse"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
       "WalletsResponse" : {
         "properties" : {
           "items" : {
@@ -7086,6 +7138,24 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/PageWalletTransactionResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "user-account-controller" ]
+      }
+    },
+    "/api/wallets/me/work-summary" : {
+      "get" : {
+        "operationId" : "getMyWorkSummary",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WalletWorkSummaryResponse"
                 }
               }
             },
