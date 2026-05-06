@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 import ru.maltsev.primemarketbackend.config.EmailProperties;
+import ru.maltsev.primemarketbackend.currency.repository.CurrencyRepository;
 import ru.maltsev.primemarketbackend.exception.ApiProblemException;
 import ru.maltsev.primemarketbackend.user.change.EmailChangeToken;
 import ru.maltsev.primemarketbackend.user.change.EmailChangeTokenRepository;
@@ -37,6 +38,7 @@ public class UserProfileService {
     private static final int TOKEN_BYTES = 64;
 
     private final UserRepository userRepository;
+    private final CurrencyRepository currencyRepository;
     private final PasswordEncoder passwordEncoder;
     private final JavaMailSender mailSender;
     private final EmailProperties emailProperties;
@@ -52,6 +54,28 @@ public class UserProfileService {
                 "USER_NOT_FOUND",
                 "User not found"
             ));
+    }
+
+    @Transactional
+    public User updatePrimaryCurrency(Long userId, String rawCurrencyCode) {
+        String currencyCode = normalizeCurrencyCode(rawCurrencyCode);
+        if (!currencyRepository.existsByCodeIgnoreCaseAndActiveTrue(currencyCode)) {
+            throw new ApiProblemException(
+                HttpStatus.BAD_REQUEST,
+                "CURRENCY_NOT_SUPPORTED",
+                "Currency is not supported"
+            );
+        }
+
+        User user = userRepository.findWithRolesById(userId)
+            .orElseThrow(() -> new ApiProblemException(
+                HttpStatus.NOT_FOUND,
+                "USER_NOT_FOUND",
+                "User not found"
+            ));
+
+        user.setPrimaryCurrencyCode(currencyCode);
+        return userRepository.save(user);
     }
 
     @Transactional
@@ -165,6 +189,10 @@ public class UserProfileService {
 
     private String normalizeEmail(String email) {
         return requireNonBlank(email, "Email").trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeCurrencyCode(String currencyCode) {
+        return requireNonBlank(currencyCode, "Currency code").trim().toUpperCase(Locale.ROOT);
     }
 
     private String requireNonBlank(String value, String fieldName) {

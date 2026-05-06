@@ -38,6 +38,10 @@ public class User {
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
 
+    @Setter
+    @Column(name = "primary_currency_code", nullable = false, length = 5)
+    private String primaryCurrencyCode = "RUB";
+
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
         name = "user_roles",

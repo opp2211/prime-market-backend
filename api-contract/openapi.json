@@ -3605,6 +3605,16 @@
         },
         "type" : "object"
       },
+      "UpdatePrimaryCurrencyRequest" : {
+        "properties" : {
+          "currency_code" : {
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "currency_code" ],
+        "type" : "object"
+      },
       "UpdateTreasuryAccountRequest" : {
         "properties" : {
           "account_type" : {
@@ -3649,6 +3659,9 @@
             },
             "type" : "array",
             "uniqueItems" : true
+          },
+          "primary_currency_code" : {
+            "type" : "string"
           },
           "roles" : {
             "items" : {
@@ -7010,6 +7023,34 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/StatusResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "user-profile-controller" ]
+      }
+    },
+    "/api/users/me/primary-currency" : {
+      "patch" : {
+        "operationId" : "updatePrimaryCurrency",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdatePrimaryCurrencyRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserProfileResponse"
                 }
               }
             },

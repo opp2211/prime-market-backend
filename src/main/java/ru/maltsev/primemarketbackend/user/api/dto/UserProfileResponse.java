@@ -1,5 +1,6 @@
 package ru.maltsev.primemarketbackend.user.api.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -13,6 +14,7 @@ public record UserProfileResponse(
     String username,
     String email,
     boolean active,
+    @JsonProperty("primary_currency_code") String primaryCurrencyCode,
     Instant createdAt,
     Set<String> roles,
     Set<String> permissions
@@ -29,6 +31,7 @@ public record UserProfileResponse(
             user.getUsername(),
             user.getEmail(),
             user.isActive(),
+            user.getPrimaryCurrencyCode(),
             user.getCreatedAt(),
             roles,
             permissions

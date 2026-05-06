@@ -74,8 +74,10 @@ class OpenApiContractArtifactIT extends AbstractPostgresIntegrationTest {
         assertThat(paths.isObject()).isTrue();
         assertThat(paths.has("/api/auth/login")).isTrue();
         assertThat(paths.has("/api/users/me")).isTrue();
+        assertThat(paths.has("/api/users/me/primary-currency")).isTrue();
         assertThat(paths.has("/api/currencies")).isTrue();
         assertThat(paths.has("/api/wallets/me")).isTrue();
+        assertThat(paths.has("/api/wallets/me/work-summary")).isTrue();
         assertThat(paths.has("/api/wallets/me/txs")).isTrue();
         assertThat(paths.has("/api/deposit-requests")).isTrue();
         assertThat(paths.has("/api/backoffice/deposit-requests")).isTrue();

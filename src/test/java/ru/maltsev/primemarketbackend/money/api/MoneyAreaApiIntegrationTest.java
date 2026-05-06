@@ -81,6 +81,7 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
                 user_accounts
             restart identity cascade
             """);
+        jdbcTemplate.update("update users set primary_currency_code = 'RUB'");
     }
 
     @Test
@@ -155,6 +156,33 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
             .isEqualTo(deposit.path("public_id").asText());
         assertThat(summary.path("pending_deposits").get(0).path("amount").decimalValue()).isEqualByComparingTo("150.0000");
         assertThat(summary.path("pending_deposits").get(0).path("currency_code").asText()).isEqualTo("USD");
+    }
+
+    @Test
+    void userCanChangePrimaryCurrencyPreference() throws Exception {
+        User user = loadUser("user1@123.123");
+
+        JsonNode updated = updatePrimaryCurrency(user, """
+            {
+              "currency_code": "usd"
+            }
+            """);
+
+        assertThat(updated.path("primary_currency_code").asText()).isEqualTo("USD");
+
+        JsonNode profile = getMe(user);
+        assertThat(profile.path("primary_currency_code").asText()).isEqualTo("USD");
+
+        mockMvc.perform(patch("/api/users/me/primary-currency")
+                .with(auth(user))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "currency_code": "DOGE"
+                    }
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("CURRENCY_NOT_SUPPORTED"));
     }
 
     @Test
@@ -488,6 +516,23 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
 
     private JsonNode getWalletWorkSummary(User user) throws Exception {
         MvcResult result = mockMvc.perform(get("/api/wallets/me/work-summary").with(auth(user)))
+            .andExpect(status().isOk())
+            .andReturn();
+        return readBody(result);
+    }
+
+    private JsonNode getMe(User user) throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/users/me").with(auth(user)))
+            .andExpect(status().isOk())
+            .andReturn();
+        return readBody(result);
+    }
+
+    private JsonNode updatePrimaryCurrency(User user, String body) throws Exception {
+        MvcResult result = mockMvc.perform(patch("/api/users/me/primary-currency")
+                .with(auth(user))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
             .andExpect(status().isOk())
             .andReturn();
         return readBody(result);

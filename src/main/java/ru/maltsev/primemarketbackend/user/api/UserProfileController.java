@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,6 +17,7 @@ import ru.maltsev.primemarketbackend.user.api.dto.ChangeEmailRequest;
 import ru.maltsev.primemarketbackend.user.api.dto.ChangePasswordRequest;
 import ru.maltsev.primemarketbackend.user.api.dto.ConfirmEmailChangeRequest;
 import ru.maltsev.primemarketbackend.user.api.dto.ConfirmPasswordChangeRequest;
+import ru.maltsev.primemarketbackend.user.api.dto.UpdatePrimaryCurrencyRequest;
 import ru.maltsev.primemarketbackend.user.api.dto.UserProfileResponse;
 import ru.maltsev.primemarketbackend.user.service.UserProfileService;
 
@@ -32,6 +34,21 @@ public class UserProfileController {
         }
         return ResponseEntity.ok(
             UserProfileResponse.from(userProfileService.getProfile(principal.getUser().getId()))
+        );
+    }
+
+    @PatchMapping("/me/primary-currency")
+    public ResponseEntity<UserProfileResponse> updatePrimaryCurrency(
+        @AuthenticationPrincipal UserPrincipal principal,
+        @Valid @RequestBody UpdatePrimaryCurrencyRequest request
+    ) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(
+            UserProfileResponse.from(
+                userProfileService.updatePrimaryCurrency(principal.getUser().getId(), request.currencyCode())
+            )
         );
     }
 
