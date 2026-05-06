@@ -22,6 +22,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
+import org.hibernate.query.criteria.JpaExpression;
 import ru.maltsev.primemarketbackend.account.domain.UserAccount;
 import ru.maltsev.primemarketbackend.account.domain.UserAccountTx;
 import ru.maltsev.primemarketbackend.currency.domain.UserCurrencyConversion;
@@ -148,6 +149,7 @@ public class UserAccountTxCriteriaRepository {
         searchPredicates.add(likeText(cb, tx.get("txType"), likePattern));
         searchPredicates.add(likeText(cb, tx.get("refType"), likePattern));
         searchPredicates.add(likeText(cb, acc.get("currencyCode"), likePattern));
+        searchPredicates.add(likeAsText(cb, tx.get("publicId"), likePattern));
 
         UUID uuidQuery = parseUuid(normalizedQuery);
         if (uuidQuery != null) {
@@ -189,6 +191,34 @@ public class UserAccountTxCriteriaRepository {
             ));
         }
 
+        addPublicIdTextSubqueryPredicate(
+                cb,
+                criteriaQuery,
+                tx,
+                searchPredicates,
+                DepositRequest.class,
+                "DEPOSIT_REQUEST",
+                likePattern
+        );
+        addPublicIdTextSubqueryPredicate(
+                cb,
+                criteriaQuery,
+                tx,
+                searchPredicates,
+                WithdrawalRequest.class,
+                "WITHDRAWAL_REQUEST",
+                likePattern
+        );
+        addPublicIdTextSubqueryPredicate(
+                cb,
+                criteriaQuery,
+                tx,
+                searchPredicates,
+                UserCurrencyConversion.class,
+                "USER_CURRENCY_CONVERSION",
+                likePattern
+        );
+
         addTextSubqueryPredicate(
                 cb,
                 criteriaQuery,
@@ -227,7 +257,8 @@ public class UserAccountTxCriteriaRepository {
                 likeText(cb, order.get("gameTitleSnapshot"), likePattern),
                 likeText(cb, order.get("categoryTitleSnapshot"), likePattern),
                 likeText(cb, order.get("titleSnapshot"), likePattern),
-                likeText(cb, order.get("descriptionSnapshot"), likePattern)
+                likeText(cb, order.get("descriptionSnapshot"), likePattern),
+                likeAsText(cb, order.get("publicId"), likePattern)
         ));
         searchPredicates.add(cb.and(
                 cb.like(tx.get("refType"), "ORDER_%"),
@@ -249,6 +280,24 @@ public class UserAccountTxCriteriaRepository {
         Subquery<Long> ids = criteriaQuery.subquery(Long.class);
         Root<T> root = ids.from(entityClass);
         ids.select(root.get("id")).where(cb.equal(root.get("publicId"), publicId));
+        searchPredicates.add(cb.and(
+                cb.equal(tx.get("refType"), refType),
+                tx.get("refId").in(ids)
+        ));
+    }
+
+    private static <T> void addPublicIdTextSubqueryPredicate(
+            CriteriaBuilder cb,
+            CriteriaQuery<?> criteriaQuery,
+            Root<UserAccountTx> tx,
+            List<Predicate> searchPredicates,
+            Class<T> entityClass,
+            String refType,
+            String likePattern
+    ) {
+        Subquery<Long> ids = criteriaQuery.subquery(Long.class);
+        Root<T> root = ids.from(entityClass);
+        ids.select(root.get("id")).where(likeAsText(cb, root.get("publicId"), likePattern));
         searchPredicates.add(cb.and(
                 cb.equal(tx.get("refType"), refType),
                 tx.get("refId").in(ids)
@@ -279,6 +328,11 @@ public class UserAccountTxCriteriaRepository {
 
     private static Predicate likeText(CriteriaBuilder cb, Path<String> path, String likePattern) {
         return cb.like(cb.lower(cb.coalesce(path, "")), likePattern, '\\');
+    }
+
+    private static Predicate likeAsText(CriteriaBuilder cb, Path<?> path, String likePattern) {
+        JpaExpression<String> textPath = ((JpaExpression<?>) path).cast(String.class);
+        return cb.like(cb.lower(textPath), likePattern, '\\');
     }
 
     private static String normalizeSearchQuery(String value) {

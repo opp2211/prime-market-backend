@@ -467,6 +467,16 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
         JsonNode txByPublicId = searchWalletTransactions(user, txPublicId);
         assertThat(txByPublicId.path("content").get(0).path("public_id").asText()).isEqualTo(txPublicId);
 
+        JsonNode txByPublicIdFragment = searchWalletTransactions(user, txPublicId.substring(0, 8));
+        assertThat(txByPublicIdFragment.path("content").get(0).path("public_id").asText()).isEqualTo(txPublicId);
+
+        JsonNode txByRefPublicIdFragment = searchWalletTransactions(
+            user,
+            confirmCandidate.path("public_id").asText().substring(0, 8)
+        );
+        assertThat(txByRefPublicIdFragment.path("content").get(0).path("ref_public_id").asText())
+            .isEqualTo(confirmCandidate.path("public_id").asText());
+
         JsonNode txByLabel = searchWalletTransactions(user, "binance");
         assertThat(txByLabel.path("content").get(0).path("ref_public_id").asText())
             .isEqualTo(confirmCandidate.path("public_id").asText());
