@@ -7125,6 +7125,14 @@
             "type" : "array"
           }
         }, {
+          "description" : "Optional search by transaction id, related entity id, type, currency, or related label.",
+          "in" : "query",
+          "name" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
           "in" : "query",
           "name" : "from",
           "required" : false,

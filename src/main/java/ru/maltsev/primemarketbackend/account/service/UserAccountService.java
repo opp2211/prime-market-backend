@@ -113,6 +113,7 @@ public class UserAccountService {
             Long userId,
             List<String> currency,
             List<String> type,
+            String query,
             Instant from,
             Instant to,
             Pageable pageable
@@ -121,6 +122,7 @@ public class UserAccountService {
                 userId,
                 currency,
                 type,
+                query,
                 from,
                 to,
                 pageable

@@ -462,6 +462,14 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(txHistory.path("content").get(0).path("label").asText()).isEqualTo("Withdrawal via Binance UID");
         assertThat(txHistory.path("content").get(0).path("ref_public_id").asText())
             .isEqualTo(confirmCandidate.path("public_id").asText());
+
+        String txPublicId = txHistory.path("content").get(0).path("public_id").asText();
+        JsonNode txByPublicId = searchWalletTransactions(user, txPublicId);
+        assertThat(txByPublicId.path("content").get(0).path("public_id").asText()).isEqualTo(txPublicId);
+
+        JsonNode txByLabel = searchWalletTransactions(user, "binance");
+        assertThat(txByLabel.path("content").get(0).path("ref_public_id").asText())
+            .isEqualTo(confirmCandidate.path("public_id").asText());
     }
 
     @Test
@@ -623,6 +631,15 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
         MvcResult result = mockMvc.perform(get("/api/wallets/me/txs")
                 .with(auth(user))
                 .queryParam("type", type))
+            .andExpect(status().isOk())
+            .andReturn();
+        return readBody(result);
+    }
+
+    private JsonNode searchWalletTransactions(User user, String query) throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/wallets/me/txs")
+                .with(auth(user))
+                .queryParam("query", query))
             .andExpect(status().isOk())
             .andReturn();
         return readBody(result);

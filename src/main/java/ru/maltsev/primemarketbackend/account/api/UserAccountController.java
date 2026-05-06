@@ -68,6 +68,8 @@ public class UserAccountController {
             array = @ArraySchema(schema = @Schema(type = "string"))
         )
         @RequestParam(required = false) List<String> type,
+        @Parameter(description = "Optional search by transaction id, related entity id, type, currency, or related label.")
+        @RequestParam(required = false) String query,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
         @ParameterObject
@@ -82,6 +84,7 @@ public class UserAccountController {
             userId,
             currency,
             type,
+            query,
             from,
             to,
             pageable

@@ -137,7 +137,7 @@ class OpenApiContractArtifactIT extends AbstractPostgresIntegrationTest {
         assertThat(queryParameterNames(contract, "/api/notifications", "get"))
             .containsExactly("isRead", "page", "size", "sort");
         assertThat(queryParameterNames(contract, "/api/wallets/me/txs", "get"))
-            .containsExactly("currency", "type", "from", "to", "page", "size", "sort");
+            .containsExactly("currency", "type", "query", "from", "to", "page", "size", "sort");
 
         assertThat(queryParameterNames(contract, "/api/withdrawal-requests", "get"))
             .doesNotContain("pageable", "statuses", "currency_code");
