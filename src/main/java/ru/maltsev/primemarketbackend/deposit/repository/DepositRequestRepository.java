@@ -4,7 +4,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.Collection;
 import java.util.List;
-import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Lock;
@@ -16,18 +15,18 @@ import ru.maltsev.primemarketbackend.deposit.domain.DepositRequest;
 import ru.maltsev.primemarketbackend.deposit.domain.DepositRequestStatus;
 
 public interface DepositRequestRepository extends JpaRepository<DepositRequest, Long> {
-    Optional<DepositRequest> findByPublicId(UUID publicId);
+    Optional<DepositRequest> findByPublicCode(String publicCode);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select dr from DepositRequest dr where dr.publicId = :publicId")
-    Optional<DepositRequest> findByPublicIdForUpdate(@Param("publicId") UUID publicId);
+    @Query("select dr from DepositRequest dr where dr.publicCode = :publicCode")
+    Optional<DepositRequest> findByPublicCodeForUpdate(@Param("publicCode") String publicCode);
 
-    Optional<DepositRequest> findByPublicIdAndUserId(UUID publicId, Long userId);
+    Optional<DepositRequest> findByPublicCodeAndUserId(String publicCode, Long userId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select dr from DepositRequest dr where dr.publicId = :publicId and dr.userId = :userId")
-    Optional<DepositRequest> findByPublicIdAndUserIdForUpdate(
-        @Param("publicId") UUID publicId,
+    @Query("select dr from DepositRequest dr where dr.publicCode = :publicCode and dr.userId = :userId")
+    Optional<DepositRequest> findByPublicCodeAndUserIdForUpdate(
+        @Param("publicCode") String publicCode,
         @Param("userId") Long userId
     );
 
@@ -54,7 +53,7 @@ public interface DepositRequestRepository extends JpaRepository<DepositRequest, 
     @Query(
         value = """
             select new ru.maltsev.primemarketbackend.deposit.repository.AdminDepositRequestQueueRow(
-                dr.publicId,
+                dr.publicCode,
                 dr.amount,
                 dr.currencyCodeSnapshot,
                 dm.id,
@@ -87,7 +86,7 @@ public interface DepositRequestRepository extends JpaRepository<DepositRequest, 
     @Query(
         value = """
             select new ru.maltsev.primemarketbackend.deposit.repository.AdminDepositRequestQueueRow(
-                dr.publicId,
+                dr.publicCode,
                 dr.amount,
                 dr.currencyCodeSnapshot,
                 dm.id,

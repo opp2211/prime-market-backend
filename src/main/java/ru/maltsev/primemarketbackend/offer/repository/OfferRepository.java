@@ -12,9 +12,15 @@ import ru.maltsev.primemarketbackend.offer.domain.Offer;
 public interface OfferRepository extends JpaRepository<Offer, Long> {
     Optional<Offer> findByIdAndUserId(Long id, Long userId);
 
+    Optional<Offer> findByPublicCodeAndUserId(String publicCode, Long userId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select o from Offer o where o.id = :offerId and o.userId = :userId")
     Optional<Offer> findByIdAndUserIdForUpdate(@Param("offerId") Long offerId, @Param("userId") Long userId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select o from Offer o where o.publicCode = :offerCode and o.userId = :userId")
+    Optional<Offer> findByPublicCodeAndUserIdForUpdate(@Param("offerCode") String offerCode, @Param("userId") Long userId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select o from Offer o where o.id = :offerId")
@@ -23,6 +29,7 @@ public interface OfferRepository extends JpaRepository<Offer, Long> {
     @Query("""
         select new ru.maltsev.primemarketbackend.offer.repository.OfferView(
             o.id,
+            o.publicCode,
             o.gameId,
             g.slug,
             g.title,
@@ -55,6 +62,7 @@ public interface OfferRepository extends JpaRepository<Offer, Long> {
     @Query("""
         select new ru.maltsev.primemarketbackend.offer.repository.OfferView(
             o.id,
+            o.publicCode,
             o.gameId,
             g.slug,
             g.title,
@@ -83,4 +91,37 @@ public interface OfferRepository extends JpaRepository<Offer, Long> {
           and o.userId = :userId
         """)
     Optional<OfferView> findViewByIdAndUserId(@Param("offerId") Long offerId, @Param("userId") Long userId);
+
+    @Query("""
+        select new ru.maltsev.primemarketbackend.offer.repository.OfferView(
+            o.id,
+            o.publicCode,
+            o.gameId,
+            g.slug,
+            g.title,
+            o.categoryId,
+            c.slug,
+            c.title,
+            o.side,
+            o.title,
+            o.description,
+            o.tradeTerms,
+            o.priceCurrencyCode,
+            o.priceAmount,
+            o.quantity,
+            o.minTradeQuantity,
+            o.maxTradeQuantity,
+            o.quantityStep,
+            o.status,
+            o.createdAt,
+            o.updatedAt,
+            o.publishedAt
+        )
+        from Offer o
+        join ru.maltsev.primemarketbackend.category.domain.Category c on c.id = o.categoryId
+        join c.game g
+        where o.publicCode = :offerCode
+          and o.userId = :userId
+        """)
+    Optional<OfferView> findViewByPublicCodeAndUserId(@Param("offerCode") String offerCode, @Param("userId") Long userId);
 }

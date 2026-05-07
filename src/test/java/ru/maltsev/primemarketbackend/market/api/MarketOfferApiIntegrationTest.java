@@ -249,7 +249,7 @@ class MarketOfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(item.path("maxTradeQuantity").decimalValue()).isEqualByComparingTo("1");
         assertThat(item.path("quantityStep").decimalValue()).isEqualByComparingTo("1");
 
-        MvcResult quoteResult = mockMvc.perform(post("/api/market/offers/{offerId}/quote", offerId)
+        MvcResult quoteResult = mockMvc.perform(post("/api/market/offers/{offerId}/quote", loadOfferPublicCode(offerId))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(createQuoteRequest(
                     "buy",
@@ -292,7 +292,7 @@ class MarketOfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
         User seller = createUser("seller-details-buy");
         long offerId = createActiveOffer(seller, "sell", "USD", "2.50", "divine-orb", "Sell Divine Orb");
 
-        MvcResult result = mockMvc.perform(get("/api/market/offers/{offerId}", offerId)
+        MvcResult result = mockMvc.perform(get("/api/market/offers/{offerId}", loadOfferPublicCode(offerId))
                 .queryParam("intent", "buy")
                 .queryParam("viewerCurrencyCode", "RUB"))
             .andExpect(status().isOk())
@@ -314,7 +314,7 @@ class MarketOfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
         User buyer = createUser("buyer-details-sell");
         long offerId = createActiveOffer(buyer, "buy", "USD", "2.50", "divine-orb", "Buy Divine Orb");
 
-        MvcResult result = mockMvc.perform(get("/api/market/offers/{offerId}", offerId)
+        MvcResult result = mockMvc.perform(get("/api/market/offers/{offerId}", loadOfferPublicCode(offerId))
                 .queryParam("intent", "sell")
                 .queryParam("viewerCurrencyCode", "RUB"))
             .andExpect(status().isOk())
@@ -334,7 +334,7 @@ class MarketOfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
         User seller = createUser("seller-details-missing-rate");
         long offerId = createActiveOffer(seller, "sell", "KZT", "1000.00", "divine-orb", "No RUB rate");
 
-        mockMvc.perform(get("/api/market/offers/{offerId}", offerId)
+        mockMvc.perform(get("/api/market/offers/{offerId}", loadOfferPublicCode(offerId))
                 .queryParam("intent", "buy")
                 .queryParam("viewerCurrencyCode", "RUB"))
             .andExpect(status().isNotFound())
@@ -346,7 +346,7 @@ class MarketOfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
         User seller = createUser("seller-details-side");
         long offerId = createActiveOffer(seller, "sell", "USD", "2.50", "divine-orb", "Wrong side");
 
-        mockMvc.perform(get("/api/market/offers/{offerId}", offerId)
+        mockMvc.perform(get("/api/market/offers/{offerId}", loadOfferPublicCode(offerId))
                 .queryParam("intent", "sell")
                 .queryParam("viewerCurrencyCode", "RUB"))
             .andExpect(status().isNotFound())
@@ -367,7 +367,7 @@ class MarketOfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
             false
         );
 
-        mockMvc.perform(get("/api/market/offers/{offerId}", offerId)
+        mockMvc.perform(get("/api/market/offers/{offerId}", loadOfferPublicCode(offerId))
                 .queryParam("intent", "buy")
                 .queryParam("viewerCurrencyCode", "RUB"))
             .andExpect(status().isNotFound())
@@ -388,7 +388,7 @@ class MarketOfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
             true
         );
 
-        mockMvc.perform(get("/api/market/offers/{offerId}", offerId)
+        mockMvc.perform(get("/api/market/offers/{offerId}", loadOfferPublicCode(offerId))
                 .queryParam("intent", "buy")
                 .queryParam("viewerCurrencyCode", "RUB"))
             .andExpect(status().isOk())
@@ -401,7 +401,7 @@ class MarketOfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
         User seller = createUser("seller-details-invalid-intent");
         long offerId = createActiveOffer(seller, "sell", "USD", "2.50", "divine-orb", "Invalid intent");
 
-        mockMvc.perform(get("/api/market/offers/{offerId}", offerId)
+        mockMvc.perform(get("/api/market/offers/{offerId}", loadOfferPublicCode(offerId))
                 .queryParam("intent", "hold")
                 .queryParam("viewerCurrencyCode", "RUB"))
             .andExpect(status().isBadRequest())
@@ -413,7 +413,7 @@ class MarketOfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
         User seller = createUser("seller-details-invalid-currency");
         long offerId = createActiveOffer(seller, "sell", "USD", "2.50", "divine-orb", "Invalid currency");
 
-        mockMvc.perform(get("/api/market/offers/{offerId}", offerId)
+        mockMvc.perform(get("/api/market/offers/{offerId}", loadOfferPublicCode(offerId))
                 .queryParam("intent", "buy")
                 .queryParam("viewerCurrencyCode", "ZZZ"))
             .andExpect(status().isBadRequest())
@@ -666,6 +666,14 @@ class MarketOfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
 
     private JsonNode readBody(MvcResult result) throws Exception {
         return objectMapper.readTree(result.getResponse().getContentAsString());
+    }
+
+    private String loadOfferPublicCode(long offerId) {
+        return jdbcTemplate.queryForObject(
+            "select public_code from offers where id = ?",
+            String.class,
+            offerId
+        );
     }
 
     private long createStoredOffer(

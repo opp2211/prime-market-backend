@@ -9,24 +9,26 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.Generated;
 import org.hibernate.generator.EventType;
+import ru.maltsev.primemarketbackend.shared.PublicCodeGenerator;
 
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "user_currency_conversions")
 public class UserCurrencyConversion {
+    private static final String PUBLIC_CODE_PREFIX = "CNV";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "public_id", nullable = false, updatable = false)
-    private UUID publicId;
+    @Column(name = "public_code", nullable = false, updatable = false, length = 16)
+    private String publicCode;
 
     @Column(name = "user_id", nullable = false)
     private Long userId;
@@ -87,8 +89,8 @@ public class UserCurrencyConversion {
 
     @PrePersist
     private void onCreate() {
-        if (publicId == null) {
-            publicId = UUID.randomUUID();
+        if (publicCode == null) {
+            publicCode = PublicCodeGenerator.generate(PUBLIC_CODE_PREFIX);
         }
     }
 }

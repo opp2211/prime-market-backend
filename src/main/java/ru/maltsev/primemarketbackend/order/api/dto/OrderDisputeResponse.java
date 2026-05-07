@@ -1,13 +1,12 @@
 package ru.maltsev.primemarketbackend.order.api.dto;
 
 import java.time.Instant;
-import java.util.UUID;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderDisputeDtos.AvailableActions;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderDisputeDtos.OrderSummary;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderDisputeDtos.UserSummary;
 
 public record OrderDisputeResponse(
-    UUID publicId,
+    String publicCode,
     OrderSummary order,
     String status,
     String reasonCode,

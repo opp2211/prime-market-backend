@@ -11,11 +11,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
-import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -31,9 +29,6 @@ public class WithdrawalPayoutPlan {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(name = "public_id", nullable = false, updatable = false)
-    private UUID publicId;
 
     @OneToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "withdrawal_request_id", nullable = false)
@@ -128,13 +123,6 @@ public class WithdrawalPayoutPlan {
     public void cancel(Instant now) {
         status = WithdrawalPayoutPlanStatus.CANCELLED;
         cancelledAt = now;
-    }
-
-    @PrePersist
-    private void onCreate() {
-        if (publicId == null) {
-            publicId = UUID.randomUUID();
-        }
     }
 
     private String normalizeOptional(String value) {

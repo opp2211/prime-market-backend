@@ -140,18 +140,28 @@ public class OfferService {
             ));
     }
 
-    public List<OfferView> listViewsForUser(Long userId) {
-        return offerRepository.findViewsByUserId(userId);
-    }
-
-    @Transactional
-    public Offer update(Long offerId, Long userId, OfferUpdateRequest request) {
-        Offer offer = offerRepository.findByIdAndUserIdForUpdate(offerId, userId)
+    public OfferView getViewForUser(String offerCode, Long userId) {
+        return offerRepository.findViewByPublicCodeAndUserId(normalizePublicCode(offerCode), userId)
             .orElseThrow(() -> new ApiProblemException(
                 HttpStatus.NOT_FOUND,
                 "OFFER_NOT_FOUND",
                 "Offer not found"
             ));
+    }
+
+    public List<OfferView> listViewsForUser(Long userId) {
+        return offerRepository.findViewsByUserId(userId);
+    }
+
+    @Transactional
+    public Offer update(String offerCode, Long userId, OfferUpdateRequest request) {
+        Offer offer = offerRepository.findByPublicCodeAndUserIdForUpdate(normalizePublicCode(offerCode), userId)
+            .orElseThrow(() -> new ApiProblemException(
+                HttpStatus.NOT_FOUND,
+                "OFFER_NOT_FOUND",
+                "Offer not found"
+            ));
+        Long offerId = offer.getId();
         validatePatchRequest(request);
 
         String previousStatus = offer.getStatus();
@@ -1174,6 +1184,13 @@ public class OfferService {
             return null;
         }
         return trimmed.toUpperCase(Locale.ROOT);
+    }
+
+    private String normalizePublicCode(String value) {
+        if (value == null || value.isBlank()) {
+            throw new ApiProblemException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Offer code is required");
+        }
+        return value.trim().toUpperCase(Locale.ROOT);
     }
 
     private String normalizeNullableText(String value) {

@@ -60,8 +60,8 @@ public class OrderReadService {
     }
 
     @Transactional(readOnly = true)
-    public OrderDetailsResponse getOrderDetails(java.util.UUID publicOrderId, UserPrincipal principal) {
-        Order order = orderAccessService.requireReadableOrder(publicOrderId, principal);
+    public OrderDetailsResponse getOrderDetails(String orderCode, UserPrincipal principal) {
+        Order order = orderAccessService.requireReadableOrder(orderCode, principal);
         Long currentUserId = principal.getUser().getId();
 
         boolean viewerIsParticipant = isParticipant(order, currentUserId);
@@ -75,7 +75,7 @@ public class OrderReadService {
             .toList();
         return new OrderDetailsResponse(
             order.getId(),
-            order.getPublicId(),
+            order.getPublicCode(),
             order.getStatus(),
             viewerIsParticipant ? (viewerIsMaker ? order.getMakerRole() : order.getTakerRole()) : null,
             viewerIsParticipant ? (viewerIsMaker ? order.getTakerRole() : order.getMakerRole()) : null,
@@ -132,7 +132,7 @@ public class OrderReadService {
         boolean viewerIsMaker = isMaker(order, currentUserId);
         return new MyOrdersResponse.Item(
             order.getId(),
-            order.getPublicId(),
+            order.getPublicCode(),
             order.getStatus(),
             viewerIsMaker ? order.getMakerRole() : order.getTakerRole(),
             viewerIsMaker ? order.getTakerRole() : order.getMakerRole(),
@@ -267,7 +267,7 @@ public class OrderReadService {
             && !request.getRequestedByUserId().equals(currentUserId)
             && !request.getRequestedByRole().equals(resolveParticipantRole(order, currentUserId));
         return new OrderReadModelDtos.PendingRequest(
-            request.getPublicId(),
+            request.getId(),
             request.getRequestType(),
             request.getRequestedByUserId(),
             request.getRequestedByRole(),

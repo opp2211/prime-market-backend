@@ -9,7 +9,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -92,8 +91,8 @@ public class OrderConversationService {
     }
 
     @Transactional
-    public OrderConversationListResponse getOrderConversations(UUID publicOrderId, UserPrincipal principal) {
-        Order order = orderRepository.findByPublicIdForUpdate(publicOrderId)
+    public OrderConversationListResponse getOrderConversations(String orderCode, UserPrincipal principal) {
+        Order order = orderRepository.findByPublicCodeForUpdate(orderCode)
             .orElseThrow(this::orderNotFound);
         Long currentUserId = principal.getUser().getId();
         String currentUserRole = orderAccessService.resolveParticipantRole(order, currentUserId);
@@ -128,12 +127,12 @@ public class OrderConversationService {
 
     @Transactional(readOnly = true)
     public OrderMessagesResponse getMessages(
-        UUID publicConversationId,
-        UUID beforeMessageId,
+        Long conversationId,
+        Long beforeMessageId,
         Integer requestedSize,
         UserPrincipal principal
     ) {
-        OrderConversation conversation = loadAccessibleConversation(publicConversationId, principal, false);
+        OrderConversation conversation = loadAccessibleConversation(conversationId, principal, false);
         int size = normalizePageSize(requestedSize);
         List<OrderMessage> messages = loadMessagePage(conversation, beforeMessageId, size);
         return new OrderMessagesResponse(toMessageResponses(conversation.getId(), messages));
@@ -141,11 +140,11 @@ public class OrderConversationService {
 
     @Transactional
     public OrderMessageResponse sendMessage(
-        UUID publicConversationId,
+        Long conversationId,
         UserPrincipal principal,
         SendOrderMessageRequest request
     ) {
-        OrderConversation conversation = loadAccessibleConversation(publicConversationId, principal, true);
+        OrderConversation conversation = loadAccessibleConversation(conversationId, principal, true);
         Long currentUserId = principal.getUser().getId();
         String body = normalizeMessageBody(request);
         if (!participantRepository.existsByConversationIdAndUserId(conversation.getId(), currentUserId)) {
@@ -153,7 +152,6 @@ public class OrderConversationService {
         }
 
         OrderMessage message = messageRepository.saveAndFlush(new OrderMessage(
-            UUID.randomUUID(),
             conversation.getId(),
             currentUserId,
             OrderMessage.TYPE_TEXT,
@@ -170,7 +168,6 @@ public class OrderConversationService {
             .findByOrderIdAndConversationTypeForUpdate(order.getId(), OrderConversation.TYPE_MAIN)
             .orElseGet(() -> {
                 OrderConversation created = conversationRepository.saveAndFlush(new OrderConversation(
-                    UUID.randomUUID(),
                     order.getId(),
                     OrderConversation.TYPE_MAIN,
                     OrderConversation.STATUS_ACTIVE
@@ -202,7 +199,6 @@ public class OrderConversationService {
             .findByOrderIdAndConversationTypeForUpdate(order.getId(), conversationType)
             .orElseGet(() -> {
                 OrderConversation created = conversationRepository.saveAndFlush(new OrderConversation(
-                    UUID.randomUUID(),
                     order.getId(),
                     conversationType,
                     OrderConversation.STATUS_ACTIVE
@@ -228,7 +224,6 @@ public class OrderConversationService {
 
     private void createSystemMessage(OrderConversation conversation, String body) {
         messageRepository.save(new OrderMessage(
-            UUID.randomUUID(),
             conversation.getId(),
             null,
             OrderMessage.TYPE_SYSTEM,
@@ -237,13 +232,13 @@ public class OrderConversationService {
     }
 
     private OrderConversation loadAccessibleConversation(
-        UUID publicConversationId,
+        Long conversationId,
         UserPrincipal principal,
         boolean forSend
     ) {
         OrderConversation conversation = (forSend
-            ? conversationRepository.findByPublicIdForUpdate(publicConversationId)
-            : conversationRepository.findByPublicId(publicConversationId))
+            ? conversationRepository.findByIdForUpdate(conversationId)
+            : conversationRepository.findById(conversationId))
             .orElseThrow(this::conversationNotFound);
         ensureConversationAccess(conversation, principal, forSend);
         return conversation;
@@ -308,7 +303,7 @@ public class OrderConversationService {
 
     private List<OrderMessage> loadMessagePage(
         OrderConversation conversation,
-        UUID beforeMessageId,
+        Long beforeMessageId,
         int size
     ) {
         PageRequest pageRequest = PageRequest.of(0, size);
@@ -320,7 +315,7 @@ public class OrderConversationService {
             );
         } else {
             OrderMessage anchor = messageRepository
-                .findByPublicIdAndConversationId(beforeMessageId, conversation.getId())
+                .findByIdAndConversationId(beforeMessageId, conversation.getId())
                 .orElseThrow(this::messageNotFound);
             newestFirst = messageRepository.findBefore(
                 conversation.getId(),
@@ -392,7 +387,7 @@ public class OrderConversationService {
         }
 
         return new OrderMessageResponse(
-            message.getPublicId(),
+            message.getId(),
             message.getMessageType(),
             message.getBody(),
             sender,
@@ -402,7 +397,7 @@ public class OrderConversationService {
 
     private OrderConversationResponse toConversationResponse(OrderConversation conversation) {
         return new OrderConversationResponse(
-            conversation.getPublicId(),
+            conversation.getId(),
             conversation.getConversationType(),
             titleFor(conversation.getConversationType()),
             conversation.getLastMessageAt(),

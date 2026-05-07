@@ -12,22 +12,24 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import ru.maltsev.primemarketbackend.shared.PublicCodeGenerator;
 
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "user_account_txs")
 public class UserAccountTx {
+    private static final String PUBLIC_CODE_PREFIX = "TX";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "public_id", nullable = false)
-    private UUID publicId;
+    @Column(name = "public_code", nullable = false, updatable = false, length = 16)
+    private String publicCode;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_account_id", nullable = false)
@@ -58,8 +60,8 @@ public class UserAccountTx {
 
     @PrePersist
     private void onCreate() {
-        if (publicId == null) {
-            publicId = UUID.randomUUID();
+        if (publicCode == null) {
+            publicCode = PublicCodeGenerator.generate(PUBLIC_CODE_PREFIX);
         }
         if (createdAt == null) {
             createdAt = Instant.now();

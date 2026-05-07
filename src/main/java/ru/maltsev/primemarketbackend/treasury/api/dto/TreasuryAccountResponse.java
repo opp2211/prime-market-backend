@@ -4,12 +4,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Map;
-import java.util.UUID;
 import ru.maltsev.primemarketbackend.treasury.domain.TreasuryAccount;
 import ru.maltsev.primemarketbackend.treasury.domain.TreasuryAccountType;
 
 public record TreasuryAccountResponse(
-    @JsonProperty("public_id") UUID publicId,
+    Long id,
     String code,
     String title,
     @JsonProperty("currency_code") String currencyCode,
@@ -23,7 +22,7 @@ public record TreasuryAccountResponse(
 ) {
     public static TreasuryAccountResponse from(TreasuryAccount account) {
         return new TreasuryAccountResponse(
-            account.getPublicId(),
+            account.getId(),
             account.getCode(),
             account.getTitle(),
             account.getCurrencyCode(),

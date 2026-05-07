@@ -2,7 +2,6 @@ package ru.maltsev.primemarketbackend.order.service;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -28,8 +27,8 @@ public class OrderRequestService {
     private final NotificationService notificationService;
 
     @Transactional
-    public OrderRequestResponse requestCancel(UUID publicOrderId, Long actorUserId) {
-        Order order = loadOrderForUpdate(publicOrderId);
+    public OrderRequestResponse requestCancel(String orderCode, Long actorUserId) {
+        Order order = loadOrderForUpdate(orderCode);
         requireParticipant(order, actorUserId);
         validateActiveOrderForRequest(order);
 
@@ -48,7 +47,6 @@ public class OrderRequestService {
         }
 
         OrderRequest request = orderRequestRepository.saveAndFlush(new OrderRequest(
-            UUID.randomUUID(),
             order.getId(),
             OrderRequest.TYPE_CANCEL,
             actorUserId,
@@ -62,8 +60,8 @@ public class OrderRequestService {
     }
 
     @Transactional
-    public OrderRequestResponse requestAmendQuantity(UUID publicOrderId, Long actorUserId, BigDecimal quantity) {
-        Order order = loadOrderForUpdate(publicOrderId);
+    public OrderRequestResponse requestAmendQuantity(String orderCode, Long actorUserId, BigDecimal quantity) {
+        Order order = loadOrderForUpdate(orderCode);
         requireParticipant(order, actorUserId);
         validateActiveOrderForRequest(order);
 
@@ -77,7 +75,6 @@ public class OrderRequestService {
         }
 
         OrderRequest request = orderRequestRepository.saveAndFlush(new OrderRequest(
-            UUID.randomUUID(),
             order.getId(),
             OrderRequest.TYPE_AMEND_QUANTITY,
             actorUserId,
@@ -97,8 +94,8 @@ public class OrderRequestService {
     }
 
     @Transactional
-    public OrderRequestResponse approve(UUID publicRequestId, Long actorUserId) {
-        OrderRequest request = loadRequestForUpdate(publicRequestId);
+    public OrderRequestResponse approve(Long requestId, Long actorUserId) {
+        OrderRequest request = loadRequestForUpdate(requestId);
         ensurePending(request);
         Order order = loadOrderByIdForUpdate(request.getOrderId());
         String actorRole = requireCounterparty(order, request, actorUserId);
@@ -120,8 +117,8 @@ public class OrderRequestService {
     }
 
     @Transactional
-    public OrderRequestResponse reject(UUID publicRequestId, Long actorUserId) {
-        OrderRequest request = loadRequestForUpdate(publicRequestId);
+    public OrderRequestResponse reject(Long requestId, Long actorUserId) {
+        OrderRequest request = loadRequestForUpdate(requestId);
         ensurePending(request);
         Order order = loadOrderByIdForUpdate(request.getOrderId());
         String actorRole = requireCounterparty(order, request, actorUserId);
@@ -175,8 +172,8 @@ public class OrderRequestService {
         );
     }
 
-    private Order loadOrderForUpdate(UUID publicOrderId) {
-        return orderRepository.findByPublicIdForUpdate(publicOrderId)
+    private Order loadOrderForUpdate(String orderCode) {
+        return orderRepository.findByPublicCodeForUpdate(orderCode)
             .orElseThrow(() -> new ApiProblemException(
                 HttpStatus.NOT_FOUND,
                 "ORDER_NOT_FOUND",
@@ -193,8 +190,8 @@ public class OrderRequestService {
             ));
     }
 
-    private OrderRequest loadRequestForUpdate(UUID publicRequestId) {
-        return orderRequestRepository.findByPublicIdForUpdate(publicRequestId)
+    private OrderRequest loadRequestForUpdate(Long requestId) {
+        return orderRequestRepository.findByIdForUpdate(requestId)
             .orElseThrow(() -> new ApiProblemException(
                 HttpStatus.NOT_FOUND,
                 "ORDER_REQUEST_NOT_FOUND",

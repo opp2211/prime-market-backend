@@ -1,7 +1,6 @@
 package ru.maltsev.primemarketbackend.orderquote.api;
 
 import jakarta.validation.Valid;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -17,16 +16,16 @@ import ru.maltsev.primemarketbackend.orderquote.service.OrderQuoteService;
 public class OrderQuoteController {
     private final OrderQuoteService orderQuoteService;
 
-    @PostMapping("/api/market/offers/{offerId}/quote")
+    @PostMapping("/api/market/offers/{offerCode}/quote")
     public ResponseEntity<OrderQuoteResponse> createQuote(
-        @PathVariable Long offerId,
+        @PathVariable String offerCode,
         @Valid @RequestBody CreateOrderQuoteRequest request
     ) {
-        return ResponseEntity.ok(orderQuoteService.createQuote(offerId, request));
+        return ResponseEntity.ok(orderQuoteService.createQuote(offerCode, request));
     }
 
     @PostMapping("/api/order-quotes/{quoteId}/refresh")
-    public ResponseEntity<OrderQuoteResponse> refreshQuote(@PathVariable UUID quoteId) {
+    public ResponseEntity<OrderQuoteResponse> refreshQuote(@PathVariable Long quoteId) {
         return ResponseEntity.ok(orderQuoteService.refreshQuote(quoteId));
     }
 }

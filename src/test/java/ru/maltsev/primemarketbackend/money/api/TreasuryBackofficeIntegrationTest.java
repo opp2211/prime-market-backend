@@ -82,13 +82,13 @@ class TreasuryBackofficeIntegrationTest extends AbstractPostgresIntegrationTest 
 
         JsonNode manual = createTransaction(support, """
             {
-              "treasury_account_public_id": "%s",
+              "treasury_account_id": %d,
               "transaction_type": "MANUAL_IN",
               "amount": 1000.0000,
               "external_reference": "opening-balance",
               "description": "Opening balance"
             }
-            """.formatted(rubAccount.path("public_id").asText()));
+            """.formatted(rubAccount.path("id").asLong()));
         assertThat(manual.path("amount").decimalValue()).isEqualByComparingTo("1000.0000");
         assertThat(manual.path("transaction_type").asText()).isEqualTo("MANUAL_IN");
 
@@ -98,21 +98,21 @@ class TreasuryBackofficeIntegrationTest extends AbstractPostgresIntegrationTest 
 
         JsonNode transfer = createTransfer(support, """
             {
-              "from_account_public_id": "%s",
-              "to_account_public_id": "%s",
+              "from_account_id": %d,
+              "to_account_id": %d,
               "from_amount": 100.0000,
               "to_amount": 1.0000,
               "external_reference": "p2p-conversion-1",
               "description": "RUB to USD conversion"
             }
             """.formatted(
-                rubAccount.path("public_id").asText(),
-                usdAccount.path("public_id").asText()
+                rubAccount.path("id").asLong(),
+                usdAccount.path("id").asLong()
             ));
         assertThat(transfer.path("outgoing").path("amount").decimalValue()).isEqualByComparingTo("-100.0000");
         assertThat(transfer.path("incoming").path("amount").decimalValue()).isEqualByComparingTo("1.0000");
-        assertThat(transfer.path("outgoing").path("group_public_id").asText())
-            .isEqualTo(transfer.path("incoming").path("group_public_id").asText());
+        assertThat(transfer.path("outgoing").path("group_key").asText())
+            .isEqualTo(transfer.path("incoming").path("group_key").asText());
 
         JsonNode accountsAfterTransfer = listAccounts(support);
         assertThat(findAccount(accountsAfterTransfer, "TBANK-RUB-MAIN").path("balance").decimalValue())

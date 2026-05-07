@@ -167,13 +167,13 @@ public class MarketOfferController {
         return value.trim().toLowerCase(Locale.ROOT);
     }
 
-    @GetMapping("/{offerId}")
+    @GetMapping("/{offerCode}")
     @Operation(
         summary = "Get market offer details",
         description = "`intent` and `viewerCurrencyCode` are runtime-required and affect both trade direction and display price."
     )
     public ResponseEntity<MarketOfferDetailsResponse> getOffer(
-        @PathVariable Long offerId,
+        @PathVariable String offerCode,
         @Parameter(
             required = true,
             description = "Requested market intent.",
@@ -183,7 +183,7 @@ public class MarketOfferController {
         @Parameter(required = true, description = "Viewer currency code used for display price.", example = "RUB")
         @RequestParam(name = "viewerCurrencyCode", required = false) String viewerCurrencyCode
     ) {
-        MarketOfferDetailsResponse response = marketOfferService.getOffer(offerId, intent, viewerCurrencyCode);
+        MarketOfferDetailsResponse response = marketOfferService.getOffer(offerCode, intent, viewerCurrencyCode);
         return ResponseEntity.ok(response);
     }
 }

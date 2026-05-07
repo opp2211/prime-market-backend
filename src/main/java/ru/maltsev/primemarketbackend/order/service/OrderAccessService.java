@@ -1,6 +1,5 @@
 package ru.maltsev.primemarketbackend.order.service;
 
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -18,8 +17,8 @@ public class OrderAccessService {
 
     private final OrderRepository orderRepository;
 
-    public Order requireReadableOrder(UUID publicOrderId, UserPrincipal principal) {
-        Order order = loadOrder(publicOrderId);
+    public Order requireReadableOrder(String orderCode, UserPrincipal principal) {
+        Order order = loadOrder(orderCode);
         Long currentUserId = principal.getUser().getId();
         if (isParticipant(order, currentUserId) || principal.hasAuthority(PermissionCodes.ORDERS_VIEW_ANY)) {
             return order;
@@ -27,8 +26,8 @@ public class OrderAccessService {
         throw orderNotFound();
     }
 
-    public Order loadOrder(UUID publicOrderId) {
-        return orderRepository.findByPublicId(publicOrderId)
+    public Order loadOrder(String orderCode) {
+        return orderRepository.findByPublicCode(orderCode)
             .orElseThrow(this::orderNotFound);
     }
 

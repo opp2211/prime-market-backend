@@ -8,7 +8,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -50,10 +49,10 @@ public class OrderQuoteService {
     private final ObjectMapper objectMapper;
 
     @Transactional
-    public OrderQuoteResponse createQuote(Long offerId, CreateOrderQuoteRequest request) {
+    public OrderQuoteResponse createQuote(String offerCode, CreateOrderQuoteRequest request) {
         MarketIntent intent = MarketIntent.fromBody(request.intent());
         String viewerCurrencyCode = requireValidViewerCurrencyCode(request.viewerCurrencyCode());
-        QuotePayload payload = prepareQuotePayload(offerId, intent, viewerCurrencyCode);
+        QuotePayload payload = prepareQuotePayloadByPublicCode(offerCode, intent, viewerCurrencyCode);
         OrderQuote quote = orderQuoteRepository.save(buildQuote(payload));
         return toResponse(
             quote,
@@ -64,8 +63,8 @@ public class OrderQuoteService {
     }
 
     @Transactional(noRollbackFor = ApiProblemException.class)
-    public OrderQuoteResponse refreshQuote(UUID quoteId) {
-        OrderQuote existingQuote = orderQuoteRepository.findByPublicId(quoteId)
+    public OrderQuoteResponse refreshQuote(Long quoteId) {
+        OrderQuote existingQuote = orderQuoteRepository.findById(quoteId)
             .orElseThrow(() -> new ApiProblemException(
                 HttpStatus.NOT_FOUND,
                 "ORDER_QUOTE_NOT_FOUND",
@@ -96,7 +95,11 @@ public class OrderQuoteService {
         }
 
         MarketIntent intent = MarketIntent.fromBody(existingQuote.getIntent());
-        QuotePayload payload = prepareQuotePayload(existingQuote.getOfferId(), intent, existingQuote.getViewerCurrencyCode());
+        QuotePayload payload = prepareQuotePayloadById(
+            existingQuote.getOfferId(),
+            intent,
+            existingQuote.getViewerCurrencyCode()
+        );
         OrderQuote newQuote = orderQuoteRepository.save(buildQuote(payload));
 
         if (wasActiveAndUnexpired) {
@@ -112,7 +115,7 @@ public class OrderQuoteService {
         );
     }
 
-    private QuotePayload prepareQuotePayload(Long offerId, MarketIntent intent, String viewerCurrencyCode) {
+    private QuotePayload prepareQuotePayloadById(Long offerId, MarketIntent intent, String viewerCurrencyCode) {
         OrderQuoteOfferProjection rawOffer = orderQuoteOfferRepository.findProjectionByOfferId(offerId)
             .orElseThrow(() -> new ApiProblemException(
                 HttpStatus.NOT_FOUND,
@@ -120,6 +123,29 @@ public class OrderQuoteService {
                 "Offer not found"
             ));
 
+        return prepareQuotePayload(rawOffer, intent, viewerCurrencyCode);
+    }
+
+    private QuotePayload prepareQuotePayloadByPublicCode(
+        String offerCode,
+        MarketIntent intent,
+        String viewerCurrencyCode
+    ) {
+        OrderQuoteOfferProjection rawOffer = orderQuoteOfferRepository
+            .findProjectionByOfferPublicCode(requireOfferCode(offerCode))
+            .orElseThrow(() -> new ApiProblemException(
+                HttpStatus.NOT_FOUND,
+                "OFFER_NOT_FOUND",
+                "Offer not found"
+            ));
+        return prepareQuotePayload(rawOffer, intent, viewerCurrencyCode);
+    }
+
+    private QuotePayload prepareQuotePayload(
+        OrderQuoteOfferProjection rawOffer,
+        MarketIntent intent,
+        String viewerCurrencyCode
+    ) {
         OrderQuoteOfferProjection offer = adjustAvailableQuantity(rawOffer);
         ensureOfferIsPubliclyAvailable(offer, intent);
         QuotePrice price = resolveQuotePrice(offer, intent, viewerCurrencyCode);
@@ -160,6 +186,7 @@ public class OrderQuoteService {
         );
         return new OrderQuoteOfferProjection(
             offer.id(),
+            offer.publicCode(),
             offer.offerVersion(),
             offer.ownerUserId(),
             offer.ownerUsername(),
@@ -296,9 +323,15 @@ public class OrderQuoteService {
         return normalized;
     }
 
+    private String requireOfferCode(String offerCode) {
+        if (offerCode == null || offerCode.isBlank()) {
+            throw new ApiProblemException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Offer code is required");
+        }
+        return offerCode.trim().toUpperCase(Locale.ROOT);
+    }
+
     private OrderQuote buildQuote(QuotePayload payload) {
         return new OrderQuote(
-            UUID.randomUUID(),
             payload.offer().id(),
             payload.offer().offerVersion(),
             payload.intent().action(),
@@ -345,11 +378,12 @@ public class OrderQuoteService {
     ) {
         OrderQuoteOfferProjection offer = payload.offer();
         return new OrderQuoteResponse(
-            quote.getPublicId(),
+            quote.getId(),
             quote.getExpiresAt(),
             priceChanged,
             offerUpdated,
             offer.id(),
+            offer.publicCode(),
             offer.offerVersion(),
             offer.side(),
             payload.intent().action(),

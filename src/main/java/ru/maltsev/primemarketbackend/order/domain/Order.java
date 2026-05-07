@@ -6,10 +6,10 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -17,12 +17,14 @@ import org.hibernate.annotations.Generated;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.generator.EventType;
 import org.hibernate.type.SqlTypes;
+import ru.maltsev.primemarketbackend.shared.PublicCodeGenerator;
 
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "orders")
 public class Order {
+    private static final String PUBLIC_CODE_PREFIX = "PM";
     private static final String STATUS_PENDING = "pending";
     private static final String STATUS_IN_PROGRESS = "in_progress";
     private static final String STATUS_PARTIALLY_DELIVERED = "partially_delivered";
@@ -35,8 +37,8 @@ public class Order {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "public_id", nullable = false, unique = true)
-    private UUID publicId;
+    @Column(name = "public_code", nullable = false, unique = true, updatable = false, length = 16)
+    private String publicCode;
 
     @Column(name = "order_quote_id", nullable = false, unique = true)
     private Long orderQuoteId;
@@ -167,7 +169,6 @@ public class Order {
     private Instant updatedAt;
 
     public Order(
-        UUID publicId,
         Long orderQuoteId,
         Long makerUserId,
         Long takerUserId,
@@ -206,7 +207,6 @@ public class Order {
         String status,
         Instant expiresAt
     ) {
-        this.publicId = publicId;
         this.orderQuoteId = orderQuoteId;
         this.makerUserId = makerUserId;
         this.takerUserId = takerUserId;
@@ -326,5 +326,12 @@ public class Order {
             return;
         }
         status = STATUS_IN_PROGRESS;
+    }
+
+    @PrePersist
+    private void onCreate() {
+        if (publicCode == null) {
+            publicCode = PublicCodeGenerator.generate(PUBLIC_CODE_PREFIX);
+        }
     }
 }

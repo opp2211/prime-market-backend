@@ -2,7 +2,6 @@ package ru.maltsev.primemarketbackend.withdrawal.api;
 
 import jakarta.validation.Valid;
 import java.util.List;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -54,43 +53,43 @@ public class PayoutProfileController {
         return ResponseEntity.status(HttpStatus.CREATED).body(PayoutProfileResponse.from(profile));
     }
 
-    @PatchMapping("/{publicId}")
+    @PatchMapping("/{id}")
     public ResponseEntity<PayoutProfileResponse> update(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID publicId,
+        @PathVariable Long id,
         @RequestBody UpdatePayoutProfileRequest request
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        PayoutProfile profile = payoutProfileService.update(principal.getUser().getId(), publicId, request);
+        PayoutProfile profile = payoutProfileService.update(principal.getUser().getId(), id, request);
         return ResponseEntity.ok(PayoutProfileResponse.from(profile));
     }
 
-    @DeleteMapping("/{publicId}")
+    @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID publicId
+        @PathVariable Long id
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        payoutProfileService.delete(principal.getUser().getId(), publicId);
+        payoutProfileService.delete(principal.getUser().getId(), id);
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/{publicId}/make-default")
+    @PostMapping("/{id}/make-default")
     public ResponseEntity<PayoutProfileResponse> makeDefault(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID publicId
+        @PathVariable Long id
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        PayoutProfile profile = payoutProfileService.makeDefault(principal.getUser().getId(), publicId);
+        PayoutProfile profile = payoutProfileService.makeDefault(principal.getUser().getId(), id);
         return ResponseEntity.ok(PayoutProfileResponse.from(profile));
     }
 }

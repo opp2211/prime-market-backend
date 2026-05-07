@@ -4,11 +4,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import ru.maltsev.primemarketbackend.deposit.domain.DepositRequestStatus;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.UUID;
 import ru.maltsev.primemarketbackend.deposit.repository.AdminDepositRequestQueueRow;
 
 public record AdminDepositRequestShortResponse(
-        @JsonProperty("public_id") UUID publicId,
+        @JsonProperty("public_code") String publicCode,
         BigDecimal amount,
         @JsonProperty("currency_code") String currencyCode,
         @JsonProperty("deposit_method_id") Long depositMethodId,
@@ -25,7 +24,7 @@ public record AdminDepositRequestShortResponse(
 ) {
     public static AdminDepositRequestShortResponse from(AdminDepositRequestQueueRow row) {
         return new AdminDepositRequestShortResponse(
-                row.publicId(),
+                row.publicCode(),
                 row.amount(),
                 row.currencyCode(),
                 row.depositMethodId(),

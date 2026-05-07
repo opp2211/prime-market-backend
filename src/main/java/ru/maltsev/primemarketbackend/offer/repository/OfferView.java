@@ -5,6 +5,7 @@ import java.time.Instant;
 
 public record OfferView(
     Long id,
+    String publicCode,
     Long gameId,
     String gameSlug,
     String gameTitle,

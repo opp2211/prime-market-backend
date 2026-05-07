@@ -3,16 +3,15 @@ package ru.maltsev.primemarketbackend.money.api.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 import java.util.Map;
-import java.util.UUID;
 import ru.maltsev.primemarketbackend.money.domain.MoneyOperationActorType;
 import ru.maltsev.primemarketbackend.money.domain.MoneyOperationEvent;
 import ru.maltsev.primemarketbackend.money.domain.MoneyOperationEventType;
 import ru.maltsev.primemarketbackend.money.domain.MoneyOperationType;
 
 public record MoneyOperationEventResponse(
-    @JsonProperty("public_id") UUID publicId,
+    Long id,
     @JsonProperty("operation_type") MoneyOperationType operationType,
-    @JsonProperty("operation_public_id") UUID operationPublicId,
+    @JsonProperty("operation_code") String operationCode,
     @JsonProperty("event_type") MoneyOperationEventType eventType,
     @JsonProperty("status_before") String statusBefore,
     @JsonProperty("status_after") String statusAfter,
@@ -25,9 +24,9 @@ public record MoneyOperationEventResponse(
 ) {
     public static MoneyOperationEventResponse from(MoneyOperationEvent event) {
         return new MoneyOperationEventResponse(
-            event.getPublicId(),
+            event.getId(),
             event.getOperationType(),
-            event.getOperationPublicId(),
+            event.getOperationCode(),
             event.getEventType(),
             event.getStatusBefore(),
             event.getStatusAfter(),

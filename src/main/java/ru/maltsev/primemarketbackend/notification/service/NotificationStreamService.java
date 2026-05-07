@@ -1,7 +1,6 @@
 package ru.maltsev.primemarketbackend.notification.service;
 
 import java.time.Instant;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -35,8 +34,8 @@ public class NotificationStreamService {
         return session.emitter();
     }
 
-    public void publishNotificationCreated(Long userId, UUID publicId) {
-        notificationRepository.findByPublicIdAndUserId(publicId, userId)
+    public void publishNotificationCreated(Long userId, Long notificationId) {
+        notificationRepository.findByIdAndUserId(notificationId, userId)
             .map(NotificationResponse::from)
             .ifPresent(payload -> notificationSseRegistry.sendToUser(
                 userId,

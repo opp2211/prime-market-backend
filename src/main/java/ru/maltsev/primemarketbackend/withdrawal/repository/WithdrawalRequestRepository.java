@@ -5,7 +5,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -16,18 +15,18 @@ import ru.maltsev.primemarketbackend.withdrawal.domain.WithdrawalRequest;
 import ru.maltsev.primemarketbackend.withdrawal.domain.WithdrawalRequestStatus;
 
 public interface WithdrawalRequestRepository extends JpaRepository<WithdrawalRequest, Long> {
-    Optional<WithdrawalRequest> findByPublicId(UUID publicId);
+    Optional<WithdrawalRequest> findByPublicCode(String publicCode);
 
-    Optional<WithdrawalRequest> findByPublicIdAndUserId(UUID publicId, Long userId);
-
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select wr from WithdrawalRequest wr where wr.publicId = :publicId")
-    Optional<WithdrawalRequest> findByPublicIdForUpdate(@Param("publicId") UUID publicId);
+    Optional<WithdrawalRequest> findByPublicCodeAndUserId(String publicCode, Long userId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select wr from WithdrawalRequest wr where wr.publicId = :publicId and wr.userId = :userId")
-    Optional<WithdrawalRequest> findByPublicIdAndUserIdForUpdate(
-        @Param("publicId") UUID publicId,
+    @Query("select wr from WithdrawalRequest wr where wr.publicCode = :publicCode")
+    Optional<WithdrawalRequest> findByPublicCodeForUpdate(@Param("publicCode") String publicCode);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select wr from WithdrawalRequest wr where wr.publicCode = :publicCode and wr.userId = :userId")
+    Optional<WithdrawalRequest> findByPublicCodeAndUserIdForUpdate(
+        @Param("publicCode") String publicCode,
         @Param("userId") Long userId
     );
 

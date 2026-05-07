@@ -6,7 +6,6 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
@@ -80,30 +79,30 @@ public class WithdrawalRequestController {
             .map(WithdrawalRequestResponse::from));
     }
 
-    @GetMapping("/{publicId}")
+    @GetMapping("/{requestCode}")
     public ResponseEntity<WithdrawalRequestResponse> get(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID publicId
+        @PathVariable String requestCode
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
         return ResponseEntity.ok(WithdrawalRequestResponse.from(
-            withdrawalRequestService.getForUser(publicId, principal.getUser().getId())
+            withdrawalRequestService.getForUser(requestCode, principal.getUser().getId())
         ));
     }
 
-    @PostMapping("/{publicId}/cancel")
+    @PostMapping("/{requestCode}/cancel")
     public ResponseEntity<WithdrawalRequestResponse> cancel(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID publicId
+        @PathVariable String requestCode
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        WithdrawalRequest withdrawalRequest = withdrawalRequestService.cancel(publicId, principal.getUser().getId());
+        WithdrawalRequest withdrawalRequest = withdrawalRequestService.cancel(requestCode, principal.getUser().getId());
         return ResponseEntity.ok(WithdrawalRequestResponse.from(withdrawalRequest));
     }
 }

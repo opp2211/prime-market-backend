@@ -3,11 +3,10 @@ package ru.maltsev.primemarketbackend.currency.api.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.UUID;
 import ru.maltsev.primemarketbackend.currency.domain.UserCurrencyConversion;
 
 public record CurrencyConversionResponse(
-    @JsonProperty("public_id") UUID publicId,
+    @JsonProperty("public_code") String publicCode,
     @JsonProperty("from_currency_code") String fromCurrencyCode,
     @JsonProperty("to_currency_code") String toCurrencyCode,
     @JsonProperty("from_amount") BigDecimal fromAmount,
@@ -19,7 +18,7 @@ public record CurrencyConversionResponse(
 ) {
     public static CurrencyConversionResponse from(UserCurrencyConversion conversion) {
         return new CurrencyConversionResponse(
-            conversion.getPublicId(),
+            conversion.getPublicCode(),
             conversion.getFromCurrencyCode(),
             conversion.getToCurrencyCode(),
             conversion.getFromAmount(),

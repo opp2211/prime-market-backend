@@ -5,6 +5,7 @@ import java.time.Instant;
 
 public record OrderQuoteOfferProjection(
     Long id,
+    String publicCode,
     Long offerVersion,
     Long ownerUserId,
     String ownerUsername,

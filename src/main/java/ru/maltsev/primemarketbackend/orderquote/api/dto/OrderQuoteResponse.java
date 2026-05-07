@@ -3,15 +3,15 @@ package ru.maltsev.primemarketbackend.orderquote.api.dto;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 import ru.maltsev.primemarketbackend.market.api.dto.MarketOfferListResponse;
 
 public record OrderQuoteResponse(
-    UUID quoteId,
+    Long quoteId,
     Instant expiresAt,
     boolean priceChanged,
     boolean offerUpdated,
     Long id,
+    String publicCode,
     Long offerVersion,
     String side,
     String action,

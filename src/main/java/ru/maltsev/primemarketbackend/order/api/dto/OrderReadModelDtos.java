@@ -3,7 +3,6 @@ package ru.maltsev.primemarketbackend.order.api.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.UUID;
 
 public final class OrderReadModelDtos {
     private OrderReadModelDtos() {
@@ -110,7 +109,7 @@ public final class OrderReadModelDtos {
 
     public record Dispute(
         boolean exists,
-        UUID publicId,
+        String publicCode,
         String status,
         String reasonCode,
         String description,
@@ -122,7 +121,7 @@ public final class OrderReadModelDtos {
     }
 
     public record PendingRequest(
-        UUID publicId,
+        Long id,
         String requestType,
         Long requestedByUserId,
         String requestedByRole,

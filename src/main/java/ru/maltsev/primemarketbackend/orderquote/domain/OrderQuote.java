@@ -9,7 +9,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -31,9 +30,6 @@ public class OrderQuote {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(name = "public_id", nullable = false, unique = true)
-    private UUID publicId;
 
     @Column(name = "offer_id", nullable = false)
     private Long offerId;
@@ -143,7 +139,6 @@ public class OrderQuote {
     private Instant updatedAt;
 
     public OrderQuote(
-        UUID publicId,
         Long offerId,
         Long offerVersionSnapshot,
         String intent,
@@ -176,7 +171,6 @@ public class OrderQuote {
         JsonNode deliveryMethodsSnapshot,
         Instant expiresAt
     ) {
-        this.publicId = publicId;
         this.offerId = offerId;
         this.offerVersionSnapshot = offerVersionSnapshot;
         this.intent = intent;

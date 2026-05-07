@@ -4,17 +4,16 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Map;
-import java.util.UUID;
 import ru.maltsev.primemarketbackend.withdrawal.domain.WithdrawalRequest;
 
 public record WithdrawalRequestResponse(
-    @JsonProperty("public_id") UUID publicId,
+    @JsonProperty("public_code") String publicCode,
     BigDecimal amount,
     @JsonProperty("actual_payout_amount") BigDecimal actualPayoutAmount,
     @JsonProperty("currency_code") String currencyCode,
     @JsonProperty("withdrawal_method_code") String withdrawalMethodCode,
     @JsonProperty("withdrawal_method_title") String withdrawalMethodTitle,
-    @JsonProperty("payout_profile_public_id") UUID payoutProfilePublicId,
+    @JsonProperty("payout_profile_id") Long payoutProfileId,
     Map<String, Object> requisites,
     @JsonProperty("method_note") String methodNote,
     String status,
@@ -30,13 +29,13 @@ public record WithdrawalRequestResponse(
 ) {
     public static WithdrawalRequestResponse from(WithdrawalRequest request) {
         return new WithdrawalRequestResponse(
-            request.getPublicId(),
+            request.getPublicCode(),
             request.getAmount(),
             request.getActualPayoutAmount(),
             request.getCurrencyCodeSnapshot(),
             request.getWithdrawalMethodCodeSnapshot(),
             request.getWithdrawalMethodTitleSnapshot(),
-            request.getPayoutProfile() == null ? null : request.getPayoutProfile().getPublicId(),
+            request.getPayoutProfile() == null ? null : request.getPayoutProfile().getId(),
             request.getRequisitesSnapshot(),
             request.getMethodNoteSnapshot(),
             request.getStatus().name(),

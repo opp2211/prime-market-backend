@@ -7,11 +7,10 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.UUID;
 import ru.maltsev.primemarketbackend.notification.domain.Notification;
 
 public record NotificationResponse(
-    UUID publicId,
+    Long id,
     String type,
     String title,
     String body,
@@ -26,7 +25,7 @@ public record NotificationResponse(
 
     public static NotificationResponse from(Notification notification) {
         return new NotificationResponse(
-            notification.getPublicId(),
+            notification.getId(),
             notification.getType(),
             notification.getTitle(),
             notification.getBody(),

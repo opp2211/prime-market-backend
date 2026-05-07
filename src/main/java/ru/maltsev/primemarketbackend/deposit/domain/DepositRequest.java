@@ -3,7 +3,6 @@ package ru.maltsev.primemarketbackend.deposit.domain;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Objects;
-import java.util.UUID;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -24,18 +23,21 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.generator.EventType;
 import org.hibernate.type.SqlTypes;
 import ru.maltsev.primemarketbackend.treasury.domain.TreasuryTransaction;
+import ru.maltsev.primemarketbackend.shared.PublicCodeGenerator;
 
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "deposit_requests")
 public class DepositRequest {
+    private static final String PUBLIC_CODE_PREFIX = "PMD";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "public_id", nullable = false, updatable = false)
-    private UUID publicId;
+    @Column(name = "public_code", nullable = false, updatable = false, length = 16)
+    private String publicCode;
 
     @Column(name = "user_id", nullable = false)
     private Long userId;
@@ -175,8 +177,8 @@ public class DepositRequest {
 
     @PrePersist
     private void onCreate() {
-        if (publicId == null) {
-            publicId = UUID.randomUUID();
+        if (publicCode == null) {
+            publicCode = PublicCodeGenerator.generate(PUBLIC_CODE_PREFIX);
         }
     }
 

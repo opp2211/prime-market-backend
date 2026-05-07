@@ -3,7 +3,6 @@ package ru.maltsev.primemarketbackend.treasury.repository;
 import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -15,11 +14,14 @@ public interface TreasuryAccountRepository extends JpaRepository<TreasuryAccount
 
     List<TreasuryAccount> findAllByActiveTrueOrderByCurrencyCodeAscTitleAscIdAsc();
 
-    Optional<TreasuryAccount> findByPublicId(UUID publicId);
-
     boolean existsByCodeIgnoreCase(String code);
 
+    @Override
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select account from TreasuryAccount account where account.publicId = :publicId")
-    Optional<TreasuryAccount> findByPublicIdForUpdate(@Param("publicId") UUID publicId);
+    @Query("select account from TreasuryAccount account where account.id = :id")
+    Optional<TreasuryAccount> findById(@Param("id") Long id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select account from TreasuryAccount account where account.id = :id")
+    Optional<TreasuryAccount> findByIdForUpdate(@Param("id") Long id);
 }

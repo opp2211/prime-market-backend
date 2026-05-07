@@ -4,14 +4,13 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Map;
-import java.util.UUID;
 import ru.maltsev.primemarketbackend.deposit.domain.DepositPaymentInstruction;
 import ru.maltsev.primemarketbackend.deposit.domain.DepositPaymentInstructionStatus;
 
 public record DepositPaymentInstructionResponse(
-    @JsonProperty("public_id") UUID publicId,
-    @JsonProperty("deposit_payment_route_public_id") UUID depositPaymentRoutePublicId,
-    @JsonProperty("treasury_account_public_id") UUID treasuryAccountPublicId,
+    Long id,
+    @JsonProperty("deposit_payment_route_id") Long depositPaymentRouteId,
+    @JsonProperty("treasury_account_id") Long treasuryAccountId,
     @JsonProperty("treasury_account_code") String treasuryAccountCode,
     @JsonProperty("treasury_account_title") String treasuryAccountTitle,
     @JsonProperty("payment_details") Map<String, Object> paymentDetails,
@@ -30,9 +29,9 @@ public record DepositPaymentInstructionResponse(
             return null;
         }
         return new DepositPaymentInstructionResponse(
-            instruction.getPublicId(),
-            instruction.getDepositPaymentRoute() == null ? null : instruction.getDepositPaymentRoute().getPublicId(),
-            instruction.getTreasuryAccount() == null ? null : instruction.getTreasuryAccount().getPublicId(),
+            instruction.getId(),
+            instruction.getDepositPaymentRoute() == null ? null : instruction.getDepositPaymentRoute().getId(),
+            instruction.getTreasuryAccount() == null ? null : instruction.getTreasuryAccount().getId(),
             instruction.getTreasuryAccount() == null ? null : instruction.getTreasuryAccount().getCode(),
             instruction.getTreasuryAccount() == null ? null : instruction.getTreasuryAccount().getTitle(),
             instruction.getPaymentDetailsSnapshot(),

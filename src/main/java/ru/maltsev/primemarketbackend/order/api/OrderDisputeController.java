@@ -1,7 +1,6 @@
 package ru.maltsev.primemarketbackend.order.api;
 
 import jakarta.validation.Valid;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -26,84 +25,84 @@ import ru.maltsev.primemarketbackend.security.user.UserPrincipal;
 public class OrderDisputeController {
     private final OrderDisputeService orderDisputeService;
 
-    @PostMapping("/orders/{orderId}/disputes")
+    @PostMapping("/orders/{orderCode}/disputes")
     public ResponseEntity<OrderDisputeResponse> openDispute(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID orderId,
+        @PathVariable String orderCode,
         @Valid @RequestBody CreateOrderDisputeRequest request
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        OrderDisputeResponse response = orderDisputeService.openDispute(orderId, principal, request);
+        OrderDisputeResponse response = orderDisputeService.openDispute(orderCode, principal, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @GetMapping("/orders/{orderId}/dispute")
+    @GetMapping("/orders/{orderCode}/dispute")
     public ResponseEntity<OrderDisputeResponse> getOrderDispute(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID orderId
+        @PathVariable String orderCode
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        return ResponseEntity.ok(orderDisputeService.getOrderDispute(orderId, principal));
+        return ResponseEntity.ok(orderDisputeService.getOrderDispute(orderCode, principal));
     }
 
-    @PostMapping("/order-disputes/{disputeId}/take")
+    @PostMapping("/order-disputes/{disputeCode}/take")
     @PreAuthorize("hasAuthority('ORDER_DISPUTES_TAKE')")
     public ResponseEntity<OrderDisputeResponse> takeDispute(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID disputeId
+        @PathVariable String disputeCode
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        return ResponseEntity.ok(orderDisputeService.takeDispute(disputeId, principal));
+        return ResponseEntity.ok(orderDisputeService.takeDispute(disputeCode, principal));
     }
 
-    @PostMapping("/order-disputes/{disputeId}/resolve-cancel")
+    @PostMapping("/order-disputes/{disputeCode}/resolve-cancel")
     @PreAuthorize("hasAuthority('ORDER_DISPUTES_RESOLVE')")
     public ResponseEntity<OrderDisputeResponse> resolveCancel(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID disputeId,
+        @PathVariable String disputeCode,
         @RequestBody(required = false) ResolveOrderDisputeRequest request
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        return ResponseEntity.ok(orderDisputeService.resolveCancel(disputeId, principal, request));
+        return ResponseEntity.ok(orderDisputeService.resolveCancel(disputeCode, principal, request));
     }
 
-    @PostMapping("/order-disputes/{disputeId}/resolve-complete")
+    @PostMapping("/order-disputes/{disputeCode}/resolve-complete")
     @PreAuthorize("hasAuthority('ORDER_DISPUTES_RESOLVE')")
     public ResponseEntity<OrderDisputeResponse> resolveComplete(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID disputeId,
+        @PathVariable String disputeCode,
         @RequestBody(required = false) ResolveOrderDisputeRequest request
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        return ResponseEntity.ok(orderDisputeService.resolveComplete(disputeId, principal, request));
+        return ResponseEntity.ok(orderDisputeService.resolveComplete(disputeCode, principal, request));
     }
 
-    @PostMapping("/order-disputes/{disputeId}/resolve-amend-quantity-and-complete")
+    @PostMapping("/order-disputes/{disputeCode}/resolve-amend-quantity-and-complete")
     @PreAuthorize("hasAuthority('ORDER_DISPUTES_RESOLVE')")
     public ResponseEntity<OrderDisputeResponse> resolveAmendQuantityAndComplete(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID disputeId,
+        @PathVariable String disputeCode,
         @Valid @RequestBody ResolveOrderDisputeAmendQuantityRequest request
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        return ResponseEntity.ok(orderDisputeService.resolveAmendQuantityAndComplete(disputeId, principal, request));
+        return ResponseEntity.ok(orderDisputeService.resolveAmendQuantityAndComplete(disputeCode, principal, request));
     }
 }

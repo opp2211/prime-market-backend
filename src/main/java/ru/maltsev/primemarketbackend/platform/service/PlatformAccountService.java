@@ -6,7 +6,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -60,7 +59,7 @@ public class PlatformAccountService {
         CreatePlatformAccountAdjustmentRequest request,
         Long actorUserId
     ) {
-        PlatformAccount account = platformAccountRepository.findByPublicId(request.platformAccountPublicId())
+        PlatformAccount account = platformAccountRepository.findById(request.platformAccountId())
             .orElseThrow(() -> notFound("PLATFORM_ACCOUNT_NOT_FOUND", "Platform account not found"));
         if (!account.isActive()) {
             throw conflict("PLATFORM_ACCOUNT_INACTIVE", "Platform account is inactive");
@@ -88,7 +87,7 @@ public class PlatformAccountService {
     @Transactional
     public List<PlatformAccountTransaction> recordUserFxConversion(
         Long conversionId,
-        UUID conversionPublicId,
+        String conversionCode,
         String fromCurrencyCode,
         BigDecimal fromAmount,
         String toCurrencyCode,
@@ -106,7 +105,7 @@ public class PlatformAccountService {
             toCurrencyCode,
             "FX desk " + normalizeCurrencyCode(toCurrencyCode)
         );
-        UUID groupPublicId = UUID.randomUUID();
+        String groupKey = conversionCode;
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("from_currency_code", normalizeCurrencyCode(fromCurrencyCode));
         metadata.put("to_currency_code", normalizeCurrencyCode(toCurrencyCode));
@@ -115,25 +114,25 @@ public class PlatformAccountService {
         metadata.put("rate", rate);
 
         PlatformAccountTransaction incoming = saveTransaction(
-            groupPublicId,
+            groupKey,
             fromAccount,
             normalizeMoney(fromAmount),
             PlatformAccountTransactionType.FX_IN,
             REF_TYPE_USER_CURRENCY_CONVERSION,
             conversionId,
-            conversionPublicId,
+            conversionCode,
             "User virtual FX conversion source leg",
             actorUserId,
             metadata
         );
         PlatformAccountTransaction outgoing = saveTransaction(
-            groupPublicId,
+            groupKey,
             toAccount,
             normalizeMoney(toAmount).negate(),
             PlatformAccountTransactionType.FX_OUT,
             REF_TYPE_USER_CURRENCY_CONVERSION,
             conversionId,
-            conversionPublicId,
+            conversionCode,
             "User virtual FX conversion target leg",
             actorUserId,
             metadata
@@ -164,13 +163,13 @@ public class PlatformAccountService {
     }
 
     private PlatformAccountTransaction saveTransaction(
-        UUID groupPublicId,
+        String groupKey,
         PlatformAccount account,
         BigDecimal amount,
         PlatformAccountTransactionType transactionType,
         String refType,
         Long refId,
-        UUID refPublicId,
+        String refCode,
         String description,
         Long actorUserId,
         Map<String, Object> metadata
@@ -180,13 +179,13 @@ public class PlatformAccountService {
             throw validationError("Platform account transaction amount must be non-zero");
         }
         return platformAccountTransactionRepository.save(new PlatformAccountTransaction(
-            groupPublicId,
+            groupKey,
             account,
             normalizedAmount,
             transactionType,
             refType,
             refId,
-            refPublicId,
+            refCode,
             description,
             actorUserId,
             normalizeMetadata(metadata)

@@ -5,20 +5,22 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.Instant;
-import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.Generated;
 import org.hibernate.generator.EventType;
+import ru.maltsev.primemarketbackend.shared.PublicCodeGenerator;
 
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "order_disputes")
 public class OrderDispute {
+    private static final String PUBLIC_CODE_PREFIX = "DSP";
     public static final String STATUS_OPEN = "open";
     public static final String STATUS_IN_REVIEW = "in_review";
     public static final String STATUS_RESOLVED = "resolved";
@@ -36,8 +38,8 @@ public class OrderDispute {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "public_id", nullable = false, unique = true)
-    private UUID publicId;
+    @Column(name = "public_code", nullable = false, unique = true, updatable = false, length = 16)
+    private String publicCode;
 
     @Column(name = "order_id", nullable = false)
     private Long orderId;
@@ -84,14 +86,12 @@ public class OrderDispute {
     private String resolutionNote;
 
     public OrderDispute(
-        UUID publicId,
         Long orderId,
         Long openedByUserId,
         String openedByRole,
         String reasonCode,
         String description
     ) {
-        this.publicId = publicId;
         this.orderId = orderId;
         this.openedByUserId = openedByUserId;
         this.openedByRole = openedByRole;
@@ -133,5 +133,12 @@ public class OrderDispute {
         this.resolvedAt = resolvedAt;
         this.resolutionType = resolutionType;
         this.resolutionNote = resolutionNote;
+    }
+
+    @PrePersist
+    private void onCreate() {
+        if (publicCode == null) {
+            publicCode = PublicCodeGenerator.generate(PUBLIC_CODE_PREFIX);
+        }
     }
 }

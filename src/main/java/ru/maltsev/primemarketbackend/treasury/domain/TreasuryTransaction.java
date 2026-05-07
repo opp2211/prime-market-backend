@@ -10,13 +10,11 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -35,11 +33,8 @@ public class TreasuryTransaction {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "public_id", nullable = false, updatable = false)
-    private UUID publicId;
-
-    @Column(name = "group_public_id")
-    private UUID groupPublicId;
+    @Column(name = "group_key", length = 64)
+    private String groupKey;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "treasury_account_id", nullable = false)
@@ -59,8 +54,8 @@ public class TreasuryTransaction {
     @Column(name = "operation_id")
     private Long operationId;
 
-    @Column(name = "operation_public_id")
-    private UUID operationPublicId;
+    @Column(name = "operation_code", length = 16)
+    private String operationCode;
 
     @Column(name = "external_reference")
     private String externalReference;
@@ -83,38 +78,31 @@ public class TreasuryTransaction {
     private Instant createdAt;
 
     public TreasuryTransaction(
-        UUID groupPublicId,
+        String groupKey,
         TreasuryAccount treasuryAccount,
         BigDecimal amount,
         TreasuryTransactionType transactionType,
         MoneyOperationType operationType,
         Long operationId,
-        UUID operationPublicId,
+        String operationCode,
         String externalReference,
         String description,
         String operatorComment,
         Long actorUserId,
         Map<String, Object> metadata
     ) {
-        this.groupPublicId = groupPublicId;
+        this.groupKey = groupKey;
         this.treasuryAccount = treasuryAccount;
         this.amount = amount;
         this.transactionType = transactionType;
         this.operationType = operationType;
         this.operationId = operationId;
-        this.operationPublicId = operationPublicId;
+        this.operationCode = operationCode;
         this.externalReference = normalizeOptional(externalReference);
         this.description = normalizeOptional(description);
         this.operatorComment = normalizeOptional(operatorComment);
         this.actorUserId = actorUserId;
         this.metadata = metadata == null ? new LinkedHashMap<>() : new LinkedHashMap<>(metadata);
-    }
-
-    @PrePersist
-    private void onCreate() {
-        if (publicId == null) {
-            publicId = UUID.randomUUID();
-        }
     }
 
     private String normalizeOptional(String value) {

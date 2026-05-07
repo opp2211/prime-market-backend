@@ -1,6 +1,5 @@
 package ru.maltsev.primemarketbackend.order.api;
 
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,16 +18,16 @@ import ru.maltsev.primemarketbackend.security.user.UserPrincipal;
 public class OrderEventReadController {
     private final OrderEventReadService orderEventReadService;
 
-    @GetMapping("/{orderId}/events")
+    @GetMapping("/{orderCode}/events")
     public ResponseEntity<OrderEventsResponse> getOrderEvents(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID orderId
+        @PathVariable String orderCode
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        OrderEventsResponse response = orderEventReadService.getOrderEvents(orderId, principal);
+        OrderEventsResponse response = orderEventReadService.getOrderEvents(orderCode, principal);
         return ResponseEntity.ok(response);
     }
 }

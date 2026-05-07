@@ -10,13 +10,11 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -34,11 +32,8 @@ public class PlatformAccountTransaction {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "public_id", nullable = false, updatable = false)
-    private UUID publicId;
-
-    @Column(name = "group_public_id")
-    private UUID groupPublicId;
+    @Column(name = "group_key", length = 64)
+    private String groupKey;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "platform_account_id", nullable = false)
@@ -57,8 +52,8 @@ public class PlatformAccountTransaction {
     @Column(name = "ref_id")
     private Long refId;
 
-    @Column(name = "ref_public_id")
-    private UUID refPublicId;
+    @Column(name = "ref_code", length = 32)
+    private String refCode;
 
     @Column
     private String description;
@@ -75,34 +70,27 @@ public class PlatformAccountTransaction {
     private Instant createdAt;
 
     public PlatformAccountTransaction(
-        UUID groupPublicId,
+        String groupKey,
         PlatformAccount platformAccount,
         BigDecimal amount,
         PlatformAccountTransactionType transactionType,
         String refType,
         Long refId,
-        UUID refPublicId,
+        String refCode,
         String description,
         Long actorUserId,
         Map<String, Object> metadata
     ) {
-        this.groupPublicId = groupPublicId;
+        this.groupKey = groupKey;
         this.platformAccount = platformAccount;
         this.amount = amount;
         this.transactionType = transactionType;
         this.refType = normalizeOptional(refType);
         this.refId = refId;
-        this.refPublicId = refPublicId;
+        this.refCode = normalizeOptional(refCode);
         this.description = normalizeOptional(description);
         this.actorUserId = actorUserId;
         this.metadata = metadata == null ? new LinkedHashMap<>() : new LinkedHashMap<>(metadata);
-    }
-
-    @PrePersist
-    private void onCreate() {
-        if (publicId == null) {
-            publicId = UUID.randomUUID();
-        }
     }
 
     private String normalizeOptional(String value) {

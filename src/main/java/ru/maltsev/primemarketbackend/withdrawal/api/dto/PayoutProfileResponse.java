@@ -3,11 +3,10 @@ package ru.maltsev.primemarketbackend.withdrawal.api.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 import java.util.Map;
-import java.util.UUID;
 import ru.maltsev.primemarketbackend.withdrawal.domain.PayoutProfile;
 
 public record PayoutProfileResponse(
-    @JsonProperty("public_id") UUID publicId,
+    Long id,
     String title,
     @JsonProperty("withdrawal_method_id") Long withdrawalMethodId,
     @JsonProperty("withdrawal_method_code") String withdrawalMethodCode,
@@ -21,7 +20,7 @@ public record PayoutProfileResponse(
 ) {
     public static PayoutProfileResponse from(PayoutProfile profile) {
         return new PayoutProfileResponse(
-            profile.getPublicId(),
+            profile.getId(),
             profile.getTitle(),
             profile.getWithdrawalMethod().getId(),
             profile.getWithdrawalMethod().getCode(),

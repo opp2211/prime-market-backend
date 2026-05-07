@@ -12,7 +12,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -145,15 +144,15 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
 
         assertThat(summary.path("reserves")).hasSize(1);
         assertThat(summary.path("reserves").get(0).path("source_type").asText()).isEqualTo("WITHDRAWAL_REQUEST");
-        assertThat(summary.path("reserves").get(0).path("ref_public_id").asText())
-            .isEqualTo(withdrawal.path("public_id").asText());
+        assertThat(summary.path("reserves").get(0).path("ref_code").asText())
+            .isEqualTo(withdrawal.path("public_code").asText());
         assertThat(summary.path("reserves").get(0).path("amount").decimalValue()).isEqualByComparingTo("250.0000");
         assertThat(summary.path("reserves").get(0).path("currency_code").asText()).isEqualTo("USD");
 
         assertThat(summary.path("pending_deposits")).hasSize(1);
         assertThat(summary.path("pending_deposits").get(0).path("source_type").asText()).isEqualTo("DEPOSIT_REQUEST");
-        assertThat(summary.path("pending_deposits").get(0).path("ref_public_id").asText())
-            .isEqualTo(deposit.path("public_id").asText());
+        assertThat(summary.path("pending_deposits").get(0).path("ref_code").asText())
+            .isEqualTo(deposit.path("public_code").asText());
         assertThat(summary.path("pending_deposits").get(0).path("amount").decimalValue()).isEqualByComparingTo("150.0000");
         assertThat(summary.path("pending_deposits").get(0).path("currency_code").asText()).isEqualTo("USD");
     }
@@ -220,9 +219,9 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(secondProfile.path("is_default").asBoolean()).isFalse();
 
         JsonNode listed = listPayoutProfiles(user);
-        assertThat(listed.get(0).path("public_id").asText()).isEqualTo(firstProfile.path("public_id").asText());
+        assertThat(listed.get(0).path("id").asLong()).isEqualTo(firstProfile.path("id").asLong());
 
-        JsonNode updated = updatePayoutProfile(user, firstProfile.path("public_id").asText(), """
+        JsonNode updated = updatePayoutProfile(user, firstProfile.path("id").asLong(), """
             {
               "title": "Updated SBP",
               "requisites": {
@@ -235,13 +234,13 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(updated.path("title").asText()).isEqualTo("Updated SBP");
         assertThat(updated.path("requisites").path("bankName").asText()).isEqualTo("Alfa");
 
-        JsonNode madeDefault = makeDefaultPayoutProfile(user, secondProfile.path("public_id").asText());
+        JsonNode madeDefault = makeDefaultPayoutProfile(user, secondProfile.path("id").asLong());
         assertThat(madeDefault.path("is_default").asBoolean()).isTrue();
         JsonNode listedAfterDefault = listPayoutProfiles(user);
-        assertThat(listedAfterDefault.get(0).path("public_id").asText())
-            .isEqualTo(secondProfile.path("public_id").asText());
+        assertThat(listedAfterDefault.get(0).path("id").asLong())
+            .isEqualTo(secondProfile.path("id").asLong());
 
-        mockMvc.perform(patch("/api/payout-profiles/{publicId}", firstProfile.path("public_id").asText())
+        mockMvc.perform(patch("/api/payout-profiles/{id}", firstProfile.path("id").asLong())
                 .with(auth(otherUser))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -252,18 +251,18 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("PAYOUT_PROFILE_NOT_FOUND"));
 
-        mockMvc.perform(delete("/api/payout-profiles/{publicId}", secondProfile.path("public_id").asText())
+        mockMvc.perform(delete("/api/payout-profiles/{id}", secondProfile.path("id").asLong())
                 .with(auth(otherUser)))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("PAYOUT_PROFILE_NOT_FOUND"));
 
-        mockMvc.perform(delete("/api/payout-profiles/{publicId}", secondProfile.path("public_id").asText())
+        mockMvc.perform(delete("/api/payout-profiles/{id}", secondProfile.path("id").asLong())
                 .with(auth(user)))
             .andExpect(status().isNoContent());
 
         JsonNode listedAfterDelete = listPayoutProfiles(user);
         assertThat(listedAfterDelete).hasSize(1);
-        assertThat(listedAfterDelete.get(0).path("public_id").asText()).isEqualTo(firstProfile.path("public_id").asText());
+        assertThat(listedAfterDelete.get(0).path("id").asLong()).isEqualTo(firstProfile.path("id").asLong());
     }
 
     @Test
@@ -360,7 +359,7 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
             }
             """.formatted(methodId));
 
-        JsonNode cancelled = cancelWithdrawal(user, created.path("public_id").asText());
+        JsonNode cancelled = cancelWithdrawal(user, created.path("public_code").asText());
         assertThat(cancelled.path("status").asText()).isEqualTo("CANCELLED");
         assertThat(loadReserved(user.getId(), "USD")).isEqualByComparingTo("0.0000");
 
@@ -374,9 +373,9 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
               }
             }
             """.formatted(methodId));
-        takeWithdrawal(support, secondCreated.path("public_id").asText());
+        takeWithdrawal(support, secondCreated.path("public_code").asText());
 
-        mockMvc.perform(post("/api/withdrawal-requests/{publicId}/cancel", secondCreated.path("public_id").asText())
+        mockMvc.perform(post("/api/withdrawal-requests/{publicCode}/cancel", secondCreated.path("public_code").asText())
                 .with(auth(user)))
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.code").value("INVALID_STATUS"));
@@ -399,8 +398,8 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
               }
             }
             """.formatted(methodId));
-        takeWithdrawal(support, rejectCandidate.path("public_id").asText());
-        JsonNode rejected = rejectWithdrawal(support, rejectCandidate.path("public_id").asText(), """
+        takeWithdrawal(support, rejectCandidate.path("public_code").asText());
+        JsonNode rejected = rejectWithdrawal(support, rejectCandidate.path("public_code").asText(), """
             {
               "rejection_reason": "Manual review failed",
               "operator_comment": "Bad requisites"
@@ -413,7 +412,7 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(rejected.path("events").get(2).path("actor_user_id").asLong()).isEqualTo(support.getId());
         assertThat(rejected.path("events").get(2).path("public_note").asText()).isEqualTo("Manual review failed");
         assertThat(rejected.path("events").get(2).path("operator_note").asText()).isEqualTo("Bad requisites");
-        assertThat(loadMoneyEventTypes("WITHDRAWAL_REQUEST", rejectCandidate.path("public_id").asText()))
+        assertThat(loadMoneyEventTypes("WITHDRAWAL_REQUEST", rejectCandidate.path("public_code").asText()))
             .containsExactly("WITHDRAWAL_CREATED", "WITHDRAWAL_TAKEN", "WITHDRAWAL_REJECTED");
         assertThat(loadReserved(user.getId(), "USD")).isEqualByComparingTo("0.0000");
 
@@ -427,10 +426,10 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
               }
             }
             """.formatted(methodId));
-        JsonNode taken = takeWithdrawal(support, confirmCandidate.path("public_id").asText());
+        JsonNode taken = takeWithdrawal(support, confirmCandidate.path("public_code").asText());
         assertThat(taken.path("status").asText()).isEqualTo("PROCESSING");
 
-        JsonNode confirmed = confirmWithdrawal(support, confirmCandidate.path("public_id").asText(), """
+        JsonNode confirmed = confirmWithdrawal(support, confirmCandidate.path("public_code").asText(), """
             {
               "actual_payout_amount": 590.0000,
               "operator_comment": "Rounded by operator"
@@ -442,44 +441,44 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(confirmed.path("events").get(2).path("event_type").asText()).isEqualTo("WITHDRAWAL_CONFIRMED");
         assertThat(confirmed.path("events").get(2).path("payload").path("actual_payout_amount").decimalValue())
             .isEqualByComparingTo("590.0000");
-        assertThat(loadMoneyEventTypes("WITHDRAWAL_REQUEST", confirmCandidate.path("public_id").asText()))
+        assertThat(loadMoneyEventTypes("WITHDRAWAL_REQUEST", confirmCandidate.path("public_code").asText()))
             .containsExactly("WITHDRAWAL_CREATED", "WITHDRAWAL_TAKEN", "WITHDRAWAL_CONFIRMED");
         assertThat(loadReserved(user.getId(), "USD")).isEqualByComparingTo("0.0000");
         assertThat(loadBalance(user.getId(), "USD")).isEqualByComparingTo("400.0000");
-        assertThat(loadWithdrawalTxCount(confirmCandidate.path("public_id").asText())).isEqualTo(1);
-        assertThat(loadWithdrawalTxAmount(confirmCandidate.path("public_id").asText())).isEqualByComparingTo("-600.0000");
+        assertThat(loadWithdrawalTxCount(confirmCandidate.path("public_code").asText())).isEqualTo(1);
+        assertThat(loadWithdrawalTxAmount(confirmCandidate.path("public_code").asText())).isEqualByComparingTo("-600.0000");
 
-        JsonNode confirmedAgain = confirmWithdrawal(support, confirmCandidate.path("public_id").asText(), """
+        JsonNode confirmedAgain = confirmWithdrawal(support, confirmCandidate.path("public_code").asText(), """
             {
               "actual_payout_amount": 590.0000
             }
             """);
         assertThat(confirmedAgain.path("status").asText()).isEqualTo("COMPLETED");
         assertThat(loadBalance(user.getId(), "USD")).isEqualByComparingTo("400.0000");
-        assertThat(loadWithdrawalTxCount(confirmCandidate.path("public_id").asText())).isEqualTo(1);
+        assertThat(loadWithdrawalTxCount(confirmCandidate.path("public_code").asText())).isEqualTo(1);
 
         JsonNode txHistory = getWalletTransactions(user, "WITHDRAWAL");
         assertThat(txHistory.path("content").get(0).path("label").asText()).isEqualTo("Withdrawal via Binance UID");
-        assertThat(txHistory.path("content").get(0).path("ref_public_id").asText())
-            .isEqualTo(confirmCandidate.path("public_id").asText());
+        assertThat(txHistory.path("content").get(0).path("ref_code").asText())
+            .isEqualTo(confirmCandidate.path("public_code").asText());
 
-        String txPublicId = txHistory.path("content").get(0).path("public_id").asText();
-        JsonNode txByPublicId = searchWalletTransactions(user, txPublicId);
-        assertThat(txByPublicId.path("content").get(0).path("public_id").asText()).isEqualTo(txPublicId);
+        String txPublicCode = txHistory.path("content").get(0).path("public_code").asText();
+        JsonNode txByPublicCode = searchWalletTransactions(user, txPublicCode);
+        assertThat(txByPublicCode.path("content").get(0).path("public_code").asText()).isEqualTo(txPublicCode);
 
-        JsonNode txByPublicIdFragment = searchWalletTransactions(user, txPublicId.substring(0, 8));
-        assertThat(txByPublicIdFragment.path("content").get(0).path("public_id").asText()).isEqualTo(txPublicId);
+        JsonNode txByPublicCodeFragment = searchWalletTransactions(user, txPublicCode.substring(0, 8));
+        assertThat(txByPublicCodeFragment.path("content").get(0).path("public_code").asText()).isEqualTo(txPublicCode);
 
-        JsonNode txByRefPublicIdFragment = searchWalletTransactions(
+        JsonNode txByRefCodeFragment = searchWalletTransactions(
             user,
-            confirmCandidate.path("public_id").asText().substring(0, 8)
+            confirmCandidate.path("public_code").asText().substring(0, 8)
         );
-        assertThat(txByRefPublicIdFragment.path("content").get(0).path("ref_public_id").asText())
-            .isEqualTo(confirmCandidate.path("public_id").asText());
+        assertThat(txByRefCodeFragment.path("content").get(0).path("ref_code").asText())
+            .isEqualTo(confirmCandidate.path("public_code").asText());
 
         JsonNode txByLabel = searchWalletTransactions(user, "binance");
-        assertThat(txByLabel.path("content").get(0).path("ref_public_id").asText())
-            .isEqualTo(confirmCandidate.path("public_id").asText());
+        assertThat(txByLabel.path("content").get(0).path("ref_code").asText())
+            .isEqualTo(confirmCandidate.path("public_code").asText());
     }
 
     @Test
@@ -503,7 +502,7 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
             methodId
         );
 
-        JsonNode detail = getDepositRequest(user, created.path("public_id").asText());
+        JsonNode detail = getDepositRequest(user, created.path("public_code").asText());
         JsonNode list = listDepositRequests(user);
         assertThat(detail.path("deposit_method_title").asText()).isEqualTo("Bank transfer");
         assertThat(detail.path("currency_code").asText()).isEqualTo("RUB");
@@ -573,8 +572,8 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
         return readBody(result);
     }
 
-    private JsonNode updatePayoutProfile(User user, String publicId, String body) throws Exception {
-        MvcResult result = mockMvc.perform(patch("/api/payout-profiles/{publicId}", publicId)
+    private JsonNode updatePayoutProfile(User user, Long id, String body) throws Exception {
+        MvcResult result = mockMvc.perform(patch("/api/payout-profiles/{id}", id)
                 .with(auth(user))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
@@ -583,8 +582,8 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
         return readBody(result);
     }
 
-    private JsonNode makeDefaultPayoutProfile(User user, String publicId) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/payout-profiles/{publicId}/make-default", publicId)
+    private JsonNode makeDefaultPayoutProfile(User user, Long id) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/payout-profiles/{id}/make-default", id)
                 .with(auth(user)))
             .andExpect(status().isOk())
             .andReturn();
@@ -601,24 +600,24 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
         return readBody(result);
     }
 
-    private JsonNode cancelWithdrawal(User user, String publicId) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/withdrawal-requests/{publicId}/cancel", publicId)
+    private JsonNode cancelWithdrawal(User user, String publicCode) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/withdrawal-requests/{publicCode}/cancel", publicCode)
                 .with(auth(user)))
             .andExpect(status().isOk())
             .andReturn();
         return readBody(result);
     }
 
-    private JsonNode takeWithdrawal(User user, String publicId) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/backoffice/withdrawal-requests/{publicId}/take", publicId)
+    private JsonNode takeWithdrawal(User user, String publicCode) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/backoffice/withdrawal-requests/{publicCode}/take", publicCode)
                 .with(auth(user)))
             .andExpect(status().isOk())
             .andReturn();
         return readBody(result);
     }
 
-    private JsonNode rejectWithdrawal(User user, String publicId, String body) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/backoffice/withdrawal-requests/{publicId}/reject", publicId)
+    private JsonNode rejectWithdrawal(User user, String publicCode, String body) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/backoffice/withdrawal-requests/{publicCode}/reject", publicCode)
                 .with(auth(user))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
@@ -627,8 +626,8 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
         return readBody(result);
     }
 
-    private JsonNode confirmWithdrawal(User user, String publicId, String body) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/backoffice/withdrawal-requests/{publicId}/confirm", publicId)
+    private JsonNode confirmWithdrawal(User user, String publicCode, String body) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/backoffice/withdrawal-requests/{publicCode}/confirm", publicCode)
                 .with(auth(user))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
@@ -665,8 +664,8 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
         return readBody(result);
     }
 
-    private JsonNode getDepositRequest(User user, String publicId) throws Exception {
-        MvcResult result = mockMvc.perform(get("/api/deposit-requests/{publicId}", publicId)
+    private JsonNode getDepositRequest(User user, String publicCode) throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/deposit-requests/{publicCode}", publicCode)
                 .with(auth(user)))
             .andExpect(status().isOk())
             .andReturn();
@@ -754,7 +753,7 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
         );
     }
 
-    private int loadWithdrawalTxCount(String withdrawalPublicId) {
+    private int loadWithdrawalTxCount(String withdrawalPublicCode) {
         return jdbcTemplate.queryForObject(
             """
                 select count(*)
@@ -762,14 +761,14 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
                 join withdrawal_requests wr
                   on wr.id = tx.ref_id
                 where tx.ref_type = 'WITHDRAWAL_REQUEST'
-                  and wr.public_id = ?
+                  and wr.public_code = ?
                 """,
             Integer.class,
-            UUID.fromString(withdrawalPublicId)
+            withdrawalPublicCode
         );
     }
 
-    private BigDecimal loadWithdrawalTxAmount(String withdrawalPublicId) {
+    private BigDecimal loadWithdrawalTxAmount(String withdrawalPublicCode) {
         return jdbcTemplate.queryForObject(
             """
                 select tx.amount
@@ -777,10 +776,10 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
                 join withdrawal_requests wr
                   on wr.id = tx.ref_id
                 where tx.ref_type = 'WITHDRAWAL_REQUEST'
-                  and wr.public_id = ?
+                  and wr.public_code = ?
                 """,
             BigDecimal.class,
-            UUID.fromString(withdrawalPublicId)
+            withdrawalPublicCode
         );
     }
 
@@ -790,7 +789,7 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
         User support = loadUser("sup1@123.123");
         fundWallet(user, "RUB", "3000.0000");
         long methodId = loadWithdrawalMethodId("SBP", "RUB");
-        String treasuryAccountPublicId = insertTreasuryAccount("bybit-usd-p2p", "Bybit USD P2P", "USD");
+        Long treasuryAccountId = insertTreasuryAccount("bybit-usd-p2p", "Bybit USD P2P", "USD");
 
         JsonNode created = createWithdrawal(user, """
             {
@@ -804,17 +803,17 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
               }
             }
             """.formatted(methodId));
-        takeWithdrawal(support, created.path("public_id").asText());
+        takeWithdrawal(support, created.path("public_code").asText());
 
-        JsonNode confirmed = confirmWithdrawal(support, created.path("public_id").asText(), """
+        JsonNode confirmed = confirmWithdrawal(support, created.path("public_code").asText(), """
             {
               "actual_payout_amount": 2600.0000,
               "operator_comment": "Paid via P2P USDT equivalent",
-              "treasury_account_public_id": "%s",
+              "treasury_account_id": %d,
               "treasury_amount": 33.6400,
               "treasury_external_reference": "bybit-p2p-order-1"
             }
-            """.formatted(treasuryAccountPublicId));
+            """.formatted(treasuryAccountId));
 
         assertThat(confirmed.path("status").asText()).isEqualTo("COMPLETED");
         assertThat(confirmed.path("treasury_transactions")).hasSize(1);
@@ -822,7 +821,7 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(treasuryTx.path("amount").decimalValue()).isEqualByComparingTo("-33.6400");
         assertThat(treasuryTx.path("currency_code").asText()).isEqualTo("USD");
         assertThat(treasuryTx.path("operation_type").asText()).isEqualTo("WITHDRAWAL_REQUEST");
-        assertThat(loadTreasuryBalance(treasuryAccountPublicId)).isEqualByComparingTo("-33.6400");
+        assertThat(loadTreasuryBalance(treasuryAccountId)).isEqualByComparingTo("-33.6400");
         assertThat(confirmed.path("events").get(2).path("payload").path("treasury_amount").decimalValue())
             .isEqualByComparingTo("-33.6400");
     }
@@ -833,7 +832,7 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
         User support = loadUser("sup1@123.123");
         fundWallet(user, "RUB", "5000.0000");
         long methodId = loadWithdrawalMethodId("SBP", "RUB");
-        String treasuryAccountPublicId = insertTreasuryAccount("tbank-rub-payouts", "T-Bank RUB payouts", "RUB");
+        Long treasuryAccountId = insertTreasuryAccount("tbank-rub-payouts", "T-Bank RUB payouts", "RUB");
 
         JsonNode created = createWithdrawal(user, """
             {
@@ -848,19 +847,19 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
             }
             """.formatted(methodId));
 
-        JsonNode planned = planWithdrawalPayout(support, created.path("public_id").asText(), """
+        JsonNode planned = planWithdrawalPayout(support, created.path("public_code").asText(), """
             {
-              "treasury_account_public_id": "%s",
+              "treasury_account_id": %d,
               "planned_user_amount": 2600.0000,
               "external_reference": "bank-payment-draft-1"
             }
-            """.formatted(treasuryAccountPublicId));
+            """.formatted(treasuryAccountId));
         assertThat(planned.path("status").asText()).isEqualTo("PROCESSING");
         assertThat(planned.path("payout_plan").path("status").asText()).isEqualTo("PLANNED");
         assertThat(planned.path("payout_plan").path("treasury_amount").decimalValue())
             .isEqualByComparingTo("2600.0000");
 
-        JsonNode confirmed = confirmWithdrawal(support, created.path("public_id").asText(), """
+        JsonNode confirmed = confirmWithdrawal(support, created.path("public_code").asText(), """
             {
               "actual_payout_amount": 2600.0000
             }
@@ -877,8 +876,8 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
         User user = loadUser("user1@123.123");
         User support = loadUser("sup1@123.123");
         fundWallet(user, "RUB", "1000.0000");
-        String treasuryAccountPublicId = insertTreasuryAccount("cash-rub-main", "Cash RUB main", "RUB");
-        insertTreasuryTransaction(treasuryAccountPublicId, "1000.0000");
+        Long treasuryAccountId = insertTreasuryAccount("cash-rub-main", "Cash RUB main", "RUB");
+        insertTreasuryTransaction(treasuryAccountId, "1000.0000");
         upsertCurrencyRate("RUB", "USD", "0.01000000");
 
         JsonNode conversion = convertCurrency(user, """
@@ -908,8 +907,8 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(usd.path("difference").decimalValue()).isEqualByComparingTo("0.0000");
     }
 
-    private JsonNode planWithdrawalPayout(User user, String publicId, String body) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/backoffice/withdrawal-requests/{publicId}/payout-plan", publicId)
+    private JsonNode planWithdrawalPayout(User user, String publicCode, String body) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/backoffice/withdrawal-requests/{publicCode}/payout-plan", publicCode)
                 .with(auth(user))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
@@ -944,27 +943,27 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
         throw new AssertionError("Exposure row not found for currency: " + currencyCode);
     }
 
-    private void insertTreasuryTransaction(String treasuryAccountPublicId, String amount) {
+    private void insertTreasuryTransaction(Long treasuryAccountId, String amount) {
         jdbcTemplate.update(
             """
                 insert into treasury_transactions (
                     treasury_account_id,
                     amount,
                     transaction_type,
-                    operation_public_id,
+                    operation_code,
                     description,
                     external_reference
                 )
                 values (
-                    (select id from treasury_accounts where public_id = ?::uuid),
+                    ?,
                     ?,
                     'ADJUSTMENT',
-                    gen_random_uuid(),
+                        'TEST-BALANCE',
                     'Initial test balance',
                     'test-balance'
                 )
                 """,
-            treasuryAccountPublicId,
+            treasuryAccountId,
             new BigDecimal(amount)
         );
     }
@@ -999,44 +998,44 @@ class MoneyAreaApiIntegrationTest extends AbstractPostgresIntegrationTest {
         );
     }
 
-    private java.util.List<String> loadMoneyEventTypes(String operationType, String publicId) {
+    private java.util.List<String> loadMoneyEventTypes(String operationType, String publicCode) {
         return jdbcTemplate.queryForList(
             """
                 select event_type
                 from money_operation_events
                 where operation_type = ?
-                  and operation_public_id = ?::uuid
+                  and operation_code = ?
                 order by created_at, id
                 """,
             String.class,
             operationType,
-            publicId
+            publicCode
         );
     }
 
-    private String insertTreasuryAccount(String code, String title, String currencyCode) {
-        UUID publicId = jdbcTemplate.queryForObject(
+    private Long insertTreasuryAccount(String code, String title, String currencyCode) {
+        Long id = jdbcTemplate.queryForObject(
             """
                 insert into treasury_accounts (code, title, currency_code, account_type)
                 values (?, ?, ?, 'EXCHANGE_ACCOUNT')
-                returning public_id
+                returning id
                 """,
-            UUID.class,
+            Long.class,
             code.toUpperCase(java.util.Locale.ROOT),
             title,
             currencyCode
         );
-        if (publicId == null) {
+        if (id == null) {
             throw new IllegalStateException("Failed to insert treasury account");
         }
-        return publicId.toString();
+        return id;
     }
 
-    private BigDecimal loadTreasuryBalance(String publicId) {
+    private BigDecimal loadTreasuryBalance(Long id) {
         return jdbcTemplate.queryForObject(
-            "select balance from treasury_accounts where public_id = ?::uuid",
+            "select balance from treasury_accounts where id = ?",
             BigDecimal.class,
-            publicId
+            id
         );
     }
 }

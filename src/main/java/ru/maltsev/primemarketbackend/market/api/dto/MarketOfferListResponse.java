@@ -14,6 +14,7 @@ public record MarketOfferListResponse(
     @Schema(name = "MarketOfferListItem")
     public record Item(
         Long id,
+        String publicCode,
         Long offerVersion,
         String side,
         String action,

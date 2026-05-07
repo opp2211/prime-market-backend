@@ -8,13 +8,11 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -32,9 +30,6 @@ public class DepositPaymentRoute {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(name = "public_id", nullable = false, updatable = false)
-    private UUID publicId;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "deposit_method_id", nullable = false)
@@ -135,13 +130,6 @@ public class DepositPaymentRoute {
     public boolean accepts(BigDecimal amount) {
         return (minAmount == null || minAmount.compareTo(amount) <= 0)
             && (maxAmount == null || maxAmount.compareTo(amount) >= 0);
-    }
-
-    @PrePersist
-    private void onCreate() {
-        if (publicId == null) {
-            publicId = UUID.randomUUID();
-        }
     }
 
     private Map<String, Object> copyDetails(Map<String, Object> value) {

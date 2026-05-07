@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -14,6 +15,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Generated;
 import org.hibernate.generator.EventType;
+import ru.maltsev.primemarketbackend.shared.PublicCodeGenerator;
 
 @Getter
 @Setter
@@ -21,10 +23,15 @@ import org.hibernate.generator.EventType;
 @Entity
 @Table(name = "offers")
 public class Offer {
+    private static final String PUBLIC_CODE_PREFIX = "OFR";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Setter(AccessLevel.NONE)
     private Long id;
+
+    @Column(name = "public_code", nullable = false, updatable = false, length = 16)
+    private String publicCode;
 
     @Column(name = "user_id", nullable = false)
     @Setter(AccessLevel.NONE)
@@ -96,5 +103,12 @@ public class Offer {
 
     public void incrementVersion() {
         this.version = version == null ? 1L : version + 1L;
+    }
+
+    @PrePersist
+    private void onCreate() {
+        if (publicCode == null) {
+            publicCode = PublicCodeGenerator.generate(PUBLIC_CODE_PREFIX);
+        }
     }
 }

@@ -7,7 +7,6 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.Set;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -49,14 +48,14 @@ public class NotificationService {
     }
 
     @Transactional
-    public UUID createNotification(Long userId, String type, String title, String body, ObjectNode payload) {
+    public Long createNotification(Long userId, String type, String title, String body, ObjectNode payload) {
         Notification notification = create(userId, type, title, body, payload);
-        return notification == null ? null : notification.getPublicId();
+        return notification == null ? null : notification.getId();
     }
 
     @Transactional
-    public NotificationResponse markRead(Long userId, UUID publicId) {
-        Notification notification = notificationRepository.findByPublicIdAndUserIdForUpdate(publicId, userId)
+    public NotificationResponse markRead(Long userId, Long notificationId) {
+        Notification notification = notificationRepository.findByIdAndUserIdForUpdate(notificationId, userId)
             .orElseThrow(this::notificationNotFound);
         notification.markRead(Instant.now());
         publishUnreadCountAfterCommit(userId);
@@ -230,50 +229,49 @@ public class NotificationService {
             return null;
         }
         Notification notification = notificationRepository.save(new Notification(
-            UUID.randomUUID(),
             userId,
             type,
             title,
             body,
             payload
         ));
-        publishCreatedNotificationAfterCommit(userId, notification.getPublicId());
+        publishCreatedNotificationAfterCommit(userId, notification.getId());
         return notification;
     }
 
     private ObjectNode orderPayload(Order order) {
         ObjectNode payload = JsonNodeFactory.instance.objectNode();
-        payload.put("orderPublicId", order.getPublicId().toString());
+        payload.put("orderCode", order.getPublicCode());
         return payload;
     }
 
     private ObjectNode conversationPayload(Order order, OrderConversation conversation) {
         ObjectNode payload = orderPayload(order);
-        payload.put("conversationPublicId", conversation.getPublicId().toString());
+        payload.put("conversationId", conversation.getId());
         return payload;
     }
 
     private ObjectNode orderRequestPayload(Order order, OrderRequest request) {
         ObjectNode payload = orderPayload(order);
-        payload.put("orderRequestPublicId", request.getPublicId().toString());
+        payload.put("orderRequestId", request.getId());
         return payload;
     }
 
     private ObjectNode disputePayload(Order order, OrderDispute dispute) {
         ObjectNode payload = orderPayload(order);
-        payload.put("disputePublicId", dispute.getPublicId().toString());
+        payload.put("disputeCode", dispute.getPublicCode());
         return payload;
     }
 
     private ObjectNode depositPayload(DepositRequest request) {
         ObjectNode payload = JsonNodeFactory.instance.objectNode();
-        payload.put("depositRequestPublicId", request.getPublicId().toString());
+        payload.put("depositRequestCode", request.getPublicCode());
         return payload;
     }
 
     private ObjectNode withdrawalPayload(WithdrawalRequest request) {
         ObjectNode payload = JsonNodeFactory.instance.objectNode();
-        payload.put("withdrawalRequestPublicId", request.getPublicId().toString());
+        payload.put("withdrawalRequestCode", request.getPublicCode());
         return payload;
     }
 
@@ -315,9 +313,9 @@ public class NotificationService {
         return amount == null ? "0" : amount.toPlainString();
     }
 
-    private void publishCreatedNotificationAfterCommit(Long userId, UUID publicId) {
+    private void publishCreatedNotificationAfterCommit(Long userId, Long notificationId) {
         afterCommit(() -> {
-            notificationStreamService.publishNotificationCreated(userId, publicId);
+            notificationStreamService.publishNotificationCreated(userId, notificationId);
             notificationStreamService.publishUnreadCount(userId);
         });
     }

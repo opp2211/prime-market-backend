@@ -11,10 +11,9 @@ import ru.maltsev.primemarketbackend.treasury.domain.TreasuryTransaction;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 
 public record AdminDepositRequestResponse(
-    @JsonProperty("public_id") UUID publicId,
+    @JsonProperty("public_code") String publicCode,
     @JsonProperty("user_id") Long userId,
     BigDecimal amount,
     @JsonProperty("currency_code") String currencyCode,
@@ -64,7 +63,7 @@ public record AdminDepositRequestResponse(
         ru.maltsev.primemarketbackend.deposit.domain.DepositPaymentInstruction paymentInstruction
     ) {
         return new AdminDepositRequestResponse(
-            request.getPublicId(),
+            request.getPublicCode(),
             request.getUserId(),
             request.getAmount(),
             request.getCurrencyCodeSnapshot(),

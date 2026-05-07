@@ -2,11 +2,10 @@ package ru.maltsev.primemarketbackend.deposit.repository;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.UUID;
 import ru.maltsev.primemarketbackend.deposit.domain.DepositRequestStatus;
 
 public record AdminDepositRequestQueueRow(
-    UUID publicId,
+    String publicCode,
     BigDecimal amount,
     String currencyCode,
     Long depositMethodId,

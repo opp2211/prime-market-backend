@@ -5,7 +5,6 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import ru.maltsev.primemarketbackend.money.api.dto.MoneyOperationEventResponse;
 import ru.maltsev.primemarketbackend.money.domain.MoneyOperationEvent;
 import ru.maltsev.primemarketbackend.treasury.api.dto.TreasuryTransactionResponse;
@@ -13,7 +12,7 @@ import ru.maltsev.primemarketbackend.treasury.domain.TreasuryTransaction;
 import ru.maltsev.primemarketbackend.withdrawal.domain.WithdrawalRequest;
 
 public record BackofficeWithdrawalRequestResponse(
-    @JsonProperty("public_id") UUID publicId,
+    @JsonProperty("public_code") String publicCode,
     @JsonProperty("user_id") Long userId,
     @JsonProperty("user_account_id") Long userAccountId,
     BigDecimal amount,
@@ -22,7 +21,7 @@ public record BackofficeWithdrawalRequestResponse(
     @JsonProperty("withdrawal_method_id") Long withdrawalMethodId,
     @JsonProperty("withdrawal_method_code") String withdrawalMethodCode,
     @JsonProperty("withdrawal_method_title") String withdrawalMethodTitle,
-    @JsonProperty("payout_profile_public_id") UUID payoutProfilePublicId,
+    @JsonProperty("payout_profile_id") Long payoutProfileId,
     Map<String, Object> requisites,
     @JsonProperty("method_note") String methodNote,
     String status,
@@ -68,7 +67,7 @@ public record BackofficeWithdrawalRequestResponse(
         ru.maltsev.primemarketbackend.withdrawal.domain.WithdrawalPayoutPlan payoutPlan
     ) {
         return new BackofficeWithdrawalRequestResponse(
-            request.getPublicId(),
+            request.getPublicCode(),
             request.getUserId(),
             request.getUserAccountId(),
             request.getAmount(),
@@ -77,7 +76,7 @@ public record BackofficeWithdrawalRequestResponse(
             request.getWithdrawalMethod().getId(),
             request.getWithdrawalMethodCodeSnapshot(),
             request.getWithdrawalMethodTitleSnapshot(),
-            request.getPayoutProfile() == null ? null : request.getPayoutProfile().getPublicId(),
+            request.getPayoutProfile() == null ? null : request.getPayoutProfile().getId(),
             request.getRequisitesSnapshot(),
             request.getMethodNoteSnapshot(),
             request.getStatus().name(),

@@ -2,11 +2,10 @@ package ru.maltsev.primemarketbackend.order.repository;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.UUID;
 
 public record WalletReserveReadRow(
     String sourceType,
-    UUID refPublicId,
+    String refCode,
     Long refId,
     String title,
     String description,

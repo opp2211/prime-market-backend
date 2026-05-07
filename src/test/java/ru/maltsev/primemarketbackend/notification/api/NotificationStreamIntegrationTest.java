@@ -13,7 +13,6 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -117,7 +116,7 @@ class NotificationStreamIntegrationTest extends AbstractPostgresIntegrationTest 
 
         awaitStreamContains(stream, "\"count\":0");
 
-        UUID publicId = notificationService.createNotification(
+        Long notificationId = notificationService.createNotification(
             user.getId(),
             NotificationTypes.ORDER_CREATED,
             "Live notification",
@@ -126,7 +125,7 @@ class NotificationStreamIntegrationTest extends AbstractPostgresIntegrationTest 
         );
 
         awaitStreamContains(stream, "notification.created");
-        awaitStreamContains(stream, publicId.toString());
+        awaitStreamContains(stream, notificationId.toString());
         awaitStreamContains(stream, "\"count\":1");
     }
 
@@ -134,29 +133,29 @@ class NotificationStreamIntegrationTest extends AbstractPostgresIntegrationTest 
     void createdNotificationEventReturnsPlainPayloadObject() throws Exception {
         User user = createUser("stream-created-payload");
         MvcResult stream = openStream(user);
-        String orderPublicId = UUID.randomUUID().toString();
-        String conversationPublicId = UUID.randomUUID().toString();
+        String orderCode = "PM-STREAM1";
+        String conversationId = "303";
 
         awaitStreamContains(stream, "\"count\":0");
 
-        UUID publicId = notificationService.createNotification(
+        Long notificationId = notificationService.createNotification(
             user.getId(),
             NotificationTypes.ORDER_MESSAGE_RECEIVED,
             "Payload notification",
             "Payload notification body",
-            payload(orderPublicId, conversationPublicId)
+            payload(orderCode, conversationId)
         );
 
         JsonNode event = awaitEventData(stream, "notification.created");
 
-        assertThat(event.path("publicId").asText()).isEqualTo(publicId.toString());
-        assertPlainNotificationPayload(event.path("payload"), orderPublicId, conversationPublicId);
+        assertThat(event.path("id").asLong()).isEqualTo(notificationId);
+        assertPlainNotificationPayload(event.path("payload"), orderCode, conversationId);
     }
 
     @Test
     void markReadPublishesUnreadCountUpdate() throws Exception {
         User user = createUser("stream-mark-read");
-        UUID firstNotification = notificationService.createNotification(
+        Long firstNotification = notificationService.createNotification(
             user.getId(),
             NotificationTypes.ORDER_CREATED,
             "First unread",
@@ -174,7 +173,7 @@ class NotificationStreamIntegrationTest extends AbstractPostgresIntegrationTest 
         MvcResult stream = openStream(user);
         awaitStreamContains(stream, "\"count\":2");
 
-        mockMvc.perform(post("/api/notifications/{publicId}/read", firstNotification).with(auth(user)))
+        mockMvc.perform(post("/api/notifications/{id}/read", firstNotification).with(auth(user)))
             .andExpect(status().isOk());
 
         awaitStreamContains(stream, "\"count\":1");
@@ -239,14 +238,14 @@ class NotificationStreamIntegrationTest extends AbstractPostgresIntegrationTest 
 
     private ObjectNode payload(String suffix) {
         return JsonNodeFactory.instance.objectNode()
-            .put("orderPublicId", UUID.nameUUIDFromBytes(("payload-" + suffix).getBytes()).toString())
+            .put("orderCode", "PM-" + suffix.toUpperCase(java.util.Locale.ROOT))
             .put("createdAtHint", Instant.now().toString());
     }
 
-    private ObjectNode payload(String orderPublicId, String conversationPublicId) {
+    private ObjectNode payload(String orderCode, String conversationId) {
         return JsonNodeFactory.instance.objectNode()
-            .put("orderPublicId", orderPublicId)
-            .put("conversationPublicId", conversationPublicId);
+            .put("orderCode", orderCode)
+            .put("conversationId", conversationId);
     }
 
     private void awaitStreamContains(MvcResult result, String expected) throws Exception {
@@ -305,11 +304,11 @@ class NotificationStreamIntegrationTest extends AbstractPostgresIntegrationTest 
         return body.substring(valueStart, valueEnd).trim();
     }
 
-    private void assertPlainNotificationPayload(JsonNode payload, String orderPublicId, String conversationPublicId) {
+    private void assertPlainNotificationPayload(JsonNode payload, String orderCode, String conversationId) {
         assertThat(payload.isObject()).isTrue();
         assertThat(payload.size()).isEqualTo(2);
-        assertThat(payload.path("orderPublicId").asText()).isEqualTo(orderPublicId);
-        assertThat(payload.path("conversationPublicId").asText()).isEqualTo(conversationPublicId);
+        assertThat(payload.path("orderCode").asText()).isEqualTo(orderCode);
+        assertThat(payload.path("conversationId").asText()).isEqualTo(conversationId);
         assertThat(payload.has("array")).isFalse();
         assertThat(payload.has("containerNode")).isFalse();
         assertThat(payload.has("nodeType")).isFalse();

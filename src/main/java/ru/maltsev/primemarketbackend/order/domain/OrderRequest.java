@@ -8,7 +8,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -30,9 +29,6 @@ public class OrderRequest {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(name = "public_id", nullable = false, unique = true)
-    private UUID publicId;
 
     @Column(name = "order_id", nullable = false)
     private Long orderId;
@@ -70,7 +66,6 @@ public class OrderRequest {
     private Long resolvedByUserId;
 
     public OrderRequest(
-        UUID publicId,
         Long orderId,
         String requestType,
         Long requestedByUserId,
@@ -78,7 +73,6 @@ public class OrderRequest {
         String reason,
         BigDecimal requestedQuantity
     ) {
-        this.publicId = publicId;
         this.orderId = orderId;
         this.requestType = requestType;
         this.requestedByUserId = requestedByUserId;

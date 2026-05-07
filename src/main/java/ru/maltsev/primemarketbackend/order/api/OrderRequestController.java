@@ -1,6 +1,5 @@
 package ru.maltsev.primemarketbackend.order.api;
 
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,7 +21,7 @@ public class OrderRequestController {
     @PostMapping("/{requestId}/approve")
     public ResponseEntity<OrderRequestResponse> approve(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID requestId
+        @PathVariable Long requestId
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -34,7 +33,7 @@ public class OrderRequestController {
     @PostMapping("/{requestId}/reject")
     public ResponseEntity<OrderRequestResponse> reject(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID requestId
+        @PathVariable Long requestId
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();

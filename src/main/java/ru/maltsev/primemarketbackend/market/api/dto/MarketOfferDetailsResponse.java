@@ -6,6 +6,7 @@ import java.util.List;
 
 public record MarketOfferDetailsResponse(
     Long id,
+    String publicCode,
     Long offerVersion,
     String side,
     String action,

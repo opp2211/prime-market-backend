@@ -19,8 +19,8 @@ public class OrderEventReadService {
     private final OrderEventReadQueryRepository orderEventReadQueryRepository;
 
     @Transactional(readOnly = true)
-    public OrderEventsResponse getOrderEvents(java.util.UUID publicOrderId, UserPrincipal principal) {
-        Order order = orderAccessService.requireReadableOrder(publicOrderId, principal);
+    public OrderEventsResponse getOrderEvents(String orderCode, UserPrincipal principal) {
+        Order order = orderAccessService.requireReadableOrder(orderCode, principal);
 
         List<OrderEventsResponse.Item> items = orderEventReadQueryRepository
             .findAllByOrderIdOrderedOldestFirst(order.getId())

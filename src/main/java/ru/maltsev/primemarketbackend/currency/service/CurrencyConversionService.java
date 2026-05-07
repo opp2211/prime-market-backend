@@ -91,7 +91,7 @@ public class CurrencyConversionService {
         ));
         platformAccountService.recordUserFxConversion(
             conversion.getId(),
-            conversion.getPublicId(),
+            conversion.getPublicCode(),
             fromCurrencyCode,
             fromAmount,
             toCurrencyCode,

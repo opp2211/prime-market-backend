@@ -1,7 +1,6 @@
 package ru.maltsev.primemarketbackend.treasury.repository;
 
 import java.util.List;
-import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -14,14 +13,14 @@ public interface TreasuryTransactionRepository extends JpaRepository<TreasuryTra
     Page<TreasuryTransaction> findAllByOrderByCreatedAtDescIdDesc(Pageable pageable);
 
     @EntityGraph(attributePaths = "treasuryAccount")
-    Page<TreasuryTransaction> findAllByTreasuryAccountPublicIdOrderByCreatedAtDescIdDesc(
-        UUID treasuryAccountPublicId,
+    Page<TreasuryTransaction> findAllByTreasuryAccountIdOrderByCreatedAtDescIdDesc(
+        Long treasuryAccountId,
         Pageable pageable
     );
 
     @EntityGraph(attributePaths = "treasuryAccount")
-    List<TreasuryTransaction> findAllByOperationTypeAndOperationPublicIdOrderByCreatedAtAscIdAsc(
+    List<TreasuryTransaction> findAllByOperationTypeAndOperationCodeOrderByCreatedAtAscIdAsc(
         MoneyOperationType operationType,
-        UUID operationPublicId
+        String operationCode
     );
 }

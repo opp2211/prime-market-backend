@@ -2,12 +2,11 @@ package ru.maltsev.primemarketbackend.order.api.dto;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.UUID;
 import ru.maltsev.primemarketbackend.order.domain.Order;
 
 public record OrderResponse(
     Long id,
-    UUID publicId,
+    String publicCode,
     String status,
     String makerRole,
     String takerRole,
@@ -26,7 +25,7 @@ public record OrderResponse(
     public static OrderResponse from(Order order) {
         return new OrderResponse(
             order.getId(),
-            order.getPublicId(),
+            order.getPublicCode(),
             order.getStatus(),
             order.getMakerRole(),
             order.getTakerRole(),

@@ -3,7 +3,6 @@ package ru.maltsev.primemarketbackend.money.service;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,7 +20,7 @@ public class MoneyOperationEventService {
     public MoneyOperationEvent record(
         MoneyOperationType operationType,
         Long operationId,
-        UUID operationPublicId,
+        String operationCode,
         MoneyOperationEventType eventType,
         String statusBefore,
         String statusAfter,
@@ -34,7 +33,7 @@ public class MoneyOperationEventService {
         return eventRepository.save(new MoneyOperationEvent(
             operationType,
             operationId,
-            operationPublicId,
+            operationCode,
             eventType,
             statusBefore,
             statusAfter,
@@ -47,10 +46,10 @@ public class MoneyOperationEventService {
     }
 
     @Transactional(readOnly = true)
-    public List<MoneyOperationEvent> list(MoneyOperationType operationType, UUID operationPublicId) {
-        return eventRepository.findAllByOperationTypeAndOperationPublicIdOrderByCreatedAtAscIdAsc(
+    public List<MoneyOperationEvent> list(MoneyOperationType operationType, String operationCode) {
+        return eventRepository.findAllByOperationTypeAndOperationCodeOrderByCreatedAtAscIdAsc(
             operationType,
-            operationPublicId
+            operationCode
         );
     }
 

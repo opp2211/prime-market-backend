@@ -8,6 +8,7 @@ import ru.maltsev.primemarketbackend.offer.repository.OfferView;
 
 public record OfferResponse(
     Long id,
+    String publicCode,
     GameResponse game,
     CategoryResponse category,
     Long gameId,
@@ -30,6 +31,7 @@ public record OfferResponse(
     public static OfferResponse from(OfferView view) {
         return new OfferResponse(
             view.id(),
+            view.publicCode(),
             new GameResponse(view.gameId(), view.gameSlug(), view.gameTitle()),
             new CategoryResponse(view.categoryId(), view.categorySlug(), view.categoryTitle()),
             view.gameId(),

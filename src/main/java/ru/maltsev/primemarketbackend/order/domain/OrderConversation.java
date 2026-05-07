@@ -7,7 +7,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
-import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -27,9 +26,6 @@ public class OrderConversation {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(name = "public_id", nullable = false, unique = true)
-    private UUID publicId;
 
     @Column(name = "order_id", nullable = false)
     private Long orderId;
@@ -52,12 +48,10 @@ public class OrderConversation {
     private Instant lastMessageAt;
 
     public OrderConversation(
-        UUID publicId,
         Long orderId,
         String conversationType,
         String status
     ) {
-        this.publicId = publicId;
         this.orderId = orderId;
         this.conversationType = conversationType;
         this.status = status;

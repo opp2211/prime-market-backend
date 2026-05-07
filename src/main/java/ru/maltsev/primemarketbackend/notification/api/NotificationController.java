@@ -5,7 +5,6 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
@@ -57,7 +56,7 @@ public class NotificationController {
                     data: {"count":5}
 
                     event: notification.created
-                    data: {"publicId":"311f9519-a43a-4305-9d26-bd0941961ec7","type":"order_created","title":"Order created","body":"A new order has been created.","payload":{"orderPublicId":"55c1327d-749e-4d9f-9f95-c56dcafec1d9"},"isRead":false,"createdAt":"2026-04-23T10:16:00Z","readAt":null}
+                    data: {"id":123,"type":"order_created","title":"Order created","body":"A new order has been created.","payload":{"orderCode":"PM-7K4Q9D"},"isRead":false,"createdAt":"2026-04-23T10:16:00Z","readAt":null}
                     """
             )
         )
@@ -102,16 +101,16 @@ public class NotificationController {
         ));
     }
 
-    @PostMapping("/{publicId}/read")
+    @PostMapping("/{id}/read")
     public ResponseEntity<NotificationResponse> markRead(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID publicId
+        @PathVariable Long id
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        return ResponseEntity.ok(notificationService.markRead(principal.getUser().getId(), publicId));
+        return ResponseEntity.ok(notificationService.markRead(principal.getUser().getId(), id));
     }
 
     @PostMapping("/read-all")

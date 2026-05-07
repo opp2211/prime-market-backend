@@ -6,7 +6,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -72,8 +71,8 @@ public class TreasuryService {
     }
 
     @Transactional
-    public TreasuryAccount updateAccount(UUID publicId, UpdateTreasuryAccountRequest request) {
-        TreasuryAccount account = getAccountForUpdate(publicId);
+    public TreasuryAccount updateAccount(Long id, UpdateTreasuryAccountRequest request) {
+        TreasuryAccount account = getAccountForUpdate(id);
         account.update(
             request.title(),
             request.accountType(),
@@ -85,12 +84,12 @@ public class TreasuryService {
     }
 
     @Transactional(readOnly = true)
-    public Page<TreasuryTransaction> listTransactions(UUID accountPublicId, Pageable pageable) {
-        if (accountPublicId == null) {
+    public Page<TreasuryTransaction> listTransactions(Long accountId, Pageable pageable) {
+        if (accountId == null) {
             return treasuryTransactionRepository.findAllByOrderByCreatedAtDescIdDesc(pageable);
         }
-        return treasuryTransactionRepository.findAllByTreasuryAccountPublicIdOrderByCreatedAtDescIdDesc(
-            accountPublicId,
+        return treasuryTransactionRepository.findAllByTreasuryAccountIdOrderByCreatedAtDescIdDesc(
+            accountId,
             pageable
         );
     }
@@ -98,17 +97,17 @@ public class TreasuryService {
     @Transactional(readOnly = true)
     public List<TreasuryTransaction> listOperationTransactions(
         MoneyOperationType operationType,
-        UUID operationPublicId
+        String operationCode
     ) {
-        return treasuryTransactionRepository.findAllByOperationTypeAndOperationPublicIdOrderByCreatedAtAscIdAsc(
+        return treasuryTransactionRepository.findAllByOperationTypeAndOperationCodeOrderByCreatedAtAscIdAsc(
             operationType,
-            operationPublicId
+            operationCode
         );
     }
 
     @Transactional
     public TreasuryTransaction recordManualTransaction(CreateTreasuryTransactionRequest request, Long actorUserId) {
-        TreasuryAccount account = getActiveAccountForUpdate(request.treasuryAccountPublicId());
+        TreasuryAccount account = getActiveAccountForUpdate(request.treasuryAccountId());
         TreasuryTransactionType type = request.transactionType();
         if (type != TreasuryTransactionType.MANUAL_IN
             && type != TreasuryTransactionType.MANUAL_OUT
@@ -135,19 +134,19 @@ public class TreasuryService {
 
     @Transactional
     public List<TreasuryTransaction> recordTransfer(CreateTreasuryTransferRequest request, Long actorUserId) {
-        if (request.fromAccountPublicId().equals(request.toAccountPublicId())) {
+        if (request.fromAccountId().equals(request.toAccountId())) {
             throw validationError("Transfer source and destination must be different");
         }
 
-        TreasuryAccount from = getActiveAccountForUpdate(request.fromAccountPublicId());
-        TreasuryAccount to = getActiveAccountForUpdate(request.toAccountPublicId());
-        UUID groupPublicId = UUID.randomUUID();
+        TreasuryAccount from = getActiveAccountForUpdate(request.fromAccountId());
+        TreasuryAccount to = getActiveAccountForUpdate(request.toAccountId());
+        String groupKey = java.util.UUID.randomUUID().toString();
         Map<String, Object> metadata = normalizeMetadata(request.metadata());
         metadata.put("from_currency_code", from.getCurrencyCode());
         metadata.put("to_currency_code", to.getCurrencyCode());
 
         TreasuryTransaction outgoing = saveTransaction(
-            groupPublicId,
+            groupKey,
             from,
             normalizePositiveMoney(request.fromAmount()).negate(),
             TreasuryTransactionType.TRANSFER_OUT,
@@ -161,7 +160,7 @@ public class TreasuryService {
             metadata
         );
         TreasuryTransaction incoming = saveTransaction(
-            groupPublicId,
+            groupKey,
             to,
             normalizePositiveMoney(request.toAmount()),
             TreasuryTransactionType.TRANSFER_IN,
@@ -180,21 +179,21 @@ public class TreasuryService {
 
     @Transactional
     public TreasuryTransaction recordDepositIn(
-        UUID treasuryAccountPublicId,
+        Long treasuryAccountId,
         BigDecimal treasuryAmount,
         BigDecimal requestAmount,
         String requestCurrencyCode,
         Long operationId,
-        UUID operationPublicId,
+        String operationCode,
         String externalReference,
         String operatorComment,
         Long actorUserId,
         Map<String, Object> metadata
     ) {
-        if (treasuryAccountPublicId == null) {
+        if (treasuryAccountId == null) {
             return null;
         }
-        TreasuryAccount account = getActiveAccountForUpdate(treasuryAccountPublicId);
+        TreasuryAccount account = getActiveAccountForUpdate(treasuryAccountId);
         BigDecimal amount = resolveOperationTreasuryAmount(
             account,
             treasuryAmount,
@@ -208,7 +207,7 @@ public class TreasuryService {
             TreasuryTransactionType.DEPOSIT_IN,
             MoneyOperationType.DEPOSIT_REQUEST,
             operationId,
-            operationPublicId,
+            operationCode,
             externalReference,
             "Deposit request confirmation",
             operatorComment,
@@ -219,21 +218,21 @@ public class TreasuryService {
 
     @Transactional
     public TreasuryTransaction recordWithdrawalOut(
-        UUID treasuryAccountPublicId,
+        Long treasuryAccountId,
         BigDecimal treasuryAmount,
         BigDecimal requestAmount,
         String requestCurrencyCode,
         Long operationId,
-        UUID operationPublicId,
+        String operationCode,
         String externalReference,
         String operatorComment,
         Long actorUserId,
         Map<String, Object> metadata
     ) {
-        if (treasuryAccountPublicId == null) {
+        if (treasuryAccountId == null) {
             return null;
         }
-        TreasuryAccount account = getActiveAccountForUpdate(treasuryAccountPublicId);
+        TreasuryAccount account = getActiveAccountForUpdate(treasuryAccountId);
         BigDecimal amount = resolveOperationTreasuryAmount(
             account,
             treasuryAmount,
@@ -247,7 +246,7 @@ public class TreasuryService {
             TreasuryTransactionType.WITHDRAWAL_OUT,
             MoneyOperationType.WITHDRAWAL_REQUEST,
             operationId,
-            operationPublicId,
+            operationCode,
             externalReference,
             "Withdrawal request payout",
             operatorComment,
@@ -257,13 +256,13 @@ public class TreasuryService {
     }
 
     private TreasuryTransaction saveTransaction(
-        UUID groupPublicId,
+        String groupKey,
         TreasuryAccount account,
         BigDecimal amount,
         TreasuryTransactionType transactionType,
         MoneyOperationType operationType,
         Long operationId,
-        UUID operationPublicId,
+        String operationCode,
         String externalReference,
         String description,
         String operatorComment,
@@ -275,13 +274,13 @@ public class TreasuryService {
             throw validationError("Treasury transaction amount must be non-zero");
         }
         TreasuryTransaction transaction = new TreasuryTransaction(
-            groupPublicId,
+            groupKey,
             account,
             normalizedAmount,
             transactionType,
             operationType,
             operationId,
-            operationPublicId,
+            operationCode,
             externalReference,
             description,
             operatorComment,
@@ -291,19 +290,19 @@ public class TreasuryService {
         return treasuryTransactionRepository.save(transaction);
     }
 
-    private TreasuryAccount getActiveAccountForUpdate(UUID publicId) {
-        TreasuryAccount account = getAccountForUpdate(publicId);
+    private TreasuryAccount getActiveAccountForUpdate(Long id) {
+        TreasuryAccount account = getAccountForUpdate(id);
         if (!account.isActive()) {
             throw conflict("TREASURY_ACCOUNT_INACTIVE", "Treasury account is inactive");
         }
         return account;
     }
 
-    private TreasuryAccount getAccountForUpdate(UUID publicId) {
-        if (publicId == null) {
-            throw validationError("Treasury account public id is required");
+    private TreasuryAccount getAccountForUpdate(Long id) {
+        if (id == null) {
+            throw validationError("Treasury account id is required");
         }
-        return treasuryAccountRepository.findByPublicIdForUpdate(publicId)
+        return treasuryAccountRepository.findById(id)
             .orElseThrow(() -> notFound("TREASURY_ACCOUNT_NOT_FOUND", "Treasury account not found"));
     }
 

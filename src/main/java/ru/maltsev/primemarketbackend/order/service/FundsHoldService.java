@@ -3,7 +3,6 @@ package ru.maltsev.primemarketbackend.order.service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -58,7 +57,6 @@ public class FundsHoldService {
 
         buyerAccount.increaseReserved(holdAmount);
         userAccountHoldRepository.save(new UserAccountHold(
-            UUID.randomUUID(),
             REF_TYPE_ORDER,
             orderId,
             buyerAccount.getId(),
@@ -255,7 +253,6 @@ public class FundsHoldService {
             ensureAvailableDelta(targetAccount, BigDecimal.ZERO, targetAmount, insufficientFundsCode);
             targetAccount.increaseReserved(targetAmount);
             userAccountHoldRepository.save(new UserAccountHold(
-                UUID.randomUUID(),
                 REF_TYPE_OFFER,
                 offer.getId(),
                 targetAccount.getId(),

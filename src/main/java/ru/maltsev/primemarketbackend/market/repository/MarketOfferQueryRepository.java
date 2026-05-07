@@ -140,7 +140,7 @@ public class MarketOfferQueryRepository {
           on true
         left join currency_rates cr
           on %s
-        where o.id = :offerId
+        where o.public_code = :offerCode
           and o.status = 'active'
           and o.published_at is not null
           and o.side = :offerSide
@@ -158,6 +158,7 @@ public class MarketOfferQueryRepository {
         """;
     private static final RowMapper<MarketOfferRow> MARKET_OFFER_ROW_MAPPER = (rs, rowNum) -> new MarketOfferRow(
         rs.getLong("id"),
+        rs.getString("public_code"),
         rs.getLong("offer_version"),
         rs.getString("side"),
         rs.getLong("owner_user_id"),
@@ -220,13 +221,13 @@ public class MarketOfferQueryRepository {
         return new MarketOfferPageData(toOfferRecords(rows, criteria.viewerCurrencyCode()), total);
     }
 
-    public Optional<MarketOfferRecord> findOfferById(
-        Long offerId,
+    public Optional<MarketOfferRecord> findOfferByPublicCode(
+        String offerCode,
         MarketIntent intent,
         String viewerCurrencyCode
     ) {
         MapSqlParameterSource parameters = new MapSqlParameterSource()
-            .addValue("offerId", offerId)
+            .addValue("offerCode", offerCode)
             .addValue("offerSide", intent.offerSide())
             .addValue("viewerCurrencyCode", viewerCurrencyCode);
         String fromWhere = MARKET_DETAILS_FROM_WHERE.formatted(rateJoin(intent));
@@ -270,6 +271,7 @@ public class MarketOfferQueryRepository {
         return """
             select
                 o.id,
+                o.public_code,
                 o.version as offer_version,
                 o.side,
                 o.user_id as owner_user_id,
@@ -406,6 +408,7 @@ public class MarketOfferQueryRepository {
         return rows.stream()
             .map(row -> new MarketOfferRecord(
                 row.id(),
+                row.publicCode(),
                 row.offerVersion(),
                 row.side(),
                 row.ownerUserId(),
@@ -552,6 +555,7 @@ public class MarketOfferQueryRepository {
 
     private record MarketOfferRow(
         Long id,
+        String publicCode,
         Long offerVersion,
         String side,
         Long ownerUserId,
@@ -585,6 +589,7 @@ public class MarketOfferQueryRepository {
 
     public record MarketOfferRecord(
         Long id,
+        String publicCode,
         Long offerVersion,
         String side,
         Long ownerUserId,

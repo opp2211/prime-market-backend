@@ -44,39 +44,39 @@ public class OfferController {
         return ResponseEntity.status(HttpStatus.CREATED).body(OfferResponse.from(response));
     }
 
-    @GetMapping("/{offerId}")
+    @GetMapping("/{offerCode}")
     public ResponseEntity<OfferDetailsResponse> getMyOffer(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable Long offerId
+        @PathVariable String offerCode
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        OfferView offer = offerService.getViewForUser(offerId, principal.getUser().getId());
-        List<OfferContextResponse> contexts = offerService.getContextValues(offerId)
+        OfferView offer = offerService.getViewForUser(offerCode, principal.getUser().getId());
+        List<OfferContextResponse> contexts = offerService.getContextValues(offer.id())
             .stream()
             .map(OfferContextResponse::from)
             .toList();
-        List<OfferAttributeResponse> attributes = offerService.getAttributeValues(offerId)
+        List<OfferAttributeResponse> attributes = offerService.getAttributeValues(offer.id())
             .stream()
             .map(OfferAttributeResponse::from)
             .toList();
-        List<String> deliveryMethods = offerService.getDeliveryMethods(offerId);
+        List<String> deliveryMethods = offerService.getDeliveryMethods(offer.id());
         return ResponseEntity.ok(OfferDetailsResponse.from(offer, contexts, attributes, deliveryMethods));
     }
 
-    @PatchMapping("/{offerId}")
+    @PatchMapping("/{offerCode}")
     public ResponseEntity<OfferResponse> update(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable Long offerId,
+        @PathVariable String offerCode,
         @Valid @RequestBody OfferUpdateRequest request
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        Offer offer = offerService.update(offerId, principal.getUser().getId(), request);
+        Offer offer = offerService.update(offerCode, principal.getUser().getId(), request);
         OfferView response = offerService.getViewForUser(offer.getId(), principal.getUser().getId());
         return ResponseEntity.ok(OfferResponse.from(response));
     }

@@ -3,7 +3,6 @@ package ru.maltsev.primemarketbackend.order.api.dto;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.Attribute;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.AvailableActions;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.Category;
@@ -18,7 +17,7 @@ import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.Price;
 
 public record OrderDetailsResponse(
     Long id,
-    UUID publicId,
+    String publicCode,
     String status,
     String myRole,
     String counterpartyRole,

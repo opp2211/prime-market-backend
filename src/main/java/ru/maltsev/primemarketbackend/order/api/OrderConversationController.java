@@ -1,6 +1,5 @@
 package ru.maltsev.primemarketbackend.order.api;
 
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,24 +24,24 @@ import ru.maltsev.primemarketbackend.security.user.UserPrincipal;
 public class OrderConversationController {
     private final OrderConversationService orderConversationService;
 
-    @GetMapping("/orders/{orderId}/conversations")
+    @GetMapping("/orders/{orderCode}/conversations")
     public ResponseEntity<OrderConversationListResponse> getOrderConversations(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID orderId
+        @PathVariable String orderCode
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        OrderConversationListResponse response = orderConversationService.getOrderConversations(orderId, principal);
+        OrderConversationListResponse response = orderConversationService.getOrderConversations(orderCode, principal);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/order-conversations/{conversationId}/messages")
     public ResponseEntity<OrderMessagesResponse> getMessages(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID conversationId,
-        @RequestParam(required = false) UUID before,
+        @PathVariable Long conversationId,
+        @RequestParam(required = false) Long before,
         @RequestParam(required = false) Integer size
     ) {
         if (principal == null) {
@@ -61,7 +60,7 @@ public class OrderConversationController {
     @PostMapping("/order-conversations/{conversationId}/messages")
     public ResponseEntity<OrderMessageResponse> sendMessage(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID conversationId,
+        @PathVariable Long conversationId,
         @RequestBody(required = false) SendOrderMessageRequest request
     ) {
         if (principal == null) {

@@ -12,7 +12,6 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -25,9 +24,6 @@ public class PlatformAccountTx {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(name = "public_id", nullable = false)
-    private UUID publicId;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "platform_account_id", nullable = false)
@@ -64,9 +60,6 @@ public class PlatformAccountTx {
 
     @PrePersist
     private void onCreate() {
-        if (publicId == null) {
-            publicId = UUID.randomUUID();
-        }
         if (createdAt == null) {
             createdAt = Instant.now();
         }

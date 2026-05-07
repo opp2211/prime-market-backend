@@ -8,7 +8,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -29,9 +28,6 @@ public class UserAccountHold {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(name = "public_id", nullable = false, unique = true)
-    private UUID publicId;
 
     @Column(name = "ref_type", nullable = false, length = 16)
     private String refType;
@@ -69,7 +65,6 @@ public class UserAccountHold {
     private Instant consumedAt;
 
     public UserAccountHold(
-        UUID publicId,
         String refType,
         Long refId,
         Long userAccountId,
@@ -78,7 +73,6 @@ public class UserAccountHold {
         String reason,
         Instant expiresAt
     ) {
-        this.publicId = publicId;
         this.refType = refType;
         this.refId = refId;
         this.userAccountId = userAccountId;

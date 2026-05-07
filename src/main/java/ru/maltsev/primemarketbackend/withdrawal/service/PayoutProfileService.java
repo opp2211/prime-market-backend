@@ -2,7 +2,6 @@ package ru.maltsev.primemarketbackend.withdrawal.service;
 
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -35,8 +34,8 @@ public class PayoutProfileService {
     }
 
     @Transactional
-    public PayoutProfile update(Long userId, UUID publicId, UpdatePayoutProfileRequest request) {
-        PayoutProfile profile = payoutProfileRepository.findByPublicIdAndUserIdForUpdate(publicId, userId)
+    public PayoutProfile update(Long userId, Long id, UpdatePayoutProfileRequest request) {
+        PayoutProfile profile = payoutProfileRepository.findByIdAndUserIdForUpdate(id, userId)
             .orElseThrow(() -> notFound("PAYOUT_PROFILE_NOT_FOUND", "Payout profile not found"));
         if (!profile.isActive()) {
             throw notFound("PAYOUT_PROFILE_NOT_FOUND", "Payout profile not found");
@@ -55,8 +54,8 @@ public class PayoutProfileService {
     }
 
     @Transactional
-    public void delete(Long userId, UUID publicId) {
-        PayoutProfile profile = payoutProfileRepository.findByPublicIdAndUserIdForUpdate(publicId, userId)
+    public void delete(Long userId, Long id) {
+        PayoutProfile profile = payoutProfileRepository.findByIdAndUserIdForUpdate(id, userId)
             .orElseThrow(() -> notFound("PAYOUT_PROFILE_NOT_FOUND", "Payout profile not found"));
         if (!profile.isActive()) {
             return;
@@ -66,8 +65,8 @@ public class PayoutProfileService {
     }
 
     @Transactional
-    public PayoutProfile makeDefault(Long userId, UUID publicId) {
-        PayoutProfile profile = payoutProfileRepository.findByPublicIdAndUserIdForUpdate(publicId, userId)
+    public PayoutProfile makeDefault(Long userId, Long id) {
+        PayoutProfile profile = payoutProfileRepository.findByIdAndUserIdForUpdate(id, userId)
             .orElseThrow(() -> notFound("PAYOUT_PROFILE_NOT_FOUND", "Payout profile not found"));
         if (!profile.isActive()) {
             throw notFound("PAYOUT_PROFILE_NOT_FOUND", "Payout profile not found");
@@ -82,8 +81,8 @@ public class PayoutProfileService {
     }
 
     @Transactional(readOnly = true)
-    public PayoutProfile getActiveForUser(UUID publicId, Long userId) {
-        return payoutProfileRepository.findByPublicIdAndUserIdAndActiveTrue(publicId, userId)
+    public PayoutProfile getActiveForUser(Long id, Long userId) {
+        return payoutProfileRepository.findByIdAndUserIdAndActiveTrue(id, userId)
             .orElseThrow(() -> notFound("PAYOUT_PROFILE_NOT_FOUND", "Payout profile not found"));
     }
 

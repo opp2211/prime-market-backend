@@ -8,12 +8,10 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -30,9 +28,6 @@ public class PayoutProfile {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(name = "public_id", nullable = false, updatable = false)
-    private UUID publicId;
 
     @Column(name = "user_id", nullable = false)
     private Long userId;
@@ -93,12 +88,5 @@ public class PayoutProfile {
     public void deactivate() {
         this.active = false;
         this.defaultProfile = false;
-    }
-
-    @PrePersist
-    private void onCreate() {
-        if (publicId == null) {
-            publicId = UUID.randomUUID();
-        }
     }
 }

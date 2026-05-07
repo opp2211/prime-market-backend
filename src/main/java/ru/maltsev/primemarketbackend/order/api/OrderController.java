@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import java.util.UUID;
 import ru.maltsev.primemarketbackend.order.api.dto.CreateOrderRequest;
 import ru.maltsev.primemarketbackend.order.api.dto.MarkPartiallyDeliveredRequest;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderRequestResponse;
@@ -42,49 +41,49 @@ public class OrderController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @PostMapping("/{orderId}/confirm-ready")
+    @PostMapping("/{orderCode}/confirm-ready")
     public ResponseEntity<OrderResponse> confirmReady(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID orderId
+        @PathVariable String orderCode
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        OrderResponse response = orderLifecycleService.confirmReady(orderId, principal.getUser().getId());
+        OrderResponse response = orderLifecycleService.confirmReady(orderCode, principal.getUser().getId());
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/{orderId}/cancel")
+    @PostMapping("/{orderCode}/cancel")
     public ResponseEntity<OrderResponse> cancel(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID orderId
+        @PathVariable String orderCode
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        OrderResponse response = orderLifecycleService.cancel(orderId, principal.getUser().getId());
+        OrderResponse response = orderLifecycleService.cancel(orderCode, principal.getUser().getId());
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/{orderId}/request-cancel")
+    @PostMapping("/{orderCode}/request-cancel")
     public ResponseEntity<OrderRequestResponse> requestCancel(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID orderId
+        @PathVariable String orderCode
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        OrderRequestResponse response = orderRequestService.requestCancel(orderId, principal.getUser().getId());
+        OrderRequestResponse response = orderRequestService.requestCancel(orderCode, principal.getUser().getId());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @PostMapping("/{orderId}/request-amend-quantity")
+    @PostMapping("/{orderCode}/request-amend-quantity")
     public ResponseEntity<OrderRequestResponse> requestAmendQuantity(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID orderId,
+        @PathVariable String orderCode,
         @RequestBody(required = false) RequestAmendQuantityRequest request
     ) {
         if (principal == null) {
@@ -92,17 +91,17 @@ public class OrderController {
         }
 
         OrderRequestResponse response = orderRequestService.requestAmendQuantity(
-            orderId,
+            orderCode,
             principal.getUser().getId(),
             request == null ? null : request.quantity()
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @PostMapping("/{orderId}/mark-partially-delivered")
+    @PostMapping("/{orderCode}/mark-partially-delivered")
     public ResponseEntity<OrderResponse> markPartiallyDelivered(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID orderId,
+        @PathVariable String orderCode,
         @Valid @RequestBody MarkPartiallyDeliveredRequest request
     ) {
         if (principal == null) {
@@ -110,36 +109,36 @@ public class OrderController {
         }
 
         OrderResponse response = orderLifecycleService.markPartiallyDelivered(
-            orderId,
+            orderCode,
             principal.getUser().getId(),
             request.deliveredQuantity()
         );
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/{orderId}/mark-delivered")
+    @PostMapping("/{orderCode}/mark-delivered")
     public ResponseEntity<OrderResponse> markDelivered(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID orderId
+        @PathVariable String orderCode
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        OrderResponse response = orderLifecycleService.markDelivered(orderId, principal.getUser().getId());
+        OrderResponse response = orderLifecycleService.markDelivered(orderCode, principal.getUser().getId());
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/{orderId}/confirm-received")
+    @PostMapping("/{orderCode}/confirm-received")
     public ResponseEntity<OrderResponse> confirmReceived(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID orderId
+        @PathVariable String orderCode
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        OrderResponse response = orderLifecycleService.confirmReceived(orderId, principal.getUser().getId());
+        OrderResponse response = orderLifecycleService.confirmReceived(orderCode, principal.getUser().getId());
         return ResponseEntity.ok(response);
     }
 }

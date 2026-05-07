@@ -2,7 +2,6 @@ package ru.maltsev.primemarketbackend.treasury.api;
 
 import jakarta.validation.Valid;
 import java.util.List;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
@@ -69,30 +68,30 @@ public class BackofficeTreasuryController {
             .body(TreasuryAccountResponse.from(treasuryService.createAccount(request)));
     }
 
-    @PatchMapping("/accounts/{publicId}")
+    @PatchMapping("/accounts/{id}")
     @PreAuthorize("hasAuthority('" + PermissionCodes.TREASURY_MANAGE + "')")
     public ResponseEntity<TreasuryAccountResponse> updateAccount(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID publicId,
+        @PathVariable Long id,
         @RequestBody UpdateTreasuryAccountRequest request
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        return ResponseEntity.ok(TreasuryAccountResponse.from(treasuryService.updateAccount(publicId, request)));
+        return ResponseEntity.ok(TreasuryAccountResponse.from(treasuryService.updateAccount(id, request)));
     }
 
     @GetMapping("/transactions")
     public ResponseEntity<Page<TreasuryTransactionResponse>> listTransactions(
         @AuthenticationPrincipal UserPrincipal principal,
-        @RequestParam(name = "account_public_id", required = false) UUID accountPublicId,
+        @RequestParam(name = "account_id", required = false) Long accountId,
         @ParameterObject
         @PageableDefault(size = 30, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        return ResponseEntity.ok(treasuryService.listTransactions(accountPublicId, pageable)
+        return ResponseEntity.ok(treasuryService.listTransactions(accountId, pageable)
             .map(TreasuryTransactionResponse::from));
     }
 

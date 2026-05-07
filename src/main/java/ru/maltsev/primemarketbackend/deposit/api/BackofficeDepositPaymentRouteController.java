@@ -2,7 +2,6 @@ package ru.maltsev.primemarketbackend.deposit.api;
 
 import jakarta.validation.Valid;
 import java.util.List;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -57,18 +56,18 @@ public class BackofficeDepositPaymentRouteController {
             .body(DepositPaymentRouteResponse.from(depositPaymentRouteService.createRoute(request)));
     }
 
-    @PatchMapping("/{publicId}")
+    @PatchMapping("/{id}")
     @PreAuthorize("hasAuthority('" + PermissionCodes.TREASURY_MANAGE + "')")
     public ResponseEntity<DepositPaymentRouteResponse> update(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID publicId,
+        @PathVariable Long id,
         @Valid @RequestBody UpdateDepositPaymentRouteRequest request
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         return ResponseEntity.ok(DepositPaymentRouteResponse.from(
-            depositPaymentRouteService.updateRoute(publicId, request)
+            depositPaymentRouteService.updateRoute(id, request)
         ));
     }
 }

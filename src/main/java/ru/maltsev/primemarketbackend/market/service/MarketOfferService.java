@@ -93,11 +93,15 @@ public class MarketOfferService {
     }
 
     @Transactional(readOnly = true)
-    public MarketOfferDetailsResponse getOffer(Long offerId, String rawIntent, String rawViewerCurrencyCode) {
+    public MarketOfferDetailsResponse getOffer(String offerCode, String rawIntent, String rawViewerCurrencyCode) {
         MarketIntent intent = MarketIntent.from(rawIntent);
         String viewerCurrencyCode = requireValidViewerCurrencyCode(rawViewerCurrencyCode);
 
-        MarketOfferRecord offer = marketOfferQueryRepository.findOfferById(offerId, intent, viewerCurrencyCode)
+        MarketOfferRecord offer = marketOfferQueryRepository.findOfferByPublicCode(
+            requireOfferCode(offerCode),
+            intent,
+            viewerCurrencyCode
+        )
             .orElseThrow(() -> new ApiProblemException(
                 HttpStatus.NOT_FOUND,
                 "MARKET_OFFER_NOT_FOUND",
@@ -106,6 +110,7 @@ public class MarketOfferService {
 
         return new MarketOfferDetailsResponse(
             offer.id(),
+            offer.publicCode(),
             offer.offerVersion(),
             offer.side(),
             intent.action(),
@@ -130,6 +135,7 @@ public class MarketOfferService {
     private MarketOfferListResponse.Item toResponseItem(MarketOfferRecord item, MarketIntent intent) {
         return new MarketOfferListResponse.Item(
             item.id(),
+            item.publicCode(),
             item.offerVersion(),
             item.side(),
             intent.action(),
@@ -214,6 +220,17 @@ public class MarketOfferService {
                 HttpStatus.BAD_REQUEST,
                 "VALIDATION_ERROR",
                 "Query parameter 'viewerCurrencyCode' is required"
+            );
+        }
+        return value.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private String requireOfferCode(String value) {
+        if (value == null || value.isBlank()) {
+            throw new ApiProblemException(
+                HttpStatus.BAD_REQUEST,
+                "VALIDATION_ERROR",
+                "Offer code is required"
             );
         }
         return value.trim().toUpperCase(Locale.ROOT);

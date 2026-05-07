@@ -3,7 +3,6 @@ package ru.maltsev.primemarketbackend.notification.repository;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Optional;
-import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -20,17 +19,17 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 
     long countByUserIdAndIsReadFalse(Long userId);
 
-    Optional<Notification> findByPublicIdAndUserId(UUID publicId, Long userId);
+    Optional<Notification> findByIdAndUserId(Long id, Long userId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
         select n
         from Notification n
-        where n.publicId = :publicId
+        where n.id = :id
           and n.userId = :userId
         """)
-    Optional<Notification> findByPublicIdAndUserIdForUpdate(
-        @Param("publicId") UUID publicId,
+    Optional<Notification> findByIdAndUserIdForUpdate(
+        @Param("id") Long id,
         @Param("userId") Long userId
     );
 

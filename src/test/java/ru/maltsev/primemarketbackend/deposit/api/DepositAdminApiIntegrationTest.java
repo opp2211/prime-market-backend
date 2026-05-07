@@ -75,7 +75,7 @@ class DepositAdminApiIntegrationTest extends AbstractPostgresIntegrationTest {
         JsonNode list = listBackofficeDepositRequests(support);
         JsonNode row = list.path("content").get(0);
 
-        assertThat(row.path("public_id").asText()).isEqualTo(created.path("public_id").asText());
+        assertThat(row.path("public_code").asText()).isEqualTo(created.path("public_code").asText());
         assertThat(row.path("status").asText()).isEqualTo("WAITING_PAYMENT");
         assertThat(row.path("user").path("id").asLong()).isEqualTo(user.getId());
         assertThat(row.path("user").path("username").asText()).isEqualTo(user.getUsername());
@@ -123,10 +123,10 @@ class DepositAdminApiIntegrationTest extends AbstractPostgresIntegrationTest {
               "amount": 1000.0000
             }
             """.formatted(methodId));
-        String publicId = created.path("public_id").asText();
+        String publicCode = created.path("public_code").asText();
         assertThat(created.path("status").asText()).isEqualTo("PENDING_DETAILS");
 
-        JsonNode issued = issueDepositDetails(support, publicId, """
+        JsonNode issued = issueDepositDetails(support, publicCode, """
             {
               "payment_details": "T-Bank card 2200 0000 0000 0000",
               "operator_comment": "Issued personal T-Bank card"
@@ -136,15 +136,15 @@ class DepositAdminApiIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(issued.path("details_issued_by_user_id").asLong()).isEqualTo(support.getId());
         assertThat(issued.path("operator_comment").asText()).isEqualTo("Issued personal T-Bank card");
 
-        String treasuryAccountPublicId = insertTreasuryAccount("tbank-rub-deposits", "T-Bank RUB deposits", "RUB");
-        markDepositPaid(user, publicId);
-        JsonNode confirmed = confirmDeposit(support, publicId, """
+        Long treasuryAccountId = insertTreasuryAccount("tbank-rub-deposits", "T-Bank RUB deposits", "RUB");
+        markDepositPaid(user, publicCode);
+        JsonNode confirmed = confirmDeposit(support, publicCode, """
             {
               "confirmation_reference": "tbank-incoming-100500",
               "operator_comment": "Incoming payment matched by amount",
-              "treasury_account_public_id": "%s"
+              "treasury_account_id": %d
             }
-            """.formatted(treasuryAccountPublicId));
+            """.formatted(treasuryAccountId));
         assertThat(confirmed.path("status").asText()).isEqualTo("CONFIRMED");
         assertThat(confirmed.path("confirmed_by_user_id").asLong()).isEqualTo(support.getId());
         assertThat(confirmed.path("confirmation_reference").asText()).isEqualTo("tbank-incoming-100500");
@@ -163,14 +163,14 @@ class DepositAdminApiIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(confirmed.path("events").get(3).path("operator_note").asText())
             .isEqualTo("Incoming payment matched by amount");
 
-        assertThat(loadMoneyEventTypes("DEPOSIT_REQUEST", publicId))
+        assertThat(loadMoneyEventTypes("DEPOSIT_REQUEST", publicCode))
             .containsExactly(
                 "DEPOSIT_CREATED",
                 "DEPOSIT_DETAILS_ISSUED",
                 "DEPOSIT_USER_MARKED_PAID",
                 "DEPOSIT_CONFIRMED"
             );
-        assertThat(loadTreasuryBalance(treasuryAccountPublicId)).isEqualByComparingTo("1000.0000");
+        assertThat(loadTreasuryBalance(treasuryAccountId)).isEqualByComparingTo("1000.0000");
     }
 
     @Test
@@ -178,8 +178,8 @@ class DepositAdminApiIntegrationTest extends AbstractPostgresIntegrationTest {
         User user = loadUser("user1@123.123");
         User support = loadUser("sup1@123.123");
         long methodId = insertDepositMethod("SBP route", "RUB", null);
-        String treasuryAccountPublicId = insertTreasuryAccount("tbank-route-rub", "T-Bank route RUB", "RUB");
-        insertDepositPaymentRoute(methodId, treasuryAccountPublicId, """
+        Long treasuryAccountId = insertTreasuryAccount("tbank-route-rub", "T-Bank route RUB", "RUB");
+        insertDepositPaymentRoute(methodId, treasuryAccountId, """
             {
               "bank": "T-Bank",
               "phone": "+79990001122",
@@ -195,13 +195,13 @@ class DepositAdminApiIntegrationTest extends AbstractPostgresIntegrationTest {
             """.formatted(methodId));
 
         assertThat(created.path("status").asText()).isEqualTo("WAITING_PAYMENT");
-        assertThat(created.path("payment_instruction").path("treasury_account_public_id").asText())
-            .isEqualTo(treasuryAccountPublicId);
+        assertThat(created.path("payment_instruction").path("treasury_account_id").asLong())
+            .isEqualTo(treasuryAccountId);
         assertThat(created.path("payment_instruction").path("payment_details").path("bank").asText())
             .isEqualTo("T-Bank");
 
-        markDepositPaid(user, created.path("public_id").asText());
-        JsonNode confirmed = confirmDeposit(support, created.path("public_id").asText(), """
+        markDepositPaid(user, created.path("public_code").asText());
+        JsonNode confirmed = confirmDeposit(support, created.path("public_code").asText(), """
             {
               "confirmation_reference": "route-bank-statement-1"
             }
@@ -212,7 +212,7 @@ class DepositAdminApiIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(confirmed.path("treasury_transactions")).hasSize(1);
         assertThat(confirmed.path("treasury_transactions").get(0).path("amount").decimalValue())
             .isEqualByComparingTo("1500.0000");
-        assertThat(loadTreasuryBalance(treasuryAccountPublicId)).isEqualByComparingTo("1500.0000");
+        assertThat(loadTreasuryBalance(treasuryAccountId)).isEqualByComparingTo("1500.0000");
     }
 
     private User loadUser(String email) {
@@ -239,8 +239,8 @@ class DepositAdminApiIntegrationTest extends AbstractPostgresIntegrationTest {
         return readBody(result);
     }
 
-    private JsonNode issueDepositDetails(User user, String publicId, String body) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/backoffice/deposit-requests/{publicId}/issue-details", publicId)
+    private JsonNode issueDepositDetails(User user, String publicCode, String body) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/backoffice/deposit-requests/{publicCode}/issue-details", publicCode)
                 .with(auth(user))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
@@ -249,16 +249,16 @@ class DepositAdminApiIntegrationTest extends AbstractPostgresIntegrationTest {
         return readBody(result);
     }
 
-    private JsonNode markDepositPaid(User user, String publicId) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/deposit-requests/{publicId}/mark-paid", publicId)
+    private JsonNode markDepositPaid(User user, String publicCode) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/deposit-requests/{publicCode}/mark-paid", publicCode)
                 .with(auth(user)))
             .andExpect(status().isOk())
             .andReturn();
         return readBody(result);
     }
 
-    private JsonNode confirmDeposit(User user, String publicId, String body) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/backoffice/deposit-requests/{publicId}/confirm", publicId)
+    private JsonNode confirmDeposit(User user, String publicCode, String body) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/backoffice/deposit-requests/{publicCode}/confirm", publicCode)
                 .with(auth(user))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
@@ -300,40 +300,40 @@ class DepositAdminApiIntegrationTest extends AbstractPostgresIntegrationTest {
         return id;
     }
 
-    private java.util.List<String> loadMoneyEventTypes(String operationType, String publicId) {
+    private java.util.List<String> loadMoneyEventTypes(String operationType, String publicCode) {
         return jdbcTemplate.queryForList(
             """
                 select event_type
                 from money_operation_events
                 where operation_type = ?
-                  and operation_public_id = ?::uuid
+                  and operation_code = ?
                 order by created_at, id
                 """,
             String.class,
             operationType,
-            publicId
+            publicCode
         );
     }
 
-    private String insertTreasuryAccount(String code, String title, String currencyCode) {
-        java.util.UUID publicId = jdbcTemplate.queryForObject(
+    private Long insertTreasuryAccount(String code, String title, String currencyCode) {
+        Long id = jdbcTemplate.queryForObject(
             """
                 insert into treasury_accounts (code, title, currency_code, account_type)
                 values (?, ?, ?, 'BANK_CARD')
-                returning public_id
+                returning id
                 """,
-            java.util.UUID.class,
+            Long.class,
             code.toUpperCase(java.util.Locale.ROOT),
             title,
             currencyCode
         );
-        if (publicId == null) {
+        if (id == null) {
             throw new IllegalStateException("Failed to insert treasury account");
         }
-        return publicId.toString();
+        return id;
     }
 
-    private void insertDepositPaymentRoute(long methodId, String treasuryAccountPublicId, String paymentDetails) {
+    private void insertDepositPaymentRoute(long methodId, Long treasuryAccountId, String paymentDetails) {
         jdbcTemplate.update(
             """
                 insert into deposit_payment_routes (
@@ -346,24 +346,24 @@ class DepositAdminApiIntegrationTest extends AbstractPostgresIntegrationTest {
                 )
                 values (
                     ?,
-                    (select id from treasury_accounts where public_id = ?::uuid),
+                    ?,
                     'Default route',
                     ?::jsonb,
                     10,
                     true
                 )
-                """,
+            """,
             methodId,
-            treasuryAccountPublicId,
+            treasuryAccountId,
             paymentDetails
         );
     }
 
-    private java.math.BigDecimal loadTreasuryBalance(String publicId) {
+    private java.math.BigDecimal loadTreasuryBalance(Long id) {
         return jdbcTemplate.queryForObject(
-            "select balance from treasury_accounts where public_id = ?::uuid",
+            "select balance from treasury_accounts where id = ?",
             java.math.BigDecimal.class,
-            publicId
+            id
         );
     }
 }

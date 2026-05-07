@@ -3,7 +3,6 @@ package ru.maltsev.primemarketbackend.order.service;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -38,8 +37,8 @@ public class OrderLifecycleService {
     private final NotificationService notificationService;
 
     @Transactional
-    public OrderResponse confirmReady(UUID publicOrderId, Long actorUserId) {
-        Order order = loadOrderForUpdate(publicOrderId);
+    public OrderResponse confirmReady(String orderCode, Long actorUserId) {
+        Order order = loadOrderForUpdate(orderCode);
         if (!order.getMakerUserId().equals(actorUserId)) {
             throw new ApiProblemException(
                 HttpStatus.FORBIDDEN,
@@ -56,8 +55,8 @@ public class OrderLifecycleService {
     }
 
     @Transactional
-    public OrderResponse cancel(UUID publicOrderId, Long actorUserId) {
-        Order order = loadOrderForUpdate(publicOrderId);
+    public OrderResponse cancel(String orderCode, Long actorUserId) {
+        Order order = loadOrderForUpdate(orderCode);
         if (!isParticipant(order, actorUserId)) {
             throw new ApiProblemException(
                 HttpStatus.FORBIDDEN,
@@ -82,8 +81,8 @@ public class OrderLifecycleService {
     }
 
     @Transactional
-    public OrderResponse markPartiallyDelivered(UUID publicOrderId, Long actorUserId, BigDecimal deliveredQuantity) {
-        Order order = loadOrderForUpdate(publicOrderId);
+    public OrderResponse markPartiallyDelivered(String orderCode, Long actorUserId, BigDecimal deliveredQuantity) {
+        Order order = loadOrderForUpdate(orderCode);
         requireSeller(order, actorUserId, "ONLY_SELLER_CAN_MARK_PARTIALLY_DELIVERED", "Only seller can mark partial delivery");
         validatePartialDelivery(order, deliveredQuantity);
 
@@ -94,8 +93,8 @@ public class OrderLifecycleService {
     }
 
     @Transactional
-    public OrderResponse markDelivered(UUID publicOrderId, Long actorUserId) {
-        Order order = loadOrderForUpdate(publicOrderId);
+    public OrderResponse markDelivered(String orderCode, Long actorUserId) {
+        Order order = loadOrderForUpdate(orderCode);
         requireSeller(order, actorUserId, "ONLY_SELLER_CAN_MARK_DELIVERED", "Only seller can mark delivered");
         validateDeliveryUpdateAllowed(order);
 
@@ -106,8 +105,8 @@ public class OrderLifecycleService {
     }
 
     @Transactional
-    public OrderResponse confirmReceived(UUID publicOrderId, Long actorUserId) {
-        Order order = loadOrderForUpdate(publicOrderId);
+    public OrderResponse confirmReceived(String orderCode, Long actorUserId) {
+        Order order = loadOrderForUpdate(orderCode);
         requireBuyer(order, actorUserId, "ONLY_BUYER_CAN_CONFIRM_RECEIVED", "Only buyer can confirm received");
         validateConfirmReceivedAllowed(order);
 
@@ -129,8 +128,8 @@ public class OrderLifecycleService {
         return orders.size();
     }
 
-    private Order loadOrderForUpdate(UUID publicOrderId) {
-        return orderRepository.findByPublicIdForUpdate(publicOrderId)
+    private Order loadOrderForUpdate(String orderCode) {
+        return orderRepository.findByPublicCodeForUpdate(orderCode)
             .orElseThrow(() -> new ApiProblemException(
                 HttpStatus.NOT_FOUND,
                 "ORDER_NOT_FOUND",

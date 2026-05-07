@@ -4,7 +4,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.Category;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.Counterparty;
 import ru.maltsev.primemarketbackend.order.api.dto.OrderReadModelDtos.FinancialSummaryPreview;
@@ -19,7 +18,7 @@ public record MyOrdersResponse(
     @Schema(name = "MyOrderListItem")
     public record Item(
         Long id,
-        UUID publicId,
+        String publicCode,
         String status,
         String myRole,
         String counterpartyRole,

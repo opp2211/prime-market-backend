@@ -70,8 +70,7 @@
           "payment_instruction" : {
             "$ref" : "#/components/schemas/DepositPaymentInstructionResponse"
           },
-          "public_id" : {
-            "format" : "uuid",
+          "public_code" : {
             "type" : "string"
           },
           "reject_reason" : {
@@ -149,8 +148,7 @@
             "format" : "date-time",
             "type" : "string"
           },
-          "public_id" : {
-            "format" : "uuid",
+          "public_code" : {
             "type" : "string"
           },
           "rejected_at" : {
@@ -277,9 +275,9 @@
           "payout_plan" : {
             "$ref" : "#/components/schemas/WithdrawalPayoutPlanResponse"
           },
-          "payout_profile_public_id" : {
-            "format" : "uuid",
-            "type" : "string"
+          "payout_profile_id" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "processed_by_user_id" : {
             "format" : "int64",
@@ -289,8 +287,7 @@
             "format" : "date-time",
             "type" : "string"
           },
-          "public_id" : {
-            "format" : "uuid",
+          "public_code" : {
             "type" : "string"
           },
           "rejected_at" : {
@@ -447,9 +444,9 @@
           "operator_comment" : {
             "type" : "string"
           },
-          "treasury_account_public_id" : {
-            "format" : "uuid",
-            "type" : "string"
+          "treasury_account_id" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "treasury_amount" : {
             "minimum" : 1.0E-4,
@@ -490,9 +487,9 @@
           "operator_comment" : {
             "type" : "string"
           },
-          "treasury_account_public_id" : {
-            "format" : "uuid",
-            "type" : "string"
+          "treasury_account_id" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "treasury_amount" : {
             "minimum" : 1.0E-4,
@@ -607,12 +604,12 @@
           "title" : {
             "type" : "string"
           },
-          "treasury_account_public_id" : {
-            "format" : "uuid",
-            "type" : "string"
+          "treasury_account_id" : {
+            "format" : "int64",
+            "type" : "integer"
           }
         },
-        "required" : [ "deposit_method_id", "title", "treasury_account_public_id" ],
+        "required" : [ "deposit_method_id", "title", "treasury_account_id" ],
         "type" : "object"
       },
       "CreateDepositRequest" : {
@@ -672,8 +669,8 @@
             "type" : "number"
           },
           "quoteId" : {
-            "format" : "uuid",
-            "type" : "string"
+            "format" : "int64",
+            "type" : "integer"
           }
         },
         "required" : [ "quoteId" ],
@@ -713,16 +710,16 @@
             "additionalProperties" : { },
             "type" : "object"
           },
-          "platform_account_public_id" : {
-            "format" : "uuid",
-            "type" : "string"
+          "platform_account_id" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "transaction_type" : {
             "enum" : [ "FX_IN", "FX_OUT", "FEE", "ROUNDING", "ADJUSTMENT", "MANUAL" ],
             "type" : "string"
           }
         },
-        "required" : [ "amount", "platform_account_public_id", "transaction_type" ],
+        "required" : [ "amount", "platform_account_id", "transaction_type" ],
         "type" : "object"
       },
       "CreateTreasuryAccountRequest" : {
@@ -779,12 +776,12 @@
             "enum" : [ "DEPOSIT_IN", "WITHDRAWAL_OUT", "MANUAL_IN", "MANUAL_OUT", "ADJUSTMENT", "TRANSFER_IN", "TRANSFER_OUT" ],
             "type" : "string"
           },
-          "treasury_account_public_id" : {
-            "format" : "uuid",
-            "type" : "string"
+          "treasury_account_id" : {
+            "format" : "int64",
+            "type" : "integer"
           }
         },
-        "required" : [ "amount", "transaction_type", "treasury_account_public_id" ],
+        "required" : [ "amount", "transaction_type", "treasury_account_id" ],
         "type" : "object"
       },
       "CreateTreasuryTransferRequest" : {
@@ -795,9 +792,9 @@
           "external_reference" : {
             "type" : "string"
           },
-          "from_account_public_id" : {
-            "format" : "uuid",
-            "type" : "string"
+          "from_account_id" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "from_amount" : {
             "minimum" : 1.0E-4,
@@ -810,16 +807,16 @@
           "operator_comment" : {
             "type" : "string"
           },
-          "to_account_public_id" : {
-            "format" : "uuid",
-            "type" : "string"
+          "to_account_id" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "to_amount" : {
             "minimum" : 1.0E-4,
             "type" : "number"
           }
         },
-        "required" : [ "from_account_public_id", "from_amount", "to_account_public_id", "to_amount" ],
+        "required" : [ "from_account_id", "from_amount", "to_account_id", "to_amount" ],
         "type" : "object"
       },
       "CreateWithdrawalPayoutPlanRequest" : {
@@ -834,16 +831,16 @@
             "minimum" : 1.0E-4,
             "type" : "number"
           },
-          "treasury_account_public_id" : {
-            "format" : "uuid",
-            "type" : "string"
+          "treasury_account_id" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "treasury_amount" : {
             "minimum" : 1.0E-4,
             "type" : "number"
           }
         },
-        "required" : [ "treasury_account_public_id" ],
+        "required" : [ "treasury_account_id" ],
         "type" : "object"
       },
       "CreateWithdrawalRequest" : {
@@ -856,9 +853,9 @@
             "minLength" : 1,
             "type" : "string"
           },
-          "payout_profile_public_id" : {
-            "format" : "uuid",
-            "type" : "string"
+          "payout_profile_id" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "payout_profile_title" : {
             "type" : "string"
@@ -890,8 +887,7 @@
           "from_currency_code" : {
             "type" : "string"
           },
-          "public_id" : {
-            "format" : "uuid",
+          "public_code" : {
             "type" : "string"
           },
           "rate" : {
@@ -981,13 +977,17 @@
           "currency_code" : {
             "type" : "string"
           },
-          "deposit_payment_route_public_id" : {
-            "format" : "uuid",
-            "type" : "string"
+          "deposit_payment_route_id" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "expires_at" : {
             "format" : "date-time",
             "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "issued_at" : {
             "format" : "date-time",
@@ -1004,10 +1004,6 @@
             "additionalProperties" : { },
             "type" : "object"
           },
-          "public_id" : {
-            "format" : "uuid",
-            "type" : "string"
-          },
           "status" : {
             "enum" : [ "ACTIVE", "USED", "CANCELLED" ],
             "type" : "string"
@@ -1015,9 +1011,9 @@
           "treasury_account_code" : {
             "type" : "string"
           },
-          "treasury_account_public_id" : {
-            "format" : "uuid",
-            "type" : "string"
+          "treasury_account_id" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "treasury_account_title" : {
             "type" : "string"
@@ -1047,6 +1043,10 @@
           "deposit_method_title" : {
             "type" : "string"
           },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "is_active" : {
             "type" : "boolean"
           },
@@ -1067,19 +1067,15 @@
             "format" : "int32",
             "type" : "integer"
           },
-          "public_id" : {
-            "format" : "uuid",
-            "type" : "string"
-          },
           "title" : {
             "type" : "string"
           },
           "treasury_account_code" : {
             "type" : "string"
           },
-          "treasury_account_public_id" : {
-            "format" : "uuid",
-            "type" : "string"
+          "treasury_account_id" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "treasury_account_title" : {
             "type" : "string"
@@ -1131,8 +1127,7 @@
           "payment_instruction" : {
             "$ref" : "#/components/schemas/DepositPaymentInstructionResponse"
           },
-          "public_id" : {
-            "format" : "uuid",
+          "public_code" : {
             "type" : "string"
           },
           "reject_reason" : {
@@ -1178,8 +1173,7 @@
           "openedByRole" : {
             "type" : "string"
           },
-          "publicId" : {
-            "format" : "uuid",
+          "publicCode" : {
             "type" : "string"
           },
           "reasonCode" : {
@@ -1276,9 +1270,9 @@
       },
       "IssueDetailsRequest" : {
         "properties" : {
-          "deposit_payment_route_public_id" : {
-            "format" : "uuid",
-            "type" : "string"
+          "deposit_payment_route_id" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "expires_at" : {
             "format" : "date-time",
@@ -1290,9 +1284,9 @@
           "payment_details" : {
             "type" : "string"
           },
-          "treasury_account_public_id" : {
-            "format" : "uuid",
-            "type" : "string"
+          "treasury_account_id" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "treasury_amount" : {
             "minimum" : 1.0E-4,
@@ -1387,6 +1381,9 @@
           "price" : {
             "$ref" : "#/components/schemas/MarketOfferPrice"
           },
+          "publicCode" : {
+            "type" : "string"
+          },
           "publishedAt" : {
             "format" : "date-time",
             "type" : "string"
@@ -1457,6 +1454,9 @@
           },
           "price" : {
             "$ref" : "#/components/schemas/MarketOfferPrice"
+          },
+          "publicCode" : {
+            "type" : "string"
           },
           "publishedAt" : {
             "format" : "date-time",
@@ -1532,8 +1532,11 @@
             "enum" : [ "DEPOSIT_CREATED", "DEPOSIT_DETAILS_ISSUED", "DEPOSIT_USER_MARKED_PAID", "DEPOSIT_CONFIRMED", "DEPOSIT_REJECTED", "DEPOSIT_CANCELLED", "WITHDRAWAL_CREATED", "WITHDRAWAL_CANCELLED", "WITHDRAWAL_TAKEN", "WITHDRAWAL_PAYOUT_PLANNED", "WITHDRAWAL_REJECTED", "WITHDRAWAL_CONFIRMED" ],
             "type" : "string"
           },
-          "operation_public_id" : {
-            "format" : "uuid",
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "operation_code" : {
             "type" : "string"
           },
           "operation_type" : {
@@ -1546,10 +1549,6 @@
           "payload" : {
             "additionalProperties" : { },
             "type" : "object"
-          },
-          "public_id" : {
-            "format" : "uuid",
-            "type" : "string"
           },
           "public_note" : {
             "type" : "string"
@@ -1607,8 +1606,7 @@
           "orderedQuantity" : {
             "type" : "number"
           },
-          "publicId" : {
-            "format" : "uuid",
+          "publicCode" : {
             "type" : "string"
           },
           "sellerFeeAmount" : {
@@ -1668,16 +1666,16 @@
             "format" : "date-time",
             "type" : "string"
           },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "isRead" : {
             "type" : "boolean"
           },
           "payload" : {
             "additionalProperties" : { },
             "type" : "object"
-          },
-          "publicId" : {
-            "format" : "uuid",
-            "type" : "string"
           },
           "readAt" : {
             "format" : "date-time",
@@ -1881,6 +1879,9 @@
           "priceCurrencyCode" : {
             "type" : "string"
           },
+          "publicCode" : {
+            "type" : "string"
+          },
           "publishedAt" : {
             "format" : "date-time",
             "type" : "string"
@@ -1947,6 +1948,9 @@
             "type" : "number"
           },
           "priceCurrencyCode" : {
+            "type" : "string"
+          },
+          "publicCode" : {
             "type" : "string"
           },
           "publishedAt" : {
@@ -2172,12 +2176,12 @@
           "hasMessages" : {
             "type" : "boolean"
           },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "lastMessageAt" : {
             "format" : "date-time",
-            "type" : "string"
-          },
-          "publicId" : {
-            "format" : "uuid",
             "type" : "string"
           },
           "title" : {
@@ -2263,8 +2267,7 @@
           "price" : {
             "$ref" : "#/components/schemas/OrderPrice"
           },
-          "publicId" : {
-            "format" : "uuid",
+          "publicCode" : {
             "type" : "string"
           },
           "sellerFeeAmount" : {
@@ -2337,8 +2340,7 @@
           "order" : {
             "$ref" : "#/components/schemas/OrderSummary"
           },
-          "publicId" : {
-            "format" : "uuid",
+          "publicCode" : {
             "type" : "string"
           },
           "reasonCode" : {
@@ -2433,11 +2435,11 @@
             "format" : "date-time",
             "type" : "string"
           },
-          "messageType" : {
-            "type" : "string"
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
           },
-          "publicId" : {
-            "format" : "uuid",
+          "messageType" : {
             "type" : "string"
           },
           "sender" : {
@@ -2533,6 +2535,9 @@
           "priceChanged" : {
             "type" : "boolean"
           },
+          "publicCode" : {
+            "type" : "string"
+          },
           "publishedAt" : {
             "format" : "date-time",
             "type" : "string"
@@ -2544,8 +2549,8 @@
             "type" : "number"
           },
           "quoteId" : {
-            "format" : "uuid",
-            "type" : "string"
+            "format" : "int64",
+            "type" : "integer"
           },
           "side" : {
             "type" : "string"
@@ -2572,10 +2577,6 @@
           "orderId" : {
             "format" : "int64",
             "type" : "integer"
-          },
-          "publicId" : {
-            "format" : "uuid",
-            "type" : "string"
           },
           "reason" : {
             "type" : "string"
@@ -2640,8 +2641,7 @@
           "orderedQuantity" : {
             "type" : "number"
           },
-          "publicId" : {
-            "format" : "uuid",
+          "publicCode" : {
             "type" : "string"
           },
           "sellerFeeAmount" : {
@@ -2678,8 +2678,7 @@
             "format" : "int64",
             "type" : "integer"
           },
-          "publicId" : {
-            "format" : "uuid",
+          "publicCode" : {
             "type" : "string"
           },
           "sellerUsername" : {
@@ -3105,15 +3104,15 @@
           "currency_code" : {
             "type" : "string"
           },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "is_active" : {
             "type" : "boolean"
           },
           "is_default" : {
             "type" : "boolean"
-          },
-          "public_id" : {
-            "format" : "uuid",
-            "type" : "string"
           },
           "requisites" : {
             "additionalProperties" : { },
@@ -3151,9 +3150,9 @@
             "format" : "date-time",
             "type" : "string"
           },
-          "publicId" : {
-            "format" : "uuid",
-            "type" : "string"
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "requestType" : {
             "type" : "string"
@@ -3187,14 +3186,14 @@
           "currency_code" : {
             "type" : "string"
           },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "is_active" : {
             "type" : "boolean"
           },
           "note" : {
-            "type" : "string"
-          },
-          "public_id" : {
-            "format" : "uuid",
             "type" : "string"
           },
           "title" : {
@@ -3226,9 +3225,12 @@
           "description" : {
             "type" : "string"
           },
-          "group_public_id" : {
-            "format" : "uuid",
+          "group_key" : {
             "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "metadata" : {
             "additionalProperties" : { },
@@ -3237,16 +3239,11 @@
           "platform_account_code" : {
             "type" : "string"
           },
-          "platform_account_public_id" : {
-            "format" : "uuid",
-            "type" : "string"
+          "platform_account_id" : {
+            "format" : "int64",
+            "type" : "integer"
           },
-          "public_id" : {
-            "format" : "uuid",
-            "type" : "string"
-          },
-          "ref_public_id" : {
-            "format" : "uuid",
+          "ref_code" : {
             "type" : "string"
           },
           "ref_type" : {
@@ -3415,14 +3412,14 @@
             "additionalProperties" : { },
             "type" : "object"
           },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "is_active" : {
             "type" : "boolean"
           },
           "note" : {
-            "type" : "string"
-          },
-          "public_id" : {
-            "format" : "uuid",
             "type" : "string"
           },
           "title" : {
@@ -3501,16 +3498,18 @@
           "external_reference" : {
             "type" : "string"
           },
-          "group_public_id" : {
-            "format" : "uuid",
+          "group_key" : {
             "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "metadata" : {
             "additionalProperties" : { },
             "type" : "object"
           },
-          "operation_public_id" : {
-            "format" : "uuid",
+          "operation_code" : {
             "type" : "string"
           },
           "operation_type" : {
@@ -3520,10 +3519,6 @@
           "operator_comment" : {
             "type" : "string"
           },
-          "public_id" : {
-            "format" : "uuid",
-            "type" : "string"
-          },
           "transaction_type" : {
             "enum" : [ "DEPOSIT_IN", "WITHDRAWAL_OUT", "MANUAL_IN", "MANUAL_OUT", "ADJUSTMENT", "TRANSFER_IN", "TRANSFER_OUT" ],
             "type" : "string"
@@ -3531,9 +3526,9 @@
           "treasury_account_code" : {
             "type" : "string"
           },
-          "treasury_account_public_id" : {
-            "format" : "uuid",
-            "type" : "string"
+          "treasury_account_id" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "treasury_account_title" : {
             "type" : "string"
@@ -3586,9 +3581,9 @@
           "title" : {
             "type" : "string"
           },
-          "treasury_account_public_id" : {
-            "format" : "uuid",
-            "type" : "string"
+          "treasury_account_id" : {
+            "format" : "int64",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -3736,12 +3731,10 @@
           "label" : {
             "type" : "string"
           },
-          "public_id" : {
-            "format" : "uuid",
+          "public_code" : {
             "type" : "string"
           },
-          "ref_public_id" : {
-            "format" : "uuid",
+          "ref_code" : {
             "type" : "string"
           },
           "ref_type" : {
@@ -3768,13 +3761,12 @@
           "description" : {
             "type" : "string"
           },
+          "ref_code" : {
+            "type" : "string"
+          },
           "ref_id" : {
             "format" : "int64",
             "type" : "integer"
-          },
-          "ref_public_id" : {
-            "format" : "uuid",
-            "type" : "string"
           },
           "source_type" : {
             "type" : "string"
@@ -3857,6 +3849,10 @@
           "external_reference" : {
             "type" : "string"
           },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "operator_comment" : {
             "type" : "string"
           },
@@ -3871,10 +3867,6 @@
           "planned_user_amount" : {
             "type" : "number"
           },
-          "public_id" : {
-            "format" : "uuid",
-            "type" : "string"
-          },
           "status" : {
             "enum" : [ "PLANNED", "COMPLETED", "CANCELLED" ],
             "type" : "string"
@@ -3882,9 +3874,9 @@
           "treasury_account_code" : {
             "type" : "string"
           },
-          "treasury_account_public_id" : {
-            "format" : "uuid",
-            "type" : "string"
+          "treasury_account_id" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "treasury_account_title" : {
             "type" : "string"
@@ -3934,16 +3926,15 @@
           "operator_comment" : {
             "type" : "string"
           },
-          "payout_profile_public_id" : {
-            "format" : "uuid",
-            "type" : "string"
+          "payout_profile_id" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "processing_at" : {
             "format" : "date-time",
             "type" : "string"
           },
-          "public_id" : {
-            "format" : "uuid",
+          "public_code" : {
             "type" : "string"
           },
           "rejected_at" : {
@@ -4053,15 +4044,14 @@
         "tags" : [ "deposit-request-admin-controller" ]
       }
     },
-    "/api/admin/deposit-requests/{publicId}" : {
+    "/api/admin/deposit-requests/{requestCode}" : {
       "get" : {
         "operationId" : "get_4",
         "parameters" : [ {
           "in" : "path",
-          "name" : "publicId",
+          "name" : "requestCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -4080,15 +4070,14 @@
         "tags" : [ "deposit-request-admin-controller" ]
       }
     },
-    "/api/admin/deposit-requests/{publicId}/confirm" : {
+    "/api/admin/deposit-requests/{requestCode}/confirm" : {
       "post" : {
         "operationId" : "confirm_2",
         "parameters" : [ {
           "in" : "path",
-          "name" : "publicId",
+          "name" : "requestCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -4116,15 +4105,14 @@
         "tags" : [ "deposit-request-admin-controller" ]
       }
     },
-    "/api/admin/deposit-requests/{publicId}/issue-details" : {
+    "/api/admin/deposit-requests/{requestCode}/issue-details" : {
       "post" : {
-        "operationId" : "issueDetails",
+        "operationId" : "issueDetails_1",
         "parameters" : [ {
           "in" : "path",
-          "name" : "publicId",
+          "name" : "requestCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -4153,15 +4141,14 @@
         "tags" : [ "deposit-request-admin-controller" ]
       }
     },
-    "/api/admin/deposit-requests/{publicId}/reject" : {
+    "/api/admin/deposit-requests/{requestCode}/reject" : {
       "post" : {
-        "operationId" : "reject_3",
+        "operationId" : "reject_2",
         "parameters" : [ {
           "in" : "path",
-          "name" : "publicId",
+          "name" : "requestCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -4415,16 +4402,16 @@
         "tags" : [ "backoffice-deposit-payment-route-controller" ]
       }
     },
-    "/api/backoffice/deposit-payment-routes/{publicId}" : {
+    "/api/backoffice/deposit-payment-routes/{id}" : {
       "patch" : {
         "operationId" : "update_2",
         "parameters" : [ {
           "in" : "path",
-          "name" : "publicId",
+          "name" : "id",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
-            "type" : "string"
+            "format" : "int64",
+            "type" : "integer"
           }
         } ],
         "requestBody" : {
@@ -4516,15 +4503,14 @@
         "tags" : [ "deposit-request-admin-controller" ]
       }
     },
-    "/api/backoffice/deposit-requests/{publicId}" : {
+    "/api/backoffice/deposit-requests/{requestCode}" : {
       "get" : {
         "operationId" : "get_3",
         "parameters" : [ {
           "in" : "path",
-          "name" : "publicId",
+          "name" : "requestCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -4543,15 +4529,14 @@
         "tags" : [ "deposit-request-admin-controller" ]
       }
     },
-    "/api/backoffice/deposit-requests/{publicId}/confirm" : {
+    "/api/backoffice/deposit-requests/{requestCode}/confirm" : {
       "post" : {
         "operationId" : "confirm_1",
         "parameters" : [ {
           "in" : "path",
-          "name" : "publicId",
+          "name" : "requestCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -4579,15 +4564,14 @@
         "tags" : [ "deposit-request-admin-controller" ]
       }
     },
-    "/api/backoffice/deposit-requests/{publicId}/issue-details" : {
+    "/api/backoffice/deposit-requests/{requestCode}/issue-details" : {
       "post" : {
-        "operationId" : "issueDetails_1",
+        "operationId" : "issueDetails",
         "parameters" : [ {
           "in" : "path",
-          "name" : "publicId",
+          "name" : "requestCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -4616,15 +4600,14 @@
         "tags" : [ "deposit-request-admin-controller" ]
       }
     },
-    "/api/backoffice/deposit-requests/{publicId}/reject" : {
+    "/api/backoffice/deposit-requests/{requestCode}/reject" : {
       "post" : {
-        "operationId" : "reject_2",
+        "operationId" : "reject_3",
         "parameters" : [ {
           "in" : "path",
-          "name" : "publicId",
+          "name" : "requestCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -4824,16 +4807,16 @@
         "tags" : [ "backoffice-treasury-controller" ]
       }
     },
-    "/api/backoffice/treasury/accounts/{publicId}" : {
+    "/api/backoffice/treasury/accounts/{id}" : {
       "patch" : {
         "operationId" : "updateAccount",
         "parameters" : [ {
           "in" : "path",
-          "name" : "publicId",
+          "name" : "id",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
-            "type" : "string"
+            "format" : "int64",
+            "type" : "integer"
           }
         } ],
         "requestBody" : {
@@ -4884,11 +4867,11 @@
         "operationId" : "listTransactions",
         "parameters" : [ {
           "in" : "query",
-          "name" : "account_public_id",
+          "name" : "account_id",
           "required" : false,
           "schema" : {
-            "format" : "uuid",
-            "type" : "string"
+            "format" : "int64",
+            "type" : "integer"
           }
         }, {
           "description" : "Zero-based page index (0..N)",
@@ -5058,15 +5041,14 @@
         "tags" : [ "backoffice-withdrawal-request-controller" ]
       }
     },
-    "/api/backoffice/withdrawal-requests/{publicId}" : {
+    "/api/backoffice/withdrawal-requests/{requestCode}" : {
       "get" : {
         "operationId" : "get_2",
         "parameters" : [ {
           "in" : "path",
-          "name" : "publicId",
+          "name" : "requestCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -5085,15 +5067,14 @@
         "tags" : [ "backoffice-withdrawal-request-controller" ]
       }
     },
-    "/api/backoffice/withdrawal-requests/{publicId}/confirm" : {
+    "/api/backoffice/withdrawal-requests/{requestCode}/confirm" : {
       "post" : {
         "operationId" : "confirm",
         "parameters" : [ {
           "in" : "path",
-          "name" : "publicId",
+          "name" : "requestCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -5121,15 +5102,14 @@
         "tags" : [ "backoffice-withdrawal-request-controller" ]
       }
     },
-    "/api/backoffice/withdrawal-requests/{publicId}/payout-plan" : {
+    "/api/backoffice/withdrawal-requests/{requestCode}/payout-plan" : {
       "post" : {
         "operationId" : "planPayout",
         "parameters" : [ {
           "in" : "path",
-          "name" : "publicId",
+          "name" : "requestCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -5158,15 +5138,14 @@
         "tags" : [ "backoffice-withdrawal-request-controller" ]
       }
     },
-    "/api/backoffice/withdrawal-requests/{publicId}/reject" : {
+    "/api/backoffice/withdrawal-requests/{requestCode}/reject" : {
       "post" : {
         "operationId" : "reject_1",
         "parameters" : [ {
           "in" : "path",
-          "name" : "publicId",
+          "name" : "requestCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -5195,15 +5174,14 @@
         "tags" : [ "backoffice-withdrawal-request-controller" ]
       }
     },
-    "/api/backoffice/withdrawal-requests/{publicId}/take" : {
+    "/api/backoffice/withdrawal-requests/{requestCode}/take" : {
       "post" : {
         "operationId" : "take",
         "parameters" : [ {
           "in" : "path",
-          "name" : "publicId",
+          "name" : "requestCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -5419,15 +5397,14 @@
         "tags" : [ "deposit-request-controller" ]
       }
     },
-    "/api/deposit-requests/{publicId}" : {
+    "/api/deposit-requests/{requestCode}" : {
       "get" : {
         "operationId" : "get_1",
         "parameters" : [ {
           "in" : "path",
-          "name" : "publicId",
+          "name" : "requestCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -5446,15 +5423,14 @@
         "tags" : [ "deposit-request-controller" ]
       }
     },
-    "/api/deposit-requests/{publicId}/cancel" : {
+    "/api/deposit-requests/{requestCode}/cancel" : {
       "post" : {
         "operationId" : "cancel_2",
         "parameters" : [ {
           "in" : "path",
-          "name" : "publicId",
+          "name" : "requestCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -5473,15 +5449,14 @@
         "tags" : [ "deposit-request-controller" ]
       }
     },
-    "/api/deposit-requests/{publicId}/mark-paid" : {
+    "/api/deposit-requests/{requestCode}/mark-paid" : {
       "post" : {
         "operationId" : "markPaid",
         "parameters" : [ {
           "in" : "path",
-          "name" : "publicId",
+          "name" : "requestCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -5747,17 +5722,16 @@
         "tags" : [ "market-offer-controller" ]
       }
     },
-    "/api/market/offers/{offerId}" : {
+    "/api/market/offers/{offerCode}" : {
       "get" : {
         "description" : "`intent` and `viewerCurrencyCode` are runtime-required and affect both trade direction and display price.",
         "operationId" : "getOffer",
         "parameters" : [ {
           "in" : "path",
-          "name" : "offerId",
+          "name" : "offerCode",
           "required" : true,
           "schema" : {
-            "format" : "int64",
-            "type" : "integer"
+            "type" : "string"
           }
         }, {
           "description" : "Requested market intent.",
@@ -5794,16 +5768,15 @@
         "tags" : [ "market-offer-controller" ]
       }
     },
-    "/api/market/offers/{offerId}/quote" : {
+    "/api/market/offers/{offerCode}/quote" : {
       "post" : {
         "operationId" : "createQuote",
         "parameters" : [ {
           "in" : "path",
-          "name" : "offerId",
+          "name" : "offerCode",
           "required" : true,
           "schema" : {
-            "format" : "int64",
-            "type" : "integer"
+            "type" : "string"
           }
         } ],
         "requestBody" : {
@@ -5985,7 +5958,7 @@
           "200" : {
             "content" : {
               "text/event-stream" : {
-                "example" : "event: stream.connected\ndata: {\"connectionId\":\"2cb4c52f-c5ee-4033-b9d4-f2bcd0f8d53c\",\"connectedAt\":\"2026-04-23T10:15:30Z\"}\n\nevent: notifications.unread_count\ndata: {\"count\":5}\n\nevent: notification.created\ndata: {\"publicId\":\"311f9519-a43a-4305-9d26-bd0941961ec7\",\"type\":\"order_created\",\"title\":\"Order created\",\"body\":\"A new order has been created.\",\"payload\":{\"orderPublicId\":\"55c1327d-749e-4d9f-9f95-c56dcafec1d9\"},\"isRead\":false,\"createdAt\":\"2026-04-23T10:16:00Z\",\"readAt\":null}\n",
+                "example" : "event: stream.connected\ndata: {\"connectionId\":\"2cb4c52f-c5ee-4033-b9d4-f2bcd0f8d53c\",\"connectedAt\":\"2026-04-23T10:15:30Z\"}\n\nevent: notifications.unread_count\ndata: {\"count\":5}\n\nevent: notification.created\ndata: {\"id\":123,\"type\":\"order_created\",\"title\":\"Order created\",\"body\":\"A new order has been created.\",\"payload\":{\"orderCode\":\"PM-7K4Q9D\"},\"isRead\":false,\"createdAt\":\"2026-04-23T10:16:00Z\",\"readAt\":null}\n",
                 "schema" : {
                   "type" : "string"
                 }
@@ -6016,16 +5989,16 @@
         "tags" : [ "notification-controller" ]
       }
     },
-    "/api/notifications/{publicId}/read" : {
+    "/api/notifications/{id}/read" : {
       "post" : {
         "operationId" : "markRead",
         "parameters" : [ {
           "in" : "path",
-          "name" : "publicId",
+          "name" : "id",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
-            "type" : "string"
+            "format" : "int64",
+            "type" : "integer"
           }
         } ],
         "responses" : {
@@ -6071,16 +6044,15 @@
         "tags" : [ "offer-controller" ]
       }
     },
-    "/api/offers/{offerId}" : {
+    "/api/offers/{offerCode}" : {
       "get" : {
         "operationId" : "getMyOffer",
         "parameters" : [ {
           "in" : "path",
-          "name" : "offerId",
+          "name" : "offerCode",
           "required" : true,
           "schema" : {
-            "format" : "int64",
-            "type" : "integer"
+            "type" : "string"
           }
         } ],
         "responses" : {
@@ -6101,11 +6073,10 @@
         "operationId" : "update_1",
         "parameters" : [ {
           "in" : "path",
-          "name" : "offerId",
+          "name" : "offerCode",
           "required" : true,
           "schema" : {
-            "format" : "int64",
-            "type" : "integer"
+            "type" : "string"
           }
         } ],
         "requestBody" : {
@@ -6141,16 +6112,16 @@
           "name" : "conversationId",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
-            "type" : "string"
+            "format" : "int64",
+            "type" : "integer"
           }
         }, {
           "in" : "query",
           "name" : "before",
           "required" : false,
           "schema" : {
-            "format" : "uuid",
-            "type" : "string"
+            "format" : "int64",
+            "type" : "integer"
           }
         }, {
           "in" : "query",
@@ -6182,8 +6153,8 @@
           "name" : "conversationId",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
-            "type" : "string"
+            "format" : "int64",
+            "type" : "integer"
           }
         } ],
         "requestBody" : {
@@ -6210,15 +6181,14 @@
         "tags" : [ "order-conversation-controller" ]
       }
     },
-    "/api/order-disputes/{disputeId}/resolve-amend-quantity-and-complete" : {
+    "/api/order-disputes/{disputeCode}/resolve-amend-quantity-and-complete" : {
       "post" : {
         "operationId" : "resolveAmendQuantityAndComplete",
         "parameters" : [ {
           "in" : "path",
-          "name" : "disputeId",
+          "name" : "disputeCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -6247,15 +6217,14 @@
         "tags" : [ "order-dispute-controller" ]
       }
     },
-    "/api/order-disputes/{disputeId}/resolve-cancel" : {
+    "/api/order-disputes/{disputeCode}/resolve-cancel" : {
       "post" : {
         "operationId" : "resolveCancel",
         "parameters" : [ {
           "in" : "path",
-          "name" : "disputeId",
+          "name" : "disputeCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -6283,15 +6252,14 @@
         "tags" : [ "order-dispute-controller" ]
       }
     },
-    "/api/order-disputes/{disputeId}/resolve-complete" : {
+    "/api/order-disputes/{disputeCode}/resolve-complete" : {
       "post" : {
         "operationId" : "resolveComplete",
         "parameters" : [ {
           "in" : "path",
-          "name" : "disputeId",
+          "name" : "disputeCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -6319,15 +6287,14 @@
         "tags" : [ "order-dispute-controller" ]
       }
     },
-    "/api/order-disputes/{disputeId}/take" : {
+    "/api/order-disputes/{disputeCode}/take" : {
       "post" : {
         "operationId" : "takeDispute",
         "parameters" : [ {
           "in" : "path",
-          "name" : "disputeId",
+          "name" : "disputeCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -6354,8 +6321,8 @@
           "name" : "quoteId",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
-            "type" : "string"
+            "format" : "int64",
+            "type" : "integer"
           }
         } ],
         "responses" : {
@@ -6381,8 +6348,8 @@
           "name" : "requestId",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
-            "type" : "string"
+            "format" : "int64",
+            "type" : "integer"
           }
         } ],
         "responses" : {
@@ -6408,8 +6375,8 @@
           "name" : "requestId",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
-            "type" : "string"
+            "format" : "int64",
+            "type" : "integer"
           }
         } ],
         "responses" : {
@@ -6455,15 +6422,14 @@
         "tags" : [ "order-controller" ]
       }
     },
-    "/api/orders/{orderId}" : {
+    "/api/orders/{orderCode}" : {
       "get" : {
         "operationId" : "getOrderDetails",
         "parameters" : [ {
           "in" : "path",
-          "name" : "orderId",
+          "name" : "orderCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -6482,15 +6448,14 @@
         "tags" : [ "order-read-controller" ]
       }
     },
-    "/api/orders/{orderId}/cancel" : {
+    "/api/orders/{orderCode}/cancel" : {
       "post" : {
         "operationId" : "cancel_1",
         "parameters" : [ {
           "in" : "path",
-          "name" : "orderId",
+          "name" : "orderCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -6509,15 +6474,14 @@
         "tags" : [ "order-controller" ]
       }
     },
-    "/api/orders/{orderId}/confirm-ready" : {
+    "/api/orders/{orderCode}/confirm-ready" : {
       "post" : {
         "operationId" : "confirmReady",
         "parameters" : [ {
           "in" : "path",
-          "name" : "orderId",
+          "name" : "orderCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -6536,15 +6500,14 @@
         "tags" : [ "order-controller" ]
       }
     },
-    "/api/orders/{orderId}/confirm-received" : {
+    "/api/orders/{orderCode}/confirm-received" : {
       "post" : {
         "operationId" : "confirmReceived",
         "parameters" : [ {
           "in" : "path",
-          "name" : "orderId",
+          "name" : "orderCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -6563,15 +6526,14 @@
         "tags" : [ "order-controller" ]
       }
     },
-    "/api/orders/{orderId}/conversations" : {
+    "/api/orders/{orderCode}/conversations" : {
       "get" : {
         "operationId" : "getOrderConversations",
         "parameters" : [ {
           "in" : "path",
-          "name" : "orderId",
+          "name" : "orderCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -6590,15 +6552,14 @@
         "tags" : [ "order-conversation-controller" ]
       }
     },
-    "/api/orders/{orderId}/dispute" : {
+    "/api/orders/{orderCode}/dispute" : {
       "get" : {
         "operationId" : "getOrderDispute",
         "parameters" : [ {
           "in" : "path",
-          "name" : "orderId",
+          "name" : "orderCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -6617,15 +6578,14 @@
         "tags" : [ "order-dispute-controller" ]
       }
     },
-    "/api/orders/{orderId}/disputes" : {
+    "/api/orders/{orderCode}/disputes" : {
       "post" : {
         "operationId" : "openDispute",
         "parameters" : [ {
           "in" : "path",
-          "name" : "orderId",
+          "name" : "orderCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -6654,15 +6614,14 @@
         "tags" : [ "order-dispute-controller" ]
       }
     },
-    "/api/orders/{orderId}/events" : {
+    "/api/orders/{orderCode}/events" : {
       "get" : {
         "operationId" : "getOrderEvents",
         "parameters" : [ {
           "in" : "path",
-          "name" : "orderId",
+          "name" : "orderCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -6681,15 +6640,14 @@
         "tags" : [ "order-event-read-controller" ]
       }
     },
-    "/api/orders/{orderId}/mark-delivered" : {
+    "/api/orders/{orderCode}/mark-delivered" : {
       "post" : {
         "operationId" : "markDelivered",
         "parameters" : [ {
           "in" : "path",
-          "name" : "orderId",
+          "name" : "orderCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -6708,15 +6666,14 @@
         "tags" : [ "order-controller" ]
       }
     },
-    "/api/orders/{orderId}/mark-partially-delivered" : {
+    "/api/orders/{orderCode}/mark-partially-delivered" : {
       "post" : {
         "operationId" : "markPartiallyDelivered",
         "parameters" : [ {
           "in" : "path",
-          "name" : "orderId",
+          "name" : "orderCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -6745,15 +6702,14 @@
         "tags" : [ "order-controller" ]
       }
     },
-    "/api/orders/{orderId}/request-amend-quantity" : {
+    "/api/orders/{orderCode}/request-amend-quantity" : {
       "post" : {
         "operationId" : "requestAmendQuantity",
         "parameters" : [ {
           "in" : "path",
-          "name" : "orderId",
+          "name" : "orderCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -6781,15 +6737,14 @@
         "tags" : [ "order-controller" ]
       }
     },
-    "/api/orders/{orderId}/request-cancel" : {
+    "/api/orders/{orderCode}/request-cancel" : {
       "post" : {
         "operationId" : "requestCancel",
         "parameters" : [ {
           "in" : "path",
-          "name" : "orderId",
+          "name" : "orderCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -6855,16 +6810,16 @@
         "tags" : [ "payout-profile-controller" ]
       }
     },
-    "/api/payout-profiles/{publicId}" : {
+    "/api/payout-profiles/{id}" : {
       "delete" : {
         "operationId" : "delete",
         "parameters" : [ {
           "in" : "path",
-          "name" : "publicId",
+          "name" : "id",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
-            "type" : "string"
+            "format" : "int64",
+            "type" : "integer"
           }
         } ],
         "responses" : {
@@ -6878,11 +6833,11 @@
         "operationId" : "update",
         "parameters" : [ {
           "in" : "path",
-          "name" : "publicId",
+          "name" : "id",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
-            "type" : "string"
+            "format" : "int64",
+            "type" : "integer"
           }
         } ],
         "requestBody" : {
@@ -6910,16 +6865,16 @@
         "tags" : [ "payout-profile-controller" ]
       }
     },
-    "/api/payout-profiles/{publicId}/make-default" : {
+    "/api/payout-profiles/{id}/make-default" : {
       "post" : {
         "operationId" : "makeDefault",
         "parameters" : [ {
           "in" : "path",
-          "name" : "publicId",
+          "name" : "id",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
-            "type" : "string"
+            "format" : "int64",
+            "type" : "integer"
           }
         } ],
         "responses" : {
@@ -7331,15 +7286,14 @@
         "tags" : [ "withdrawal-request-controller" ]
       }
     },
-    "/api/withdrawal-requests/{publicId}" : {
+    "/api/withdrawal-requests/{requestCode}" : {
       "get" : {
         "operationId" : "get",
         "parameters" : [ {
           "in" : "path",
-          "name" : "publicId",
+          "name" : "requestCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],
@@ -7358,15 +7312,14 @@
         "tags" : [ "withdrawal-request-controller" ]
       }
     },
-    "/api/withdrawal-requests/{publicId}/cancel" : {
+    "/api/withdrawal-requests/{requestCode}/cancel" : {
       "post" : {
         "operationId" : "cancel",
         "parameters" : [ {
           "in" : "path",
-          "name" : "publicId",
+          "name" : "requestCode",
           "required" : true,
           "schema" : {
-            "format" : "uuid",
             "type" : "string"
           }
         } ],

@@ -4,22 +4,21 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Map;
-import java.util.UUID;
 import ru.maltsev.primemarketbackend.money.domain.MoneyOperationType;
 import ru.maltsev.primemarketbackend.treasury.domain.TreasuryTransaction;
 import ru.maltsev.primemarketbackend.treasury.domain.TreasuryTransactionType;
 
 public record TreasuryTransactionResponse(
-    @JsonProperty("public_id") UUID publicId,
-    @JsonProperty("group_public_id") UUID groupPublicId,
-    @JsonProperty("treasury_account_public_id") UUID treasuryAccountPublicId,
+    Long id,
+    @JsonProperty("group_key") String groupKey,
+    @JsonProperty("treasury_account_id") Long treasuryAccountId,
     @JsonProperty("treasury_account_code") String treasuryAccountCode,
     @JsonProperty("treasury_account_title") String treasuryAccountTitle,
     @JsonProperty("currency_code") String currencyCode,
     BigDecimal amount,
     @JsonProperty("transaction_type") TreasuryTransactionType transactionType,
     @JsonProperty("operation_type") MoneyOperationType operationType,
-    @JsonProperty("operation_public_id") UUID operationPublicId,
+    @JsonProperty("operation_code") String operationCode,
     @JsonProperty("external_reference") String externalReference,
     String description,
     @JsonProperty("operator_comment") String operatorComment,
@@ -29,16 +28,16 @@ public record TreasuryTransactionResponse(
 ) {
     public static TreasuryTransactionResponse from(TreasuryTransaction transaction) {
         return new TreasuryTransactionResponse(
-            transaction.getPublicId(),
-            transaction.getGroupPublicId(),
-            transaction.getTreasuryAccount().getPublicId(),
+            transaction.getId(),
+            transaction.getGroupKey(),
+            transaction.getTreasuryAccount().getId(),
             transaction.getTreasuryAccount().getCode(),
             transaction.getTreasuryAccount().getTitle(),
             transaction.getTreasuryAccount().getCurrencyCode(),
             transaction.getAmount(),
             transaction.getTransactionType(),
             transaction.getOperationType(),
-            transaction.getOperationPublicId(),
+            transaction.getOperationCode(),
             transaction.getExternalReference(),
             transaction.getDescription(),
             transaction.getOperatorComment(),

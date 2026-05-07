@@ -1,7 +1,6 @@
 package ru.maltsev.primemarketbackend.order.repository;
 
 import java.util.Optional;
-import java.util.UUID;
 import java.time.Instant;
 import java.util.List;
 import jakarta.persistence.LockModeType;
@@ -12,11 +11,11 @@ import org.springframework.data.repository.query.Param;
 import ru.maltsev.primemarketbackend.order.domain.Order;
 
 public interface OrderRepository extends JpaRepository<Order, Long> {
-    Optional<Order> findByPublicId(UUID publicId);
+    Optional<Order> findByPublicCode(String publicCode);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select o from Order o where o.publicId = :publicId")
-    Optional<Order> findByPublicIdForUpdate(@Param("publicId") UUID publicId);
+    @Query("select o from Order o where o.publicCode = :publicCode")
+    Optional<Order> findByPublicCodeForUpdate(@Param("publicCode") String publicCode);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select o from Order o where o.id = :orderId")

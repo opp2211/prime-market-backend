@@ -7,12 +7,10 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -30,9 +28,6 @@ public class MoneyOperationEvent {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "public_id", nullable = false, updatable = false)
-    private UUID publicId;
-
     @Enumerated(EnumType.STRING)
     @Column(name = "operation_type", nullable = false, length = 64)
     private MoneyOperationType operationType;
@@ -40,8 +35,8 @@ public class MoneyOperationEvent {
     @Column(name = "operation_id", nullable = false)
     private Long operationId;
 
-    @Column(name = "operation_public_id", nullable = false)
-    private UUID operationPublicId;
+    @Column(name = "operation_code", nullable = false, length = 16)
+    private String operationCode;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "event_type", nullable = false, length = 96)
@@ -77,7 +72,7 @@ public class MoneyOperationEvent {
     public MoneyOperationEvent(
         MoneyOperationType operationType,
         Long operationId,
-        UUID operationPublicId,
+        String operationCode,
         MoneyOperationEventType eventType,
         String statusBefore,
         String statusAfter,
@@ -89,7 +84,7 @@ public class MoneyOperationEvent {
     ) {
         this.operationType = operationType;
         this.operationId = operationId;
-        this.operationPublicId = operationPublicId;
+        this.operationCode = operationCode;
         this.eventType = eventType;
         this.statusBefore = statusBefore;
         this.statusAfter = statusAfter;
@@ -98,12 +93,5 @@ public class MoneyOperationEvent {
         this.publicNote = publicNote;
         this.operatorNote = operatorNote;
         this.payload = payload == null ? new LinkedHashMap<>() : new LinkedHashMap<>(payload);
-    }
-
-    @PrePersist
-    private void onCreate() {
-        if (publicId == null) {
-            publicId = UUID.randomUUID();
-        }
     }
 }

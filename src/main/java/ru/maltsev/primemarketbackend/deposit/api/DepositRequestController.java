@@ -5,7 +5,6 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
@@ -88,42 +87,42 @@ public class DepositRequestController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/{publicId}")
+    @GetMapping("/{requestCode}")
     public ResponseEntity<DepositRequestResponse> get(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID publicId
+        @PathVariable String requestCode
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        DepositRequest depositRequest = depositRequestService.getForUser(publicId, principal.getUser().getId());
+        DepositRequest depositRequest = depositRequestService.getForUser(requestCode, principal.getUser().getId());
         return ResponseEntity.ok(DepositRequestResponse.from(depositRequest, paymentInstructionFor(depositRequest)));
     }
 
-    @PostMapping("/{publicId}/mark-paid")
+    @PostMapping("/{requestCode}/mark-paid")
     public ResponseEntity<DepositRequestResponse> markPaid(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID publicId
+        @PathVariable String requestCode
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        DepositRequest depositRequest = depositRequestService.markPaid(publicId, principal.getUser().getId());
+        DepositRequest depositRequest = depositRequestService.markPaid(requestCode, principal.getUser().getId());
         return ResponseEntity.ok(DepositRequestResponse.from(depositRequest, paymentInstructionFor(depositRequest)));
     }
 
-    @PostMapping("/{publicId}/cancel")
+    @PostMapping("/{requestCode}/cancel")
     public ResponseEntity<DepositRequestResponse> cancel(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID publicId
+        @PathVariable String requestCode
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        DepositRequest depositRequest = depositRequestService.cancel(publicId, principal.getUser().getId());
+        DepositRequest depositRequest = depositRequestService.cancel(requestCode, principal.getUser().getId());
         return ResponseEntity.ok(DepositRequestResponse.from(depositRequest, paymentInstructionFor(depositRequest)));
     }
 

@@ -8,7 +8,6 @@ import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -59,15 +58,15 @@ public class OrderReadQueryRepository {
         Long userId,
         String status,
         String role,
-        UUID publicOrderId
+        String orderCode
     ) {
         List<Predicate> predicates = new ArrayList<>();
         predicates.add(buildRolePredicate(cb, root, userId, role));
         if (status != null) {
             predicates.add(cb.equal(root.get("status"), status));
         }
-        if (publicOrderId != null) {
-            predicates.add(cb.equal(root.get("publicId"), publicOrderId));
+        if (orderCode != null) {
+            predicates.add(cb.equal(root.get("publicCode"), orderCode));
         }
         return predicates;
     }

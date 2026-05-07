@@ -14,7 +14,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -54,7 +53,7 @@ public class UserAccountTxCriteriaRepository {
         query.select(cb.construct(
                 UserAccountTxReadRow.class,
                 tx.get("id"),
-                tx.get("publicId"),
+                tx.get("publicCode"),
                 tx.get("amount"),
                 acc.get("currencyCode"),
                 tx.get("txType"),
@@ -149,49 +148,9 @@ public class UserAccountTxCriteriaRepository {
         searchPredicates.add(likeText(cb, tx.get("txType"), likePattern));
         searchPredicates.add(likeText(cb, tx.get("refType"), likePattern));
         searchPredicates.add(likeText(cb, acc.get("currencyCode"), likePattern));
-        searchPredicates.add(likeAsText(cb, tx.get("publicId"), likePattern));
+        searchPredicates.add(likeText(cb, tx.get("publicCode"), likePattern));
 
-        UUID uuidQuery = parseUuid(normalizedQuery);
-        if (uuidQuery != null) {
-            searchPredicates.add(cb.equal(tx.get("publicId"), uuidQuery));
-            addPublicIdSubqueryPredicate(
-                    cb,
-                    criteriaQuery,
-                    tx,
-                    searchPredicates,
-                    DepositRequest.class,
-                    "DEPOSIT_REQUEST",
-                    uuidQuery
-            );
-            addPublicIdSubqueryPredicate(
-                    cb,
-                    criteriaQuery,
-                    tx,
-                    searchPredicates,
-                    WithdrawalRequest.class,
-                    "WITHDRAWAL_REQUEST",
-                    uuidQuery
-            );
-            addPublicIdSubqueryPredicate(
-                    cb,
-                    criteriaQuery,
-                    tx,
-                    searchPredicates,
-                    UserCurrencyConversion.class,
-                    "USER_CURRENCY_CONVERSION",
-                    uuidQuery
-            );
-            Subquery<Long> orderIds = criteriaQuery.subquery(Long.class);
-            Root<ru.maltsev.primemarketbackend.order.domain.Order> order =
-                    orderIds.from(ru.maltsev.primemarketbackend.order.domain.Order.class);
-            orderIds.select(order.get("id")).where(cb.equal(order.get("publicId"), uuidQuery));
-            searchPredicates.add(cb.and(
-                    cb.like(tx.get("refType"), "ORDER_%"),
-                    tx.get("refId").in(orderIds)
-            ));
-        }
-
-        addPublicIdTextSubqueryPredicate(
+        addPublicCodeTextSubqueryPredicate(
                 cb,
                 criteriaQuery,
                 tx,
@@ -200,7 +159,7 @@ public class UserAccountTxCriteriaRepository {
                 "DEPOSIT_REQUEST",
                 likePattern
         );
-        addPublicIdTextSubqueryPredicate(
+        addPublicCodeTextSubqueryPredicate(
                 cb,
                 criteriaQuery,
                 tx,
@@ -209,7 +168,7 @@ public class UserAccountTxCriteriaRepository {
                 "WITHDRAWAL_REQUEST",
                 likePattern
         );
-        addPublicIdTextSubqueryPredicate(
+        addPublicCodeTextSubqueryPredicate(
                 cb,
                 criteriaQuery,
                 tx,
@@ -258,7 +217,7 @@ public class UserAccountTxCriteriaRepository {
                 likeText(cb, order.get("categoryTitleSnapshot"), likePattern),
                 likeText(cb, order.get("titleSnapshot"), likePattern),
                 likeText(cb, order.get("descriptionSnapshot"), likePattern),
-                likeAsText(cb, order.get("publicId"), likePattern)
+                likeText(cb, order.get("publicCode"), likePattern)
         ));
         searchPredicates.add(cb.and(
                 cb.like(tx.get("refType"), "ORDER_%"),
@@ -268,25 +227,7 @@ public class UserAccountTxCriteriaRepository {
         return cb.or(searchPredicates.toArray(new Predicate[0]));
     }
 
-    private static <T> void addPublicIdSubqueryPredicate(
-            CriteriaBuilder cb,
-            CriteriaQuery<?> criteriaQuery,
-            Root<UserAccountTx> tx,
-            List<Predicate> searchPredicates,
-            Class<T> entityClass,
-            String refType,
-            UUID publicId
-    ) {
-        Subquery<Long> ids = criteriaQuery.subquery(Long.class);
-        Root<T> root = ids.from(entityClass);
-        ids.select(root.get("id")).where(cb.equal(root.get("publicId"), publicId));
-        searchPredicates.add(cb.and(
-                cb.equal(tx.get("refType"), refType),
-                tx.get("refId").in(ids)
-        ));
-    }
-
-    private static <T> void addPublicIdTextSubqueryPredicate(
+    private static <T> void addPublicCodeTextSubqueryPredicate(
             CriteriaBuilder cb,
             CriteriaQuery<?> criteriaQuery,
             Root<UserAccountTx> tx,
@@ -297,7 +238,7 @@ public class UserAccountTxCriteriaRepository {
     ) {
         Subquery<Long> ids = criteriaQuery.subquery(Long.class);
         Root<T> root = ids.from(entityClass);
-        ids.select(root.get("id")).where(likeAsText(cb, root.get("publicId"), likePattern));
+        ids.select(root.get("id")).where(likeText(cb, root.get("publicCode"), likePattern));
         searchPredicates.add(cb.and(
                 cb.equal(tx.get("refType"), refType),
                 tx.get("refId").in(ids)
@@ -349,11 +290,4 @@ public class UserAccountTxCriteriaRepository {
                 .replace("_", "\\_") + "%";
     }
 
-    private static UUID parseUuid(String value) {
-        try {
-            return UUID.fromString(value);
-        } catch (RuntimeException ignored) {
-            return null;
-        }
-    }
 }

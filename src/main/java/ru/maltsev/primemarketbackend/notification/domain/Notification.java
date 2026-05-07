@@ -10,7 +10,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.Instant;
-import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -27,9 +26,6 @@ public class Notification {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(name = "public_id", nullable = false, updatable = false)
-    private UUID publicId;
 
     @Column(name = "user_id", nullable = false)
     private Long userId;
@@ -58,14 +54,12 @@ public class Notification {
     private Instant readAt;
 
     public Notification(
-        UUID publicId,
         Long userId,
         String type,
         String title,
         String body,
         JsonNode payload
     ) {
-        this.publicId = publicId;
         this.userId = userId;
         this.type = type;
         this.title = title;
@@ -84,9 +78,6 @@ public class Notification {
 
     @PrePersist
     private void onCreate() {
-        if (publicId == null) {
-            publicId = UUID.randomUUID();
-        }
         if (payload == null) {
             payload = JsonNodeFactory.instance.objectNode();
         }

@@ -5,7 +5,6 @@ import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import java.util.List;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
@@ -81,16 +80,16 @@ public class DepositRequestAdminController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/{publicId}")
+    @GetMapping("/{requestCode}")
     public ResponseEntity<AdminDepositRequestResponse> get(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID publicId
+        @PathVariable String requestCode
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        DepositRequest depositRequest = depositRequestService.getByPublicIdForAdmin(publicId);
+        DepositRequest depositRequest = depositRequestService.getByPublicCodeForAdmin(requestCode);
         return ResponseEntity.ok(AdminDepositRequestResponse.from(
             depositRequest,
             eventsFor(depositRequest),
@@ -99,10 +98,10 @@ public class DepositRequestAdminController {
         ));
     }
 
-    @PostMapping("/{publicId}/issue-details")
+    @PostMapping("/{requestCode}/issue-details")
     public ResponseEntity<AdminDepositRequestResponse> issueDetails(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID publicId,
+        @PathVariable String requestCode,
         @Valid @RequestBody IssueDetailsRequest request
     ) {
         if (principal == null) {
@@ -110,11 +109,11 @@ public class DepositRequestAdminController {
         }
 
         DepositRequest depositRequest = depositRequestService.issueDetails(
-            publicId,
+            requestCode,
             principal.getUser().getId(),
             request.paymentDetails(),
-            request.depositPaymentRoutePublicId(),
-            request.treasuryAccountPublicId(),
+            request.depositPaymentRouteId(),
+            request.treasuryAccountId(),
             request.treasuryAmount(),
             request.expiresAt(),
             request.operatorComment()
@@ -127,10 +126,10 @@ public class DepositRequestAdminController {
         ));
     }
 
-    @PostMapping("/{publicId}/confirm")
+    @PostMapping("/{requestCode}/confirm")
     public ResponseEntity<AdminDepositRequestResponse> confirm(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID publicId,
+        @PathVariable String requestCode,
         @RequestBody(required = false) ConfirmDepositRequest request
     ) {
         if (principal == null) {
@@ -138,11 +137,11 @@ public class DepositRequestAdminController {
         }
 
         DepositRequest depositRequest = depositRequestService.confirm(
-            publicId,
+            requestCode,
             principal.getUser().getId(),
             request == null ? null : request.confirmationReference(),
             request == null ? null : request.operatorComment(),
-            request == null ? null : request.treasuryAccountPublicId(),
+            request == null ? null : request.treasuryAccountId(),
             request == null ? null : request.treasuryAmount(),
             request == null ? null : request.treasuryExternalReference()
         );
@@ -154,10 +153,10 @@ public class DepositRequestAdminController {
         ));
     }
 
-    @PostMapping("/{publicId}/reject")
+    @PostMapping("/{requestCode}/reject")
     public ResponseEntity<AdminDepositRequestResponse> reject(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID publicId,
+        @PathVariable String requestCode,
         @Valid @RequestBody RejectDepositRequest request
     ) {
         if (principal == null) {
@@ -165,7 +164,7 @@ public class DepositRequestAdminController {
         }
 
         DepositRequest depositRequest = depositRequestService.reject(
-            publicId,
+            requestCode,
             principal.getUser().getId(),
             request.rejectReason(),
             request.operatorComment()
@@ -179,11 +178,11 @@ public class DepositRequestAdminController {
     }
 
     private List<MoneyOperationEvent> eventsFor(DepositRequest request) {
-        return moneyOperationEventService.list(MoneyOperationType.DEPOSIT_REQUEST, request.getPublicId());
+        return moneyOperationEventService.list(MoneyOperationType.DEPOSIT_REQUEST, request.getPublicCode());
     }
 
     private List<TreasuryTransaction> treasuryTransactionsFor(DepositRequest request) {
-        return treasuryService.listOperationTransactions(MoneyOperationType.DEPOSIT_REQUEST, request.getPublicId());
+        return treasuryService.listOperationTransactions(MoneyOperationType.DEPOSIT_REQUEST, request.getPublicCode());
     }
 
     private DepositPaymentInstruction paymentInstructionFor(DepositRequest request) {

@@ -7,12 +7,10 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Locale;
-import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -28,9 +26,6 @@ public class PlatformAccount {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(name = "public_id", nullable = false, updatable = false)
-    private UUID publicId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "account_code", nullable = false, length = 64)
@@ -101,13 +96,6 @@ public class PlatformAccount {
 
     public void decreaseReserved(BigDecimal amount) {
         reserved = AccountBalanceSupport.decreaseReserved(reserved, amount);
-    }
-
-    @PrePersist
-    private void onCreate() {
-        if (publicId == null) {
-            publicId = UUID.randomUUID();
-        }
     }
 
     private String normalizeRequired(String value) {

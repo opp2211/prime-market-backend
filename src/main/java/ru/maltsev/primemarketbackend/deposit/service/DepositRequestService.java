@@ -43,7 +43,6 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -151,8 +150,8 @@ public class DepositRequestService {
         return depositRequestRepository.save(savedRequest);
     }
 
-    public DepositRequest getForUser(UUID publicId, Long userId) {
-        return depositRequestRepository.findByPublicIdAndUserId(publicId, userId)
+    public DepositRequest getForUser(String requestCode, Long userId) {
+        return depositRequestRepository.findByPublicCodeAndUserId(requestCode, userId)
             .orElseThrow(() -> new ApiProblemException(
                 HttpStatus.NOT_FOUND,
                 "DEPOSIT_REQUEST_NOT_FOUND",
@@ -179,8 +178,8 @@ public class DepositRequestService {
     }
 
     @Transactional
-    public DepositRequest markPaid(UUID publicId, Long userId) {
-        DepositRequest request = depositRequestRepository.findByPublicIdAndUserIdForUpdate(publicId, userId)
+    public DepositRequest markPaid(String requestCode, Long userId) {
+        DepositRequest request = depositRequestRepository.findByPublicCodeAndUserIdForUpdate(requestCode, userId)
             .orElseThrow(() -> new ApiProblemException(
                 HttpStatus.NOT_FOUND,
                 "DEPOSIT_REQUEST_NOT_FOUND",
@@ -207,8 +206,8 @@ public class DepositRequestService {
     }
 
     @Transactional
-    public DepositRequest cancel(UUID publicId, Long userId) {
-        DepositRequest request = depositRequestRepository.findByPublicIdAndUserIdForUpdate(publicId, userId)
+    public DepositRequest cancel(String requestCode, Long userId) {
+        DepositRequest request = depositRequestRepository.findByPublicCodeAndUserIdForUpdate(requestCode, userId)
             .orElseThrow(() -> new ApiProblemException(
                 HttpStatus.NOT_FOUND,
                 "DEPOSIT_REQUEST_NOT_FOUND",
@@ -242,24 +241,24 @@ public class DepositRequestService {
 
     @Transactional
     public DepositRequest issueDetails(
-        UUID publicId,
+        String requestCode,
         Long actorUserId,
         String paymentDetails,
-        UUID routePublicId,
-        UUID treasuryAccountPublicId,
+        Long routeId,
+        Long treasuryAccountId,
         BigDecimal treasuryAmount,
         Instant expiresAt,
         String operatorComment
     ) {
-        DepositRequest request = getByPublicIdForUpdate(publicId);
+        DepositRequest request = getByPublicCodeForUpdate(requestCode);
         requireStatus(request, DepositRequestStatus.PENDING_DETAILS, "issue payment details");
         DepositRequestStatus statusBefore = request.getStatus();
 
         DepositPaymentRoute route = null;
         TreasuryAccount treasuryAccount = null;
         Map<String, Object> details;
-        if (routePublicId != null) {
-            route = depositPaymentRouteRepository.findByPublicId(routePublicId)
+        if (routeId != null) {
+            route = depositPaymentRouteRepository.findById(routeId)
                 .orElseThrow(() -> new ApiProblemException(
                     HttpStatus.NOT_FOUND,
                     "DEPOSIT_PAYMENT_ROUTE_NOT_FOUND",
@@ -289,8 +288,8 @@ public class DepositRequestService {
                 );
             }
             details = normalizePaymentDetailsForMap(paymentDetails);
-            if (treasuryAccountPublicId != null) {
-                treasuryAccount = treasuryAccountRepository.findByPublicId(treasuryAccountPublicId)
+            if (treasuryAccountId != null) {
+                treasuryAccount = treasuryAccountRepository.findById(treasuryAccountId)
                     .orElseThrow(() -> new ApiProblemException(
                         HttpStatus.NOT_FOUND,
                         "TREASURY_ACCOUNT_NOT_FOUND",
@@ -332,15 +331,15 @@ public class DepositRequestService {
 
     @Transactional
     public DepositRequest confirm(
-        UUID publicId,
+        String requestCode,
         Long actorUserId,
         String confirmationReference,
         String operatorComment,
-        UUID treasuryAccountPublicId,
+        Long treasuryAccountId,
         BigDecimal treasuryAmount,
         String treasuryExternalReference
     ) {
-        DepositRequest request = getByPublicIdForUpdate(publicId);
+        DepositRequest request = getByPublicCodeForUpdate(requestCode);
         if (request.getStatus() == DepositRequestStatus.CONFIRMED) {
             return request;
         }
@@ -358,23 +357,23 @@ public class DepositRequestService {
             request.getId()
         );
         userAccountTxRepository.save(tx);
-        UUID resolvedTreasuryAccountPublicId = treasuryAccountPublicId;
+        Long resolvedTreasuryAccountId = treasuryAccountId;
         BigDecimal resolvedTreasuryAmount = treasuryAmount;
         if (instruction != null) {
-            if (resolvedTreasuryAccountPublicId == null && instruction.getTreasuryAccount() != null) {
-                resolvedTreasuryAccountPublicId = instruction.getTreasuryAccount().getPublicId();
+            if (resolvedTreasuryAccountId == null && instruction.getTreasuryAccount() != null) {
+                resolvedTreasuryAccountId = instruction.getTreasuryAccount().getId();
             }
             if (resolvedTreasuryAmount == null) {
                 resolvedTreasuryAmount = instruction.getTreasuryAmount();
             }
         }
         TreasuryTransaction treasuryTransaction = treasuryService.recordDepositIn(
-            resolvedTreasuryAccountPublicId,
+            resolvedTreasuryAccountId,
             resolvedTreasuryAmount,
             request.getAmount(),
             request.getCurrencyCodeSnapshot(),
             request.getId(),
-            request.getPublicId(),
+            request.getPublicCode(),
             firstNonBlank(treasuryExternalReference, confirmationReference),
             operatorComment,
             actorUserId,
@@ -414,8 +413,8 @@ public class DepositRequestService {
     }
 
     @Transactional
-    public DepositRequest reject(UUID publicId, Long actorUserId, String rejectReason, String operatorComment) {
-        DepositRequest request = getByPublicIdForUpdate(publicId);
+    public DepositRequest reject(String requestCode, Long actorUserId, String rejectReason, String operatorComment) {
+        DepositRequest request = getByPublicCodeForUpdate(requestCode);
         if (request.getStatus() == DepositRequestStatus.REJECTED) {
             return request;
         }
@@ -437,12 +436,12 @@ public class DepositRequestService {
         return rejectedRequest;
     }
 
-    public DepositRequest getByPublicIdForAdmin(UUID publicId) {
-        return getByPublicId(publicId);
+    public DepositRequest getByPublicCodeForAdmin(String requestCode) {
+        return getByPublicCode(requestCode);
     }
 
-    private DepositRequest getByPublicId(UUID publicId) {
-        return depositRequestRepository.findByPublicId(publicId)
+    private DepositRequest getByPublicCode(String requestCode) {
+        return depositRequestRepository.findByPublicCode(requestCode)
             .orElseThrow(() -> new ApiProblemException(
                 HttpStatus.NOT_FOUND,
                 "DEPOSIT_REQUEST_NOT_FOUND",
@@ -450,8 +449,8 @@ public class DepositRequestService {
             ));
     }
 
-    private DepositRequest getByPublicIdForUpdate(UUID publicId) {
-        return depositRequestRepository.findByPublicIdForUpdate(publicId)
+    private DepositRequest getByPublicCodeForUpdate(String requestCode) {
+        return depositRequestRepository.findByPublicCodeForUpdate(requestCode)
             .orElseThrow(() -> new ApiProblemException(
                 HttpStatus.NOT_FOUND,
                 "DEPOSIT_REQUEST_NOT_FOUND",
@@ -560,7 +559,7 @@ public class DepositRequestService {
     private Map<String, Object> detailsIssuedPayload(DepositPaymentInstruction instruction) {
         Map<String, Object> payload = moneyOperationEventService.payload(
             "payment_details", instruction.getPaymentDetailsSnapshot(),
-            "payment_instruction_public_id", instruction.getPublicId()
+            "payment_instruction_id", instruction.getId()
         );
         appendInstructionPayload(payload, instruction);
         return payload;
@@ -570,8 +569,8 @@ public class DepositRequestService {
         if (transaction == null) {
             return;
         }
-        payload.put("treasury_transaction_public_id", transaction.getPublicId());
-        payload.put("treasury_account_public_id", transaction.getTreasuryAccount().getPublicId());
+        payload.put("treasury_transaction_id", transaction.getId());
+        payload.put("treasury_account_id", transaction.getTreasuryAccount().getId());
         payload.put("treasury_account_code", transaction.getTreasuryAccount().getCode());
         payload.put("treasury_amount", transaction.getAmount());
         payload.put("treasury_currency_code", transaction.getTreasuryAccount().getCurrencyCode());
@@ -581,12 +580,12 @@ public class DepositRequestService {
         if (instruction == null) {
             return;
         }
-        payload.put("payment_instruction_public_id", instruction.getPublicId());
+        payload.put("payment_instruction_id", instruction.getId());
         if (instruction.getDepositPaymentRoute() != null) {
-            payload.put("deposit_payment_route_public_id", instruction.getDepositPaymentRoute().getPublicId());
+            payload.put("deposit_payment_route_id", instruction.getDepositPaymentRoute().getId());
         }
         if (instruction.getTreasuryAccount() != null) {
-            payload.put("instruction_treasury_account_public_id", instruction.getTreasuryAccount().getPublicId());
+            payload.put("instruction_treasury_account_id", instruction.getTreasuryAccount().getId());
             payload.put("instruction_treasury_account_code", instruction.getTreasuryAccount().getCode());
         }
         payload.put("instruction_treasury_amount", instruction.getTreasuryAmount());
@@ -648,7 +647,7 @@ public class DepositRequestService {
         moneyOperationEventService.record(
             MoneyOperationType.DEPOSIT_REQUEST,
             request.getId(),
-            request.getPublicId(),
+            request.getPublicCode(),
             eventType,
             statusBefore == null ? null : statusBefore.name(),
             request.getStatus() == null ? null : request.getStatus().name(),

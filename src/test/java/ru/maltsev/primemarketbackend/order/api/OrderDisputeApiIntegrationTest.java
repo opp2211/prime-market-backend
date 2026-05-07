@@ -12,7 +12,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -110,21 +109,21 @@ class OrderDisputeApiIntegrationTest extends AbstractPostgresIntegrationTest {
         fundWallet(buyerOne, "RUB", "50000.0000");
 
         JsonNode firstOrder = createPendingSellOrder(sellerOne, buyerOne, "20", "Buyer dispute order");
-        confirmReady(sellerOne, firstOrder.path("publicId").asText());
+        confirmReady(sellerOne, firstOrder.path("publicCode").asText());
 
         JsonNode buyerDispute = openDispute(
             buyerOne,
-            firstOrder.path("publicId").asText(),
+            firstOrder.path("publicCode").asText(),
             "item_not_received",
             "Buyer did not receive the item"
         );
         assertThat(buyerDispute.path("status").asText()).isEqualTo("open");
         assertThat(buyerDispute.path("openedByRole").asText()).isEqualTo("buyer");
 
-        JsonNode fetchedBuyerDispute = getOrderDispute(buyerOne, firstOrder.path("publicId").asText());
-        assertThat(fetchedBuyerDispute.path("publicId").asText()).isEqualTo(buyerDispute.path("publicId").asText());
+        JsonNode fetchedBuyerDispute = getOrderDispute(buyerOne, firstOrder.path("publicCode").asText());
+        assertThat(fetchedBuyerDispute.path("publicCode").asText()).isEqualTo(buyerDispute.path("publicCode").asText());
 
-        mockMvc.perform(post("/api/orders/{orderId}/disputes", firstOrder.path("publicId").asText())
+        mockMvc.perform(post("/api/orders/{orderId}/disputes", firstOrder.path("publicCode").asText())
                 .with(auth(sellerOne))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -141,11 +140,11 @@ class OrderDisputeApiIntegrationTest extends AbstractPostgresIntegrationTest {
         fundWallet(buyerTwo, "RUB", "50000.0000");
 
         JsonNode secondOrder = createPendingSellOrder(sellerTwo, buyerTwo, "20", "Seller dispute order");
-        confirmReady(sellerTwo, secondOrder.path("publicId").asText());
+        confirmReady(sellerTwo, secondOrder.path("publicCode").asText());
 
         JsonNode sellerDispute = openDispute(
             sellerTwo,
-            secondOrder.path("publicId").asText(),
+            secondOrder.path("publicCode").asText(),
             "buyer_unresponsive",
             "Seller asked support to review the order"
         );
@@ -161,21 +160,21 @@ class OrderDisputeApiIntegrationTest extends AbstractPostgresIntegrationTest {
         fundWallet(buyer, "RUB", "50000.0000");
 
         JsonNode order = createPendingSellOrder(seller, buyer, "20", "Passive support access");
-        confirmReady(seller, order.path("publicId").asText());
-        openDispute(buyer, order.path("publicId").asText(), "item_not_received", "Need support review");
+        confirmReady(seller, order.path("publicCode").asText());
+        openDispute(buyer, order.path("publicCode").asText(), "item_not_received", "Need support review");
 
-        JsonNode details = getOrderDetails(support, order.path("publicId").asText());
+        JsonNode details = getOrderDetails(support, order.path("publicCode").asText());
         assertThat(details.path("dispute").path("exists").asBoolean()).isTrue();
         assertThat(details.path("dispute").path("status").asText()).isEqualTo("open");
         assertThat(details.path("dispute").path("availableActions").path("canTakeInWork").asBoolean()).isTrue();
 
-        JsonNode conversations = getOrderConversations(support, order.path("publicId").asText());
+        JsonNode conversations = getOrderConversations(support, order.path("publicCode").asText());
         assertThat(conversations.path("items")).hasSize(3);
-        assertThat(findConversationByType(conversations, "order_main").path("publicId").asText()).isNotBlank();
-        assertThat(findConversationByType(conversations, "order_support_buyer").path("publicId").asText()).isNotBlank();
-        assertThat(findConversationByType(conversations, "order_support_seller").path("publicId").asText()).isNotBlank();
+        assertThat(findConversationByType(conversations, "order_main").path("id").asText()).isNotBlank();
+        assertThat(findConversationByType(conversations, "order_support_buyer").path("id").asText()).isNotBlank();
+        assertThat(findConversationByType(conversations, "order_support_seller").path("id").asText()).isNotBlank();
 
-        JsonNode events = getOrderEvents(support, order.path("publicId").asText());
+        JsonNode events = getOrderEvents(support, order.path("publicCode").asText());
         assertThat(events.path("items"))
             .extracting(node -> node.path("eventType").asText())
             .contains("dispute_opened");
@@ -195,10 +194,10 @@ class OrderDisputeApiIntegrationTest extends AbstractPostgresIntegrationTest {
         fundWallet(buyer, "RUB", "50000.0000");
 
         JsonNode order = createPendingSellOrder(seller, buyer, "20", "Take dispute");
-        confirmReady(seller, order.path("publicId").asText());
-        JsonNode dispute = openDispute(buyer, order.path("publicId").asText(), "item_not_received", "Take in work");
+        confirmReady(seller, order.path("publicCode").asText());
+        JsonNode dispute = openDispute(buyer, order.path("publicCode").asText(), "item_not_received", "Take in work");
 
-        JsonNode taken = takeDispute(support, dispute.path("publicId").asText());
+        JsonNode taken = takeDispute(support, dispute.path("publicCode").asText());
         assertThat(taken.path("status").asText()).isEqualTo("in_review");
         assertThat(taken.path("assignedSupportUser").path("id").asLong()).isEqualTo(support.getId());
 
@@ -211,7 +210,7 @@ class OrderDisputeApiIntegrationTest extends AbstractPostgresIntegrationTest {
 
         JsonNode mainMessages = getConversationMessages(
             support,
-            loadConversationPublicId(order.path("id").asLong(), "order_main")
+            loadConversationId(order.path("id").asLong(), "order_main")
         );
         assertThat(mainMessages.path("items"))
             .extracting(node -> node.path("body").asText())
@@ -226,13 +225,13 @@ class OrderDisputeApiIntegrationTest extends AbstractPostgresIntegrationTest {
         fundWallet(buyer, "RUB", "50000.0000");
 
         JsonNode order = createPendingSellOrder(seller, buyer, "20", "Force cancel");
-        confirmReady(seller, order.path("publicId").asText());
-        JsonNode dispute = openDispute(buyer, order.path("publicId").asText(), "item_not_received", "Cancel this order");
+        confirmReady(seller, order.path("publicCode").asText());
+        JsonNode dispute = openDispute(buyer, order.path("publicCode").asText(), "item_not_received", "Cancel this order");
 
-        JsonNode resolved = resolveCancel(support, dispute.path("publicId").asText(), "Support canceled the order");
+        JsonNode resolved = resolveCancel(support, dispute.path("publicCode").asText(), "Support canceled the order");
         assertThat(resolved.path("status").asText()).isEqualTo("resolved");
         assertThat(resolved.path("resolutionType").asText()).isEqualTo("force_cancel");
-        assertThat(loadOrderStatus(order.path("publicId").asText())).isEqualTo("canceled");
+        assertThat(loadOrderStatus(order.path("publicCode").asText())).isEqualTo("canceled");
         assertThat(loadHoldStatus(order.path("id").asLong())).isEqualTo("released");
         assertThat(loadReservationStatus(order.path("id").asLong())).isEqualTo("released");
         assertThat(loadReservedAmount(buyer.getId(), "RUB")).isEqualByComparingTo("0.0000");
@@ -248,14 +247,14 @@ class OrderDisputeApiIntegrationTest extends AbstractPostgresIntegrationTest {
         fundWallet(buyer, "RUB", "50000.0000");
 
         JsonNode order = createPendingSellOrder(seller, buyer, "20", "Force complete");
-        confirmReady(seller, order.path("publicId").asText());
-        markDelivered(seller, order.path("publicId").asText());
-        JsonNode dispute = openDispute(buyer, order.path("publicId").asText(), "delivery_confirmed", "Support should complete");
+        confirmReady(seller, order.path("publicCode").asText());
+        markDelivered(seller, order.path("publicCode").asText());
+        JsonNode dispute = openDispute(buyer, order.path("publicCode").asText(), "delivery_confirmed", "Support should complete");
 
-        JsonNode resolved = resolveComplete(support, dispute.path("publicId").asText(), "Support completed the order");
+        JsonNode resolved = resolveComplete(support, dispute.path("publicCode").asText(), "Support completed the order");
         assertThat(resolved.path("status").asText()).isEqualTo("resolved");
         assertThat(resolved.path("resolutionType").asText()).isEqualTo("force_complete");
-        assertThat(loadOrderStatus(order.path("publicId").asText())).isEqualTo("completed");
+        assertThat(loadOrderStatus(order.path("publicCode").asText())).isEqualTo("completed");
         assertThat(loadLatestDispute(order.path("id").asLong()).status()).isEqualTo("resolved");
 
         long orderId = order.path("id").asLong();
@@ -280,26 +279,26 @@ class OrderDisputeApiIntegrationTest extends AbstractPostgresIntegrationTest {
         fundWallet(buyer, "RUB", "50000.0000");
 
         JsonNode order = createPendingSellOrder(seller, buyer, "100", "Force amend and complete");
-        confirmReady(seller, order.path("publicId").asText());
-        markPartiallyDelivered(seller, order.path("publicId").asText(), "65");
+        confirmReady(seller, order.path("publicCode").asText());
+        markPartiallyDelivered(seller, order.path("publicCode").asText(), "65");
         JsonNode dispute = openDispute(
             buyer,
-            order.path("publicId").asText(),
+            order.path("publicCode").asText(),
             "quantity_mismatch",
             "Support should set final quantity"
         );
 
         JsonNode resolved = resolveAmendQuantityAndComplete(
             support,
-            dispute.path("publicId").asText(),
+            dispute.path("publicCode").asText(),
             "65",
             "Support established final delivered quantity"
         );
         assertThat(resolved.path("status").asText()).isEqualTo("resolved");
         assertThat(resolved.path("resolutionType").asText())
             .isEqualTo("force_amend_quantity_and_complete");
-        assertThat(loadOrderStatus(order.path("publicId").asText())).isEqualTo("completed");
-        assertThat(loadOrderedQuantity(order.path("publicId").asText())).isEqualByComparingTo("65.00000000");
+        assertThat(loadOrderStatus(order.path("publicCode").asText())).isEqualTo("completed");
+        assertThat(loadOrderedQuantity(order.path("publicCode").asText())).isEqualByComparingTo("65.00000000");
         assertThat(loadHoldStatus(order.path("id").asLong())).isEqualTo("consumed");
         assertThat(loadHoldAmount(order.path("id").asLong())).isEqualByComparingTo("15476.1905");
         assertThat(loadReservedAmount(buyer.getId(), "RUB")).isEqualByComparingTo("0.0000");
@@ -333,25 +332,25 @@ class OrderDisputeApiIntegrationTest extends AbstractPostgresIntegrationTest {
         chatView = loadUserWithRoles(chatView.getEmail());
 
         JsonNode order = createPendingSellOrder(seller, buyer, "20", "Permission separation");
-        confirmReady(seller, order.path("publicId").asText());
-        openDispute(buyer, order.path("publicId").asText(), "item_not_received", "Permission checks");
+        confirmReady(seller, order.path("publicCode").asText());
+        openDispute(buyer, order.path("publicCode").asText(), "item_not_received", "Permission checks");
 
         mockMvc.perform(get("/api/backoffice/disputes").with(auth(loadUserWithRoles("user1@123.123"))))
             .andExpect(status().isForbidden());
         mockMvc.perform(get("/api/backoffice/disputes").with(auth(roleOnly)))
             .andExpect(status().isForbidden());
 
-        mockMvc.perform(get("/api/orders/{orderId}", order.path("publicId").asText()).with(auth(roleOnly)))
+        mockMvc.perform(get("/api/orders/{orderId}", order.path("publicCode").asText()).with(auth(roleOnly)))
             .andExpect(status().isNotFound());
-        mockMvc.perform(get("/api/orders/{orderId}", order.path("publicId").asText()).with(auth(viewAny)))
+        mockMvc.perform(get("/api/orders/{orderId}", order.path("publicCode").asText()).with(auth(viewAny)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.dispute.exists").value(false));
-        mockMvc.perform(get("/api/orders/{orderId}/conversations", order.path("publicId").asText()).with(auth(viewAny)))
+        mockMvc.perform(get("/api/orders/{orderId}/conversations", order.path("publicCode").asText()).with(auth(viewAny)))
             .andExpect(status().isNotFound());
 
-        mockMvc.perform(get("/api/orders/{orderId}", order.path("publicId").asText()).with(auth(chatView)))
+        mockMvc.perform(get("/api/orders/{orderId}", order.path("publicCode").asText()).with(auth(chatView)))
             .andExpect(status().isNotFound());
-        mockMvc.perform(get("/api/orders/{orderId}/conversations", order.path("publicId").asText()).with(auth(chatView)))
+        mockMvc.perform(get("/api/orders/{orderId}/conversations", order.path("publicCode").asText()).with(auth(chatView)))
             .andExpect(status().isOk());
 
         JsonNode backoffice = getBackofficeDisputes(loadUserWithRoles("sup1@123.123"));
@@ -464,7 +463,7 @@ class OrderDisputeApiIntegrationTest extends AbstractPostgresIntegrationTest {
         long listedOfferVersion,
         String listedUnitPriceAmount
     ) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/market/offers/{offerId}/quote", offerId)
+        MvcResult result = mockMvc.perform(post("/api/market/offers/{offerId}/quote", loadOfferPublicCode(offerId))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(createQuoteRequest(intent, viewerCurrencyCode, listedOfferVersion, listedUnitPriceAmount)))
             .andExpect(status().isOk())
@@ -482,24 +481,24 @@ class OrderDisputeApiIntegrationTest extends AbstractPostgresIntegrationTest {
         return readBody(result);
     }
 
-    private JsonNode confirmReady(User user, String orderPublicId) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/orders/{orderId}/confirm-ready", orderPublicId)
+    private JsonNode confirmReady(User user, String orderPublicCode) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/orders/{orderId}/confirm-ready", orderPublicCode)
                 .with(auth(user)))
             .andExpect(status().isOk())
             .andReturn();
         return readBody(result);
     }
 
-    private JsonNode markDelivered(User user, String orderPublicId) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/orders/{orderId}/mark-delivered", orderPublicId)
+    private JsonNode markDelivered(User user, String orderPublicCode) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/orders/{orderId}/mark-delivered", orderPublicCode)
                 .with(auth(user)))
             .andExpect(status().isOk())
             .andReturn();
         return readBody(result);
     }
 
-    private JsonNode markPartiallyDelivered(User user, String orderPublicId, String deliveredQuantity) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/orders/{orderId}/mark-partially-delivered", orderPublicId)
+    private JsonNode markPartiallyDelivered(User user, String orderPublicCode, String deliveredQuantity) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/orders/{orderId}/mark-partially-delivered", orderPublicCode)
                 .with(auth(user))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -514,11 +513,11 @@ class OrderDisputeApiIntegrationTest extends AbstractPostgresIntegrationTest {
 
     private JsonNode openDispute(
         User user,
-        String orderPublicId,
+        String orderPublicCode,
         String reasonCode,
         String description
     ) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/orders/{orderId}/disputes", orderPublicId)
+        MvcResult result = mockMvc.perform(post("/api/orders/{orderId}/disputes", orderPublicCode)
                 .with(auth(user))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -532,24 +531,24 @@ class OrderDisputeApiIntegrationTest extends AbstractPostgresIntegrationTest {
         return readBody(result);
     }
 
-    private JsonNode getOrderDispute(User user, String orderPublicId) throws Exception {
-        MvcResult result = mockMvc.perform(get("/api/orders/{orderId}/dispute", orderPublicId)
+    private JsonNode getOrderDispute(User user, String orderPublicCode) throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/orders/{orderId}/dispute", orderPublicCode)
                 .with(auth(user)))
             .andExpect(status().isOk())
             .andReturn();
         return readBody(result);
     }
 
-    private JsonNode takeDispute(User user, String disputePublicId) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/order-disputes/{disputeId}/take", disputePublicId)
+    private JsonNode takeDispute(User user, String disputePublicCode) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/order-disputes/{disputeId}/take", disputePublicCode)
                 .with(auth(user)))
             .andExpect(status().isOk())
             .andReturn();
         return readBody(result);
     }
 
-    private JsonNode resolveCancel(User user, String disputePublicId, String note) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/order-disputes/{disputeId}/resolve-cancel", disputePublicId)
+    private JsonNode resolveCancel(User user, String disputePublicCode, String note) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/order-disputes/{disputeId}/resolve-cancel", disputePublicCode)
                 .with(auth(user))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -562,8 +561,8 @@ class OrderDisputeApiIntegrationTest extends AbstractPostgresIntegrationTest {
         return readBody(result);
     }
 
-    private JsonNode resolveComplete(User user, String disputePublicId, String note) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/order-disputes/{disputeId}/resolve-complete", disputePublicId)
+    private JsonNode resolveComplete(User user, String disputePublicCode, String note) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/order-disputes/{disputeId}/resolve-complete", disputePublicCode)
                 .with(auth(user))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -578,12 +577,12 @@ class OrderDisputeApiIntegrationTest extends AbstractPostgresIntegrationTest {
 
     private JsonNode resolveAmendQuantityAndComplete(
         User user,
-        String disputePublicId,
+        String disputePublicCode,
         String quantity,
         String note
     ) throws Exception {
         MvcResult result = mockMvc.perform(
-                post("/api/order-disputes/{disputeId}/resolve-amend-quantity-and-complete", disputePublicId)
+                post("/api/order-disputes/{disputeId}/resolve-amend-quantity-and-complete", disputePublicCode)
                     .with(auth(user))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
@@ -597,32 +596,32 @@ class OrderDisputeApiIntegrationTest extends AbstractPostgresIntegrationTest {
         return readBody(result);
     }
 
-    private JsonNode getOrderDetails(User user, String orderPublicId) throws Exception {
-        MvcResult result = mockMvc.perform(get("/api/orders/{orderId}", orderPublicId)
+    private JsonNode getOrderDetails(User user, String orderPublicCode) throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/orders/{orderId}", orderPublicCode)
                 .with(auth(user)))
             .andExpect(status().isOk())
             .andReturn();
         return readBody(result);
     }
 
-    private JsonNode getOrderEvents(User user, String orderPublicId) throws Exception {
-        MvcResult result = mockMvc.perform(get("/api/orders/{orderId}/events", orderPublicId)
+    private JsonNode getOrderEvents(User user, String orderPublicCode) throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/orders/{orderId}/events", orderPublicCode)
                 .with(auth(user)))
             .andExpect(status().isOk())
             .andReturn();
         return readBody(result);
     }
 
-    private JsonNode getOrderConversations(User user, String orderPublicId) throws Exception {
-        MvcResult result = mockMvc.perform(get("/api/orders/{orderId}/conversations", orderPublicId)
+    private JsonNode getOrderConversations(User user, String orderPublicCode) throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/orders/{orderId}/conversations", orderPublicCode)
                 .with(auth(user)))
             .andExpect(status().isOk())
             .andReturn();
         return readBody(result);
     }
 
-    private JsonNode getConversationMessages(User user, String conversationPublicId) throws Exception {
-        MvcResult result = mockMvc.perform(get("/api/order-conversations/{conversationId}/messages", conversationPublicId)
+    private JsonNode getConversationMessages(User user, String conversationPublicCode) throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/order-conversations/{conversationId}/messages", conversationPublicCode)
                 .with(auth(user)))
             .andExpect(status().isOk())
             .andReturn();
@@ -654,7 +653,7 @@ class OrderDisputeApiIntegrationTest extends AbstractPostgresIntegrationTest {
     private StoredDispute loadLatestDispute(long orderId) {
         return jdbcTemplate.queryForObject(
             """
-                select public_id::text,
+                select public_code,
                        status,
                        assigned_support_user_id,
                        taken_at,
@@ -668,7 +667,7 @@ class OrderDisputeApiIntegrationTest extends AbstractPostgresIntegrationTest {
                 limit 1
                 """,
             (rs, rowNum) -> new StoredDispute(
-                UUID.fromString(rs.getString("public_id")),
+                rs.getString("public_code"),
                 rs.getString("status"),
                 rs.getObject("assigned_support_user_id", Long.class),
                 rs.getTimestamp("taken_at") == null ? null : rs.getTimestamp("taken_at").toInstant(),
@@ -714,33 +713,34 @@ class OrderDisputeApiIntegrationTest extends AbstractPostgresIntegrationTest {
         );
     }
 
-    private String loadConversationPublicId(long orderId, String conversationType) {
-        return jdbcTemplate.queryForObject(
+    private String loadConversationId(long orderId, String conversationType) {
+        Long id = jdbcTemplate.queryForObject(
             """
-                select public_id::text
+                select id
                 from order_conversations
                 where order_id = ?
                   and conversation_type = ?
                 """,
-            String.class,
+            Long.class,
             orderId,
             conversationType
         );
+        return id == null ? null : id.toString();
     }
 
-    private String loadOrderStatus(String orderPublicId) {
+    private String loadOrderStatus(String orderPublicCode) {
         return jdbcTemplate.queryForObject(
-            "select status from orders where public_id = ?",
+            "select status from orders where public_code = ?",
             String.class,
-            UUID.fromString(orderPublicId)
+            orderPublicCode
         );
     }
 
-    private BigDecimal loadOrderedQuantity(String orderPublicId) {
+    private BigDecimal loadOrderedQuantity(String orderPublicCode) {
         return jdbcTemplate.queryForObject(
-            "select ordered_quantity from orders where public_id = ?",
+            "select ordered_quantity from orders where public_code = ?",
             BigDecimal.class,
-            UUID.fromString(orderPublicId)
+            orderPublicCode
         );
     }
 
@@ -755,6 +755,14 @@ class OrderDisputeApiIntegrationTest extends AbstractPostgresIntegrationTest {
                 """,
             String.class,
             orderId
+        );
+    }
+
+    private String loadOfferPublicCode(long offerId) {
+        return jdbcTemplate.queryForObject(
+            "select public_code from offers where id = ?",
+            String.class,
+            offerId
         );
     }
 
@@ -949,7 +957,7 @@ class OrderDisputeApiIntegrationTest extends AbstractPostgresIntegrationTest {
     }
 
     private record StoredDispute(
-        UUID publicId,
+        String publicCode,
         String status,
         Long assignedSupportUserId,
         Instant takenAt,

@@ -6,11 +6,10 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import java.math.BigDecimal;
 import java.util.Map;
-import java.util.UUID;
 
 public record CreateDepositPaymentRouteRequest(
     @JsonProperty("deposit_method_id") @NotNull Long depositMethodId,
-    @JsonProperty("treasury_account_public_id") @NotNull UUID treasuryAccountPublicId,
+    @JsonProperty("treasury_account_id") @NotNull Long treasuryAccountId,
     @NotNull String title,
     @JsonProperty("payment_details") Map<String, Object> paymentDetails,
     @JsonProperty("min_amount") @Positive @Digits(integer = 9, fraction = 4) BigDecimal minAmount,

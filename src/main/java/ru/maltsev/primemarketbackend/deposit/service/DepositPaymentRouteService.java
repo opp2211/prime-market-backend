@@ -3,7 +3,6 @@ package ru.maltsev.primemarketbackend.deposit.service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -36,7 +35,7 @@ public class DepositPaymentRouteService {
     public DepositPaymentRoute createRoute(CreateDepositPaymentRouteRequest request) {
         DepositMethod method = depositMethodRepository.findById(request.depositMethodId())
             .orElseThrow(() -> notFound("DEPOSIT_METHOD_NOT_FOUND", "Deposit method not found"));
-        TreasuryAccount treasuryAccount = treasuryAccountRepository.findByPublicId(request.treasuryAccountPublicId())
+        TreasuryAccount treasuryAccount = treasuryAccountRepository.findById(request.treasuryAccountId())
             .orElseThrow(() -> notFound("TREASURY_ACCOUNT_NOT_FOUND", "Treasury account not found"));
         if (!treasuryAccount.isActive()) {
             throw conflict("TREASURY_ACCOUNT_INACTIVE", "Treasury account is inactive");
@@ -57,12 +56,12 @@ public class DepositPaymentRouteService {
     }
 
     @Transactional
-    public DepositPaymentRoute updateRoute(UUID publicId, UpdateDepositPaymentRouteRequest request) {
-        DepositPaymentRoute route = routeRepository.findByPublicId(publicId)
+    public DepositPaymentRoute updateRoute(Long id, UpdateDepositPaymentRouteRequest request) {
+        DepositPaymentRoute route = routeRepository.findById(id)
             .orElseThrow(() -> notFound("DEPOSIT_PAYMENT_ROUTE_NOT_FOUND", "Deposit payment route not found"));
         TreasuryAccount treasuryAccount = null;
-        if (request.treasuryAccountPublicId() != null) {
-            treasuryAccount = treasuryAccountRepository.findByPublicId(request.treasuryAccountPublicId())
+        if (request.treasuryAccountId() != null) {
+            treasuryAccount = treasuryAccountRepository.findById(request.treasuryAccountId())
                 .orElseThrow(() -> notFound("TREASURY_ACCOUNT_NOT_FOUND", "Treasury account not found"));
         }
         validateMinMax(request.minAmount(), request.maxAmount());

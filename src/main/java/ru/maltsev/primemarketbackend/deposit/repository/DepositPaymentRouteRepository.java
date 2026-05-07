@@ -2,8 +2,6 @@ package ru.maltsev.primemarketbackend.deposit.repository;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -12,7 +10,7 @@ import ru.maltsev.primemarketbackend.deposit.domain.DepositPaymentRoute;
 
 public interface DepositPaymentRouteRepository extends JpaRepository<DepositPaymentRoute, Long> {
     @EntityGraph(attributePaths = {"depositMethod", "treasuryAccount"})
-    Optional<DepositPaymentRoute> findByPublicId(UUID publicId);
+    java.util.Optional<DepositPaymentRoute> findById(Long id);
 
     @EntityGraph(attributePaths = {"depositMethod", "treasuryAccount"})
     @Query("""

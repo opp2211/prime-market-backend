@@ -5,12 +5,11 @@ import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.DecimalMin;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.UUID;
 
 public record IssueDetailsRequest(
     @JsonProperty("payment_details") String paymentDetails,
-    @JsonProperty("deposit_payment_route_public_id") UUID depositPaymentRoutePublicId,
-    @JsonProperty("treasury_account_public_id") UUID treasuryAccountPublicId,
+    @JsonProperty("deposit_payment_route_id") Long depositPaymentRouteId,
+    @JsonProperty("treasury_account_id") Long treasuryAccountId,
     @JsonProperty("treasury_amount")
     @DecimalMin(value = "0.0001", inclusive = true)
     @Digits(integer = 15, fraction = 4)

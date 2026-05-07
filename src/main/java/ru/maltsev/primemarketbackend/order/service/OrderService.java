@@ -3,7 +3,6 @@ package ru.maltsev.primemarketbackend.order.service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -49,7 +48,7 @@ public class OrderService {
 
     @Transactional
     public OrderResponse createOrder(Long takerUserId, CreateOrderRequest request) {
-        OrderQuote quote = orderQuoteRepository.findByPublicIdForUpdate(requireQuoteId(request))
+        OrderQuote quote = orderQuoteRepository.findByIdForUpdate(requireQuoteId(request))
             .orElseThrow(() -> new ApiProblemException(
                 HttpStatus.NOT_FOUND,
                 "ORDER_QUOTE_NOT_FOUND",
@@ -117,7 +116,7 @@ public class OrderService {
         return OrderResponse.from(order);
     }
 
-    private UUID requireQuoteId(CreateOrderRequest request) {
+    private Long requireQuoteId(CreateOrderRequest request) {
         if (request == null || request.quoteId() == null) {
             throw new ApiProblemException(
                 HttpStatus.BAD_REQUEST,
@@ -279,7 +278,6 @@ public class OrderService {
         Instant expiresAt
     ) {
         return new Order(
-            UUID.randomUUID(),
             quote.getId(),
             roles.makerUserId(),
             roles.takerUserId(),

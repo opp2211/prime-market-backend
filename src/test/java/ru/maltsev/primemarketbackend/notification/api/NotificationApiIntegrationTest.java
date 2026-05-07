@@ -14,7 +14,6 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -141,28 +140,28 @@ class NotificationApiIntegrationTest extends AbstractPostgresIntegrationTest {
         JsonNode response = listNotifications(user, null);
 
         assertThat(response.path("content")).hasSize(2);
-        assertThat(response.path("content").get(0).path("publicId").asText()).isEqualTo(newer.getPublicId().toString());
-        assertThat(response.path("content").get(1).path("publicId").asText()).isEqualTo(older.getPublicId().toString());
+        assertThat(response.path("content").get(0).path("id").asLong()).isEqualTo(newer.getId());
+        assertThat(response.path("content").get(1).path("id").asLong()).isEqualTo(older.getId());
         assertThat(response.path("totalElements").asLong()).isEqualTo(2L);
     }
 
     @Test
     void listNotificationsReturnsPlainPayloadObject() throws Exception {
         User user = createUser("notifications-list-payload");
-        String orderPublicId = UUID.randomUUID().toString();
-        String conversationPublicId = UUID.randomUUID().toString();
+        String orderCode = "PM-NOTIFY1";
+        String conversationId = "101";
         saveNotification(
             user,
             NotificationTypes.ORDER_MESSAGE_RECEIVED,
             Instant.parse("2026-04-20T13:00:00Z"),
             false,
-            notificationPayload(orderPublicId, conversationPublicId)
+            notificationPayload(orderCode, conversationId)
         );
 
         JsonNode response = listNotifications(user, null);
         JsonNode payload = response.path("content").get(0).path("payload");
 
-        assertPlainNotificationPayload(payload, orderPublicId, conversationPublicId);
+        assertPlainNotificationPayload(payload, orderCode, conversationId);
     }
 
     @Test
@@ -196,7 +195,7 @@ class NotificationApiIntegrationTest extends AbstractPostgresIntegrationTest {
 
         assertThat(unreadCount(user)).isEqualTo(2L);
 
-        markNotificationRead(user, firstUnread.getPublicId().toString());
+        markNotificationRead(user, firstUnread.getId().toString());
 
         assertThat(unreadCount(user)).isEqualTo(1L);
     }
@@ -211,37 +210,37 @@ class NotificationApiIntegrationTest extends AbstractPostgresIntegrationTest {
             false
         );
 
-        JsonNode firstResponse = markNotificationRead(user, notification.getPublicId().toString());
-        Instant persistedReadAt = loadNotificationReadAt(notification.getPublicId());
+        JsonNode firstResponse = markNotificationRead(user, notification.getId().toString());
+        Instant persistedReadAt = loadNotificationReadAt(notification.getId());
 
         assertThat(firstResponse.path("isRead").asBoolean()).isTrue();
         assertThat(firstResponse.path("readAt").asText()).isNotBlank();
-        assertThat(loadNotificationReadState(notification.getPublicId())).isTrue();
+        assertThat(loadNotificationReadState(notification.getId())).isTrue();
         assertThat(persistedReadAt).isNotNull();
 
-        JsonNode secondResponse = markNotificationRead(user, notification.getPublicId().toString());
+        JsonNode secondResponse = markNotificationRead(user, notification.getId().toString());
 
         assertThat(secondResponse.path("isRead").asBoolean()).isTrue();
-        assertThat(loadNotificationReadAt(notification.getPublicId())).isEqualTo(persistedReadAt);
+        assertThat(loadNotificationReadAt(notification.getId())).isEqualTo(persistedReadAt);
     }
 
     @Test
     void markReadReturnsPlainPayloadObject() throws Exception {
         User user = createUser("notifications-mark-payload");
-        String orderPublicId = UUID.randomUUID().toString();
-        String conversationPublicId = UUID.randomUUID().toString();
+        String orderCode = "PM-NOTIFY2";
+        String conversationId = "202";
         Notification notification = saveNotification(
             user,
             NotificationTypes.ORDER_MESSAGE_RECEIVED,
             Instant.parse("2026-04-20T12:30:00Z"),
             false,
-            notificationPayload(orderPublicId, conversationPublicId)
+            notificationPayload(orderCode, conversationId)
         );
 
-        JsonNode response = markNotificationRead(user, notification.getPublicId().toString());
+        JsonNode response = markNotificationRead(user, notification.getId().toString());
 
         assertThat(response.path("isRead").asBoolean()).isTrue();
-        assertPlainNotificationPayload(response.path("payload"), orderPublicId, conversationPublicId);
+        assertPlainNotificationPayload(response.path("payload"), orderCode, conversationId);
     }
 
     @Test
@@ -289,7 +288,7 @@ class NotificationApiIntegrationTest extends AbstractPostgresIntegrationTest {
         JsonNode order = createPendingSellOrder(seller, buyer, "20", "Notification order created");
 
         StoredNotification notification = findNotification(seller.getId(), NotificationTypes.ORDER_CREATED);
-        assertThat(notification.payload().path("orderPublicId").asText()).isEqualTo(order.path("publicId").asText());
+        assertThat(notification.payload().path("orderCode").asText()).isEqualTo(order.path("publicCode").asText());
         assertThat(loadNotificationsByType(buyer.getId(), NotificationTypes.ORDER_CREATED)).isEmpty();
     }
 
@@ -300,16 +299,16 @@ class NotificationApiIntegrationTest extends AbstractPostgresIntegrationTest {
         fundWallet(buyer, "RUB", "10000.0000");
 
         JsonNode order = createPendingSellOrder(seller, buyer, "20", "Notification message order");
-        String conversationPublicId = findConversationByType(
-            getOrderConversations(buyer, order.path("publicId").asText()),
+        String conversationId = findConversationByType(
+            getOrderConversations(buyer, order.path("publicCode").asText()),
             "order_main"
-        ).path("publicId").asText();
+        ).path("id").asText();
 
-        sendOrderMessage(buyer, conversationPublicId, "Нужна доставка сегодня");
+        sendOrderMessage(buyer, conversationId, "Нужна доставка сегодня");
 
         StoredNotification notification = findNotification(seller.getId(), NotificationTypes.ORDER_MESSAGE_RECEIVED);
-        assertThat(notification.payload().path("orderPublicId").asText()).isEqualTo(order.path("publicId").asText());
-        assertThat(notification.payload().path("conversationPublicId").asText()).isEqualTo(conversationPublicId);
+        assertThat(notification.payload().path("orderCode").asText()).isEqualTo(order.path("publicCode").asText());
+        assertThat(notification.payload().path("conversationId").asText()).isEqualTo(conversationId);
         assertThat(loadNotificationsByType(buyer.getId(), NotificationTypes.ORDER_MESSAGE_RECEIVED)).isEmpty();
     }
 
@@ -326,12 +325,12 @@ class NotificationApiIntegrationTest extends AbstractPostgresIntegrationTest {
             }
             """.formatted(depositMethodId));
 
-        markDepositPaid(user, created.path("public_id").asText());
-        confirmDeposit(support, created.path("public_id").asText());
+        markDepositPaid(user, created.path("public_code").asText());
+        confirmDeposit(support, created.path("public_code").asText());
 
         StoredNotification notification = findNotification(user.getId(), NotificationTypes.DEPOSIT_CONFIRMED);
-        assertThat(notification.payload().path("depositRequestPublicId").asText())
-            .isEqualTo(created.path("public_id").asText());
+        assertThat(notification.payload().path("depositRequestCode").asText())
+            .isEqualTo(created.path("public_code").asText());
     }
 
     @Test
@@ -352,8 +351,8 @@ class NotificationApiIntegrationTest extends AbstractPostgresIntegrationTest {
             }
             """.formatted(withdrawalMethodId));
 
-        takeWithdrawal(support, created.path("public_id").asText());
-        rejectWithdrawal(support, created.path("public_id").asText(), """
+        takeWithdrawal(support, created.path("public_code").asText());
+        rejectWithdrawal(support, created.path("public_code").asText(), """
             {
               "rejection_reason": "Manual review failed",
               "operator_comment": "Bad requisites"
@@ -361,8 +360,8 @@ class NotificationApiIntegrationTest extends AbstractPostgresIntegrationTest {
             """);
 
         StoredNotification notification = findNotification(user.getId(), NotificationTypes.WITHDRAWAL_REJECTED);
-        assertThat(notification.payload().path("withdrawalRequestPublicId").asText())
-            .isEqualTo(created.path("public_id").asText());
+        assertThat(notification.payload().path("withdrawalRequestCode").asText())
+            .isEqualTo(created.path("public_code").asText());
     }
 
     private User createUser(String slug) {
@@ -409,8 +408,8 @@ class NotificationApiIntegrationTest extends AbstractPostgresIntegrationTest {
         return readBody(result).path("count").asLong();
     }
 
-    private JsonNode markNotificationRead(User user, String publicId) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/notifications/{publicId}/read", publicId).with(auth(user)))
+    private JsonNode markNotificationRead(User user, String id) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/notifications/{id}/read", id).with(auth(user)))
             .andExpect(status().isOk())
             .andReturn();
         return readBody(result);
@@ -429,13 +428,12 @@ class NotificationApiIntegrationTest extends AbstractPostgresIntegrationTest {
             type,
             createdAt,
             isRead,
-            notificationPayload(UUID.randomUUID().toString(), null)
+            notificationPayload("PM-SAVED", null)
         );
     }
 
     private Notification saveNotification(User user, String type, Instant createdAt, boolean isRead, ObjectNode payload) {
         Notification notification = notificationRepository.saveAndFlush(new Notification(
-            UUID.randomUUID(),
             user.getId(),
             type,
             "Test title " + type,
@@ -452,41 +450,41 @@ class NotificationApiIntegrationTest extends AbstractPostgresIntegrationTest {
         return notificationRepository.findById(notification.getId()).orElseThrow();
     }
 
-    private ObjectNode notificationPayload(String orderPublicId, String conversationPublicId) {
+    private ObjectNode notificationPayload(String orderCode, String conversationId) {
         ObjectNode payload = JsonNodeFactory.instance.objectNode()
-            .put("orderPublicId", orderPublicId);
-        if (conversationPublicId != null) {
-            payload.put("conversationPublicId", conversationPublicId);
+            .put("orderCode", orderCode);
+        if (conversationId != null) {
+            payload.put("conversationId", conversationId);
         }
         return payload;
     }
 
-    private void assertPlainNotificationPayload(JsonNode payload, String orderPublicId, String conversationPublicId) {
+    private void assertPlainNotificationPayload(JsonNode payload, String orderCode, String conversationId) {
         assertThat(payload.isObject()).isTrue();
-        assertThat(payload.size()).isEqualTo(conversationPublicId == null ? 1 : 2);
-        assertThat(payload.path("orderPublicId").asText()).isEqualTo(orderPublicId);
-        if (conversationPublicId != null) {
-            assertThat(payload.path("conversationPublicId").asText()).isEqualTo(conversationPublicId);
+        assertThat(payload.size()).isEqualTo(conversationId == null ? 1 : 2);
+        assertThat(payload.path("orderCode").asText()).isEqualTo(orderCode);
+        if (conversationId != null) {
+            assertThat(payload.path("conversationId").asText()).isEqualTo(conversationId);
         }
         assertThat(payload.has("array")).isFalse();
         assertThat(payload.has("containerNode")).isFalse();
         assertThat(payload.has("nodeType")).isFalse();
     }
 
-    private boolean loadNotificationReadState(UUID publicId) {
+    private boolean loadNotificationReadState(Long id) {
         Boolean value = jdbcTemplate.queryForObject(
-            "select is_read from notifications where public_id = ?",
+            "select is_read from notifications where id = ?",
             Boolean.class,
-            publicId
+            id
         );
         return Boolean.TRUE.equals(value);
     }
 
-    private Instant loadNotificationReadAt(UUID publicId) {
+    private Instant loadNotificationReadAt(Long id) {
         Timestamp timestamp = jdbcTemplate.queryForObject(
-            "select read_at from notifications where public_id = ?",
+            "select read_at from notifications where id = ?",
             Timestamp.class,
-            publicId
+            id
         );
         return timestamp == null ? null : timestamp.toInstant();
     }
@@ -494,14 +492,14 @@ class NotificationApiIntegrationTest extends AbstractPostgresIntegrationTest {
     private List<StoredNotification> loadNotificationsByType(Long userId, String type) {
         return jdbcTemplate.query(
             """
-                select public_id::text as public_id, type, title, body, payload::text as payload, is_read, created_at, read_at
+                select id, type, title, body, payload::text as payload, is_read, created_at, read_at
                 from notifications
                 where user_id = ?
                   and type = ?
                 order by created_at desc, id desc
                 """,
             (rs, rowNum) -> new StoredNotification(
-                UUID.fromString(rs.getString("public_id")),
+                rs.getLong("id"),
                 rs.getString("type"),
                 rs.getString("title"),
                 rs.getString("body"),
@@ -526,7 +524,7 @@ class NotificationApiIntegrationTest extends AbstractPostgresIntegrationTest {
             .orElseThrow();
     }
 
-    private long createActiveOffer(
+    private String createActiveOffer(
         User owner,
         String side,
         String currencyCode,
@@ -547,17 +545,17 @@ class NotificationApiIntegrationTest extends AbstractPostgresIntegrationTest {
                 )))
             .andExpect(status().isCreated())
             .andReturn();
-        return readBody(result).path("id").asLong();
+        return readBody(result).path("publicCode").asText();
     }
 
     private JsonNode createQuote(
-        long offerId,
+        String offerCode,
         String intent,
         String viewerCurrencyCode,
         long listedOfferVersion,
         String listedUnitPriceAmount
     ) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/market/offers/{offerId}/quote", offerId)
+        MvcResult result = mockMvc.perform(post("/api/market/offers/{offerCode}/quote", offerCode)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(createQuoteRequest(intent, viewerCurrencyCode, listedOfferVersion, listedUnitPriceAmount)))
             .andExpect(status().isOk())
@@ -576,21 +574,21 @@ class NotificationApiIntegrationTest extends AbstractPostgresIntegrationTest {
     }
 
     private JsonNode createPendingSellOrder(User seller, User buyer, String quantity, String title) throws Exception {
-        long offerId = createActiveOffer(seller, "sell", "USD", "2.50", title);
-        JsonNode quote = createQuote(offerId, "buy", "RUB", 1L, BUY_QUOTE_DISPLAY_PRICE);
+        String offerCode = createActiveOffer(seller, "sell", "USD", "2.50", title);
+        JsonNode quote = createQuote(offerCode, "buy", "RUB", 1L, BUY_QUOTE_DISPLAY_PRICE);
         return createOrder(buyer, quote.path("quoteId").asText(), quantity);
     }
 
-    private JsonNode getOrderConversations(User user, String orderPublicId) throws Exception {
-        MvcResult result = mockMvc.perform(get("/api/orders/{orderId}/conversations", orderPublicId)
+    private JsonNode getOrderConversations(User user, String orderCode) throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/orders/{orderId}/conversations", orderCode)
                 .with(auth(user)))
             .andExpect(status().isOk())
             .andReturn();
         return readBody(result);
     }
 
-    private JsonNode sendOrderMessage(User user, String conversationPublicId, String body) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/order-conversations/{conversationId}/messages", conversationPublicId)
+    private JsonNode sendOrderMessage(User user, String conversationId, String body) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/order-conversations/{conversationId}/messages", conversationId)
                 .with(auth(user))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -613,16 +611,16 @@ class NotificationApiIntegrationTest extends AbstractPostgresIntegrationTest {
         return readBody(result);
     }
 
-    private JsonNode markDepositPaid(User user, String publicId) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/deposit-requests/{publicId}/mark-paid", publicId)
+    private JsonNode markDepositPaid(User user, String publicCode) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/deposit-requests/{publicCode}/mark-paid", publicCode)
                 .with(auth(user)))
             .andExpect(status().isOk())
             .andReturn();
         return readBody(result);
     }
 
-    private JsonNode confirmDeposit(User user, String publicId) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/backoffice/deposit-requests/{publicId}/confirm", publicId)
+    private JsonNode confirmDeposit(User user, String publicCode) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/backoffice/deposit-requests/{publicCode}/confirm", publicCode)
                 .with(auth(user)))
             .andExpect(status().isOk())
             .andReturn();
@@ -639,16 +637,16 @@ class NotificationApiIntegrationTest extends AbstractPostgresIntegrationTest {
         return readBody(result);
     }
 
-    private JsonNode takeWithdrawal(User user, String publicId) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/backoffice/withdrawal-requests/{publicId}/take", publicId)
+    private JsonNode takeWithdrawal(User user, String publicCode) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/backoffice/withdrawal-requests/{publicCode}/take", publicCode)
                 .with(auth(user)))
             .andExpect(status().isOk())
             .andReturn();
         return readBody(result);
     }
 
-    private JsonNode rejectWithdrawal(User user, String publicId, String body) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/backoffice/withdrawal-requests/{publicId}/reject", publicId)
+    private JsonNode rejectWithdrawal(User user, String publicCode, String body) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/backoffice/withdrawal-requests/{publicCode}/reject", publicCode)
                 .with(auth(user))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
@@ -783,7 +781,7 @@ class NotificationApiIntegrationTest extends AbstractPostgresIntegrationTest {
     }
 
     private record StoredNotification(
-        UUID publicId,
+        Long id,
         String type,
         String title,
         String body,

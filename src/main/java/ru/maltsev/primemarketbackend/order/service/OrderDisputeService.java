@@ -8,7 +8,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -61,11 +60,11 @@ public class OrderDisputeService {
 
     @Transactional
     public OrderDisputeResponse openDispute(
-        UUID publicOrderId,
+        String orderCode,
         UserPrincipal principal,
         CreateOrderDisputeRequest request
     ) {
-        Order order = orderRepository.findByPublicIdForUpdate(publicOrderId)
+        Order order = orderRepository.findByPublicCodeForUpdate(orderCode)
             .orElseThrow(this::orderNotFound);
         Long currentUserId = principal.getUser().getId();
         if (!orderAccessService.isParticipant(order, currentUserId)) {
@@ -88,7 +87,6 @@ public class OrderDisputeService {
 
         String openedByRole = orderAccessService.resolveParticipantRole(order, currentUserId);
         OrderDispute dispute = orderDisputeRepository.saveAndFlush(new OrderDispute(
-            UUID.randomUUID(),
             order.getId(),
             currentUserId,
             openedByRole,
@@ -108,8 +106,8 @@ public class OrderDisputeService {
     }
 
     @Transactional(readOnly = true)
-    public OrderDisputeResponse getOrderDispute(UUID publicOrderId, UserPrincipal principal) {
-        Order order = orderAccessService.loadOrder(publicOrderId);
+    public OrderDisputeResponse getOrderDispute(String orderCode, UserPrincipal principal) {
+        Order order = orderAccessService.loadOrder(orderCode);
         if (!canViewDispute(order, principal)) {
             throw orderNotFound();
         }
@@ -175,7 +173,7 @@ public class OrderDisputeService {
         boolean canResolveDispute = canResolveDispute(latestDispute, order, principal);
         return new OrderReadModelDtos.Dispute(
             true,
-            latestDispute.getPublicId(),
+            latestDispute.getPublicCode(),
             latestDispute.getStatus(),
             latestDispute.getReasonCode(),
             latestDispute.getDescription(),
@@ -194,8 +192,8 @@ public class OrderDisputeService {
     }
 
     @Transactional
-    public OrderDisputeResponse takeDispute(UUID publicDisputeId, UserPrincipal principal) {
-        OrderDispute dispute = loadDisputeForUpdate(publicDisputeId);
+    public OrderDisputeResponse takeDispute(String disputeCode, UserPrincipal principal) {
+        OrderDispute dispute = loadDisputeForUpdate(disputeCode);
         if (!dispute.isOpen()) {
             throw new ApiProblemException(
                 HttpStatus.CONFLICT,
@@ -219,12 +217,12 @@ public class OrderDisputeService {
 
     @Transactional
     public OrderDisputeResponse resolveCancel(
-        UUID publicDisputeId,
+        String disputeCode,
         UserPrincipal principal,
         ResolveOrderDisputeRequest request
     ) {
         ResolutionContext context = prepareResolution(
-            publicDisputeId,
+            disputeCode,
             request == null ? null : request.note()
         );
         Instant now = Instant.now();
@@ -250,12 +248,12 @@ public class OrderDisputeService {
 
     @Transactional
     public OrderDisputeResponse resolveComplete(
-        UUID publicDisputeId,
+        String disputeCode,
         UserPrincipal principal,
         ResolveOrderDisputeRequest request
     ) {
         ResolutionContext context = prepareResolution(
-            publicDisputeId,
+            disputeCode,
             request == null ? null : request.note()
         );
         Instant now = Instant.now();
@@ -282,12 +280,12 @@ public class OrderDisputeService {
 
     @Transactional
     public OrderDisputeResponse resolveAmendQuantityAndComplete(
-        UUID publicDisputeId,
+        String disputeCode,
         UserPrincipal principal,
         ResolveOrderDisputeAmendQuantityRequest request
     ) {
         ResolutionContext context = prepareResolution(
-            publicDisputeId,
+            disputeCode,
             request == null ? null : request.note()
         );
         if (request == null) {
@@ -354,10 +352,10 @@ public class OrderDisputeService {
     }
 
     private ResolutionContext prepareResolution(
-        UUID publicDisputeId,
+        String disputeCode,
         String resolutionNote
     ) {
-        OrderDispute dispute = loadDisputeForUpdate(publicDisputeId);
+        OrderDispute dispute = loadDisputeForUpdate(disputeCode);
         if (!dispute.isActive()) {
             throw new ApiProblemException(
                 HttpStatus.CONFLICT,
@@ -386,8 +384,8 @@ public class OrderDisputeService {
         return List.of(order.getMakerUserId(), order.getTakerUserId());
     }
 
-    private OrderDispute loadDisputeForUpdate(UUID publicDisputeId) {
-        return orderDisputeRepository.findByPublicIdForUpdate(publicDisputeId)
+    private OrderDispute loadDisputeForUpdate(String disputeCode) {
+        return orderDisputeRepository.findByPublicCodeForUpdate(disputeCode)
             .orElseThrow(this::disputeNotFound);
     }
 
@@ -432,10 +430,10 @@ public class OrderDisputeService {
         boolean canTakeDisputeInWork = canTakeDisputeInWork(dispute, principal);
         boolean canResolveDispute = canResolveDispute(dispute, order, principal);
         return new OrderDisputeResponse(
-            dispute.getPublicId(),
+            dispute.getPublicCode(),
             new OrderDisputeDtos.OrderSummary(
                 order.getId(),
-                order.getPublicId(),
+                order.getPublicCode(),
                 order.getStatus(),
                 order.getTitleSnapshot(),
                 orderAccessService.resolveBuyerUsername(order),

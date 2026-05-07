@@ -119,7 +119,7 @@ class OfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
         User stranger = createUser("stranger");
         Offer ownerOffer = createDraftOffer(owner, "Owner offer");
 
-        mockMvc.perform(get("/api/offers/{offerId}", ownerOffer.getId()).with(auth(stranger)))
+        mockMvc.perform(get("/api/offers/{offerCode}", ownerOffer.getPublicCode()).with(auth(stranger)))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("OFFER_NOT_FOUND"));
     }
@@ -216,9 +216,10 @@ class OfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
     void patchCanPauseActiveOffer() throws Exception {
         User owner = createUser("owner");
         Category category = requireCategory("path-of-exile", "currency");
-        long offerId = createActiveOffer(owner, category, "sell", "USD", "2.50").path("id").asLong();
+        JsonNode created = createActiveOffer(owner, category, "sell", "USD", "2.50");
+        String offerCode = created.path("publicCode").asText();
 
-        mockMvc.perform(patch("/api/offers/{offerId}", offerId)
+        mockMvc.perform(patch("/api/offers/{offerCode}", offerCode)
                 .with(auth(owner))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -236,10 +237,10 @@ class OfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
         User owner = createUser("owner");
         Category category = requireCategory("path-of-exile", "currency");
         JsonNode created = createActiveOffer(owner, category, "sell", "USD", "2.50");
-        long offerId = created.path("id").asLong();
+        String offerCode = created.path("publicCode").asText();
         String firstPublishedAt = created.path("publishedAt").asText();
 
-        mockMvc.perform(patch("/api/offers/{offerId}", offerId)
+        mockMvc.perform(patch("/api/offers/{offerCode}", offerCode)
                 .with(auth(owner))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -251,7 +252,7 @@ class OfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
 
         Thread.sleep(5L);
 
-        MvcResult republish = mockMvc.perform(patch("/api/offers/{offerId}", offerId)
+        MvcResult republish = mockMvc.perform(patch("/api/offers/{offerCode}", offerCode)
                 .with(auth(owner))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -271,9 +272,10 @@ class OfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
     void patchRejectsRepublishWhenOfferBecomesInvalid() throws Exception {
         User owner = createUser("owner");
         Category category = requireCategory("path-of-exile", "currency");
-        long offerId = createActiveOffer(owner, category, "sell", "USD", "2.50").path("id").asLong();
+        JsonNode created = createActiveOffer(owner, category, "sell", "USD", "2.50");
+        String offerCode = created.path("publicCode").asText();
 
-        mockMvc.perform(patch("/api/offers/{offerId}", offerId)
+        mockMvc.perform(patch("/api/offers/{offerCode}", offerCode)
                 .with(auth(owner))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -283,7 +285,7 @@ class OfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
                     """))
             .andExpect(status().isOk());
 
-        mockMvc.perform(patch("/api/offers/{offerId}", offerId)
+        mockMvc.perform(patch("/api/offers/{offerCode}", offerCode)
                 .with(auth(owner))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -301,9 +303,11 @@ class OfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
         User owner = createUser("buy-owner-reprice");
         Category category = requireCategory("path-of-exile", "currency");
         fundWallet(owner, "USD", "1000.0000");
-        long offerId = createActiveOffer(owner, category, "buy", "USD", "2.50").path("id").asLong();
+        JsonNode created = createActiveOffer(owner, category, "buy", "USD", "2.50");
+        long offerId = created.path("id").asLong();
+        String offerCode = created.path("publicCode").asText();
 
-        mockMvc.perform(patch("/api/offers/{offerId}", offerId)
+        mockMvc.perform(patch("/api/offers/{offerCode}", offerCode)
                 .with(auth(owner))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -327,9 +331,11 @@ class OfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
         User owner = createUser("buy-owner-insufficient");
         Category category = requireCategory("path-of-exile", "currency");
         fundWallet(owner, "USD", "300.0000");
-        long offerId = createActiveOffer(owner, category, "buy", "USD", "2.50").path("id").asLong();
+        JsonNode created = createActiveOffer(owner, category, "buy", "USD", "2.50");
+        long offerId = created.path("id").asLong();
+        String offerCode = created.path("publicCode").asText();
 
-        mockMvc.perform(patch("/api/offers/{offerId}", offerId)
+        mockMvc.perform(patch("/api/offers/{offerCode}", offerCode)
                 .with(auth(owner))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -351,9 +357,11 @@ class OfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
         User owner = createUser("buy-owner-pause");
         Category category = requireCategory("path-of-exile", "currency");
         fundWallet(owner, "USD", "500.0000");
-        long offerId = createActiveOffer(owner, category, "buy", "USD", "2.50").path("id").asLong();
+        JsonNode created = createActiveOffer(owner, category, "buy", "USD", "2.50");
+        long offerId = created.path("id").asLong();
+        String offerCode = created.path("publicCode").asText();
 
-        mockMvc.perform(patch("/api/offers/{offerId}", offerId)
+        mockMvc.perform(patch("/api/offers/{offerCode}", offerCode)
                 .with(auth(owner))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -399,7 +407,7 @@ class OfferApiIntegrationTest extends AbstractPostgresIntegrationTest {
         offer.setQuantityStep(new BigDecimal("2"));
         offerRepository.saveAndFlush(offer);
 
-        mockMvc.perform(patch("/api/offers/{offerId}", offer.getId())
+        mockMvc.perform(patch("/api/offers/{offerCode}", offer.getPublicCode())
                 .with(auth(owner))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""

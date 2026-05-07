@@ -3,13 +3,12 @@ package ru.maltsev.primemarketbackend.withdrawal.api.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.UUID;
 import ru.maltsev.primemarketbackend.withdrawal.domain.WithdrawalPayoutPlan;
 import ru.maltsev.primemarketbackend.withdrawal.domain.WithdrawalPayoutPlanStatus;
 
 public record WithdrawalPayoutPlanResponse(
-    @JsonProperty("public_id") UUID publicId,
-    @JsonProperty("treasury_account_public_id") UUID treasuryAccountPublicId,
+    Long id,
+    @JsonProperty("treasury_account_id") Long treasuryAccountId,
     @JsonProperty("treasury_account_code") String treasuryAccountCode,
     @JsonProperty("treasury_account_title") String treasuryAccountTitle,
     @JsonProperty("planned_user_amount") BigDecimal plannedUserAmount,
@@ -29,8 +28,8 @@ public record WithdrawalPayoutPlanResponse(
             return null;
         }
         return new WithdrawalPayoutPlanResponse(
-            plan.getPublicId(),
-            plan.getTreasuryAccount().getPublicId(),
+            plan.getId(),
+            plan.getTreasuryAccount().getId(),
             plan.getTreasuryAccount().getCode(),
             plan.getTreasuryAccount().getTitle(),
             plan.getPlannedUserAmount(),

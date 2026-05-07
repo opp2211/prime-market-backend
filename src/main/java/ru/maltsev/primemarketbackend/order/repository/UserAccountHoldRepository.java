@@ -44,7 +44,7 @@ public interface UserAccountHoldRepository extends JpaRepository<UserAccountHold
                 when h.refType = 'offer' then 'OFFER'
                 else h.refType
             end,
-            o.publicId,
+            coalesce(o.publicCode, offer.publicCode),
             h.refId,
             coalesce(o.titleSnapshot, offer.title, h.reason),
             case

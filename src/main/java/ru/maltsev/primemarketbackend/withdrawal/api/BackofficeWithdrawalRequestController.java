@@ -6,7 +6,6 @@ import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import java.util.List;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
@@ -77,16 +76,16 @@ public class BackofficeWithdrawalRequestController {
             .map(BackofficeWithdrawalRequestResponse::from));
     }
 
-    @GetMapping("/{publicId}")
+    @GetMapping("/{requestCode}")
     public ResponseEntity<BackofficeWithdrawalRequestResponse> get(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID publicId
+        @PathVariable String requestCode
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        WithdrawalRequest request = withdrawalRequestService.getForBackoffice(publicId);
+        WithdrawalRequest request = withdrawalRequestService.getForBackoffice(requestCode);
         return ResponseEntity.ok(BackofficeWithdrawalRequestResponse.from(
             request,
             eventsFor(request),
@@ -95,17 +94,17 @@ public class BackofficeWithdrawalRequestController {
         ));
     }
 
-    @PostMapping("/{publicId}/take")
+    @PostMapping("/{requestCode}/take")
     @PreAuthorize("hasAuthority('" + PermissionCodes.WITHDRAWAL_REQUESTS_TAKE + "')")
     public ResponseEntity<BackofficeWithdrawalRequestResponse> take(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID publicId
+        @PathVariable String requestCode
     ) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        WithdrawalRequest request = withdrawalRequestService.take(publicId, principal.getUser().getId());
+        WithdrawalRequest request = withdrawalRequestService.take(requestCode, principal.getUser().getId());
         return ResponseEntity.ok(BackofficeWithdrawalRequestResponse.from(
             request,
             eventsFor(request),
@@ -114,11 +113,11 @@ public class BackofficeWithdrawalRequestController {
         ));
     }
 
-    @PostMapping("/{publicId}/payout-plan")
+    @PostMapping("/{requestCode}/payout-plan")
     @PreAuthorize("hasAuthority('" + PermissionCodes.WITHDRAWAL_REQUESTS_TAKE + "')")
     public ResponseEntity<BackofficeWithdrawalRequestResponse> planPayout(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID publicId,
+        @PathVariable String requestCode,
         @Valid @RequestBody CreateWithdrawalPayoutPlanRequest request
     ) {
         if (principal == null) {
@@ -126,7 +125,7 @@ public class BackofficeWithdrawalRequestController {
         }
 
         WithdrawalRequest withdrawalRequest = withdrawalRequestService.planPayout(
-            publicId,
+            requestCode,
             principal.getUser().getId(),
             request
         );
@@ -138,11 +137,11 @@ public class BackofficeWithdrawalRequestController {
         ));
     }
 
-    @PostMapping("/{publicId}/reject")
+    @PostMapping("/{requestCode}/reject")
     @PreAuthorize("hasAuthority('" + PermissionCodes.WITHDRAWAL_REQUESTS_REJECT + "')")
     public ResponseEntity<BackofficeWithdrawalRequestResponse> reject(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID publicId,
+        @PathVariable String requestCode,
         @Valid @RequestBody RejectWithdrawalRequest request
     ) {
         if (principal == null) {
@@ -150,7 +149,7 @@ public class BackofficeWithdrawalRequestController {
         }
 
         WithdrawalRequest withdrawalRequest = withdrawalRequestService.reject(
-            publicId,
+            requestCode,
             principal.getUser().getId(),
             request
         );
@@ -162,11 +161,11 @@ public class BackofficeWithdrawalRequestController {
         ));
     }
 
-    @PostMapping("/{publicId}/confirm")
+    @PostMapping("/{requestCode}/confirm")
     @PreAuthorize("hasAuthority('" + PermissionCodes.WITHDRAWAL_REQUESTS_CONFIRM + "')")
     public ResponseEntity<BackofficeWithdrawalRequestResponse> confirm(
         @AuthenticationPrincipal UserPrincipal principal,
-        @PathVariable UUID publicId,
+        @PathVariable String requestCode,
         @Valid @RequestBody(required = false) ConfirmWithdrawalRequest request
     ) {
         if (principal == null) {
@@ -174,7 +173,7 @@ public class BackofficeWithdrawalRequestController {
         }
 
         WithdrawalRequest withdrawalRequest = withdrawalRequestService.confirm(
-            publicId,
+            requestCode,
             principal.getUser().getId(),
             request
         );
@@ -187,11 +186,11 @@ public class BackofficeWithdrawalRequestController {
     }
 
     private List<MoneyOperationEvent> eventsFor(WithdrawalRequest request) {
-        return moneyOperationEventService.list(MoneyOperationType.WITHDRAWAL_REQUEST, request.getPublicId());
+        return moneyOperationEventService.list(MoneyOperationType.WITHDRAWAL_REQUEST, request.getPublicCode());
     }
 
     private List<TreasuryTransaction> treasuryTransactionsFor(WithdrawalRequest request) {
-        return treasuryService.listOperationTransactions(MoneyOperationType.WITHDRAWAL_REQUEST, request.getPublicId());
+        return treasuryService.listOperationTransactions(MoneyOperationType.WITHDRAWAL_REQUEST, request.getPublicCode());
     }
 
     private WithdrawalPayoutPlan payoutPlanFor(WithdrawalRequest request) {

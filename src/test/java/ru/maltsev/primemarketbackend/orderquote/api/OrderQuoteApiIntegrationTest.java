@@ -12,7 +12,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -102,9 +101,9 @@ class OrderQuoteApiIntegrationTest extends AbstractPostgresIntegrationTest {
     @Test
     void createQuoteForBuyUsesCorrectConversionDirection() throws Exception {
         User seller = createUser("quote-buy-seller");
-        long offerId = createActiveOffer(seller, "sell", "USD", "2.50", "divine-orb", "Sell Divine Orb");
+        String offerCode = createActiveOffer(seller, "sell", "USD", "2.50", "divine-orb", "Sell Divine Orb");
 
-        mockMvc.perform(post("/api/market/offers/{offerId}/quote", offerId)
+        mockMvc.perform(post("/api/market/offers/{offerCode}/quote", offerCode)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(createQuoteRequest("buy", "RUB", 1L, "238.09523810")))
             .andExpect(status().isOk())
@@ -121,9 +120,9 @@ class OrderQuoteApiIntegrationTest extends AbstractPostgresIntegrationTest {
     @Test
     void createQuoteForSellUsesCorrectConversionDirection() throws Exception {
         User buyer = createUser("quote-sell-buyer");
-        long offerId = createActiveOffer(buyer, "buy", "USD", "2.50", "divine-orb", "Buy Divine Orb");
+        String offerCode = createActiveOffer(buyer, "buy", "USD", "2.50", "divine-orb", "Buy Divine Orb");
 
-        mockMvc.perform(post("/api/market/offers/{offerId}/quote", offerId)
+        mockMvc.perform(post("/api/market/offers/{offerCode}/quote", offerCode)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(createQuoteRequest("sell", "RUB", 1L, "231.25000000")))
             .andExpect(status().isOk())
@@ -139,9 +138,9 @@ class OrderQuoteApiIntegrationTest extends AbstractPostgresIntegrationTest {
     @Test
     void createQuoteMarksPriceChangedWhenListedUnitPriceAmountDiffers() throws Exception {
         User seller = createUser("quote-price-changed");
-        long offerId = createActiveOffer(seller, "sell", "USD", "2.50", "divine-orb", "Changed price");
+        String offerCode = createActiveOffer(seller, "sell", "USD", "2.50", "divine-orb", "Changed price");
 
-        mockMvc.perform(post("/api/market/offers/{offerId}/quote", offerId)
+        mockMvc.perform(post("/api/market/offers/{offerCode}/quote", offerCode)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(createQuoteRequest("buy", "RUB", 1L, "240.00000000")))
             .andExpect(status().isOk())
@@ -152,9 +151,9 @@ class OrderQuoteApiIntegrationTest extends AbstractPostgresIntegrationTest {
     @Test
     void createQuoteMarksOfferUpdatedWhenListedOfferVersionDiffers() throws Exception {
         User seller = createUser("quote-offer-updated");
-        long offerId = createActiveOffer(seller, "sell", "USD", "2.50", "divine-orb", "Changed offer");
+        String offerCode = createActiveOffer(seller, "sell", "USD", "2.50", "divine-orb", "Changed offer");
 
-        mockMvc.perform(post("/api/market/offers/{offerId}/quote", offerId)
+        mockMvc.perform(post("/api/market/offers/{offerCode}/quote", offerCode)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(createQuoteRequest("buy", "RUB", 0L, "238.09523810")))
             .andExpect(status().isOk())
@@ -165,9 +164,9 @@ class OrderQuoteApiIntegrationTest extends AbstractPostgresIntegrationTest {
     @Test
     void createQuoteUnavailableWhenRateMissing() throws Exception {
         User seller = createUser("quote-missing-rate");
-        long offerId = createActiveOffer(seller, "sell", "KZT", "1000.00", "divine-orb", "No rate");
+        String offerCode = createActiveOffer(seller, "sell", "KZT", "1000.00", "divine-orb", "No rate");
 
-        mockMvc.perform(post("/api/market/offers/{offerId}/quote", offerId)
+        mockMvc.perform(post("/api/market/offers/{offerCode}/quote", offerCode)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(createQuoteRequest("buy", "RUB", 1L, "1.00000000")))
             .andExpect(status().isConflict())
@@ -177,11 +176,11 @@ class OrderQuoteApiIntegrationTest extends AbstractPostgresIntegrationTest {
     @Test
     void refreshQuoteReturnsNewQuoteWithNewExpiresAt() throws Exception {
         User seller = createUser("quote-refresh");
-        long offerId = createActiveOffer(seller, "sell", "USD", "2.50", "divine-orb", "Refreshable offer");
-        JsonNode createdQuote = createQuote(offerId, "buy", "RUB", 1L, "238.09523810");
+        String offerCode = createActiveOffer(seller, "sell", "USD", "2.50", "divine-orb", "Refreshable offer");
+        JsonNode createdQuote = createQuote(offerCode, "buy", "RUB", 1L, "238.09523810");
 
         Thread.sleep(5L);
-        expireQuote(UUID.fromString(createdQuote.path("quoteId").asText()));
+        expireQuote(createdQuote.path("quoteId").asLong());
 
         JsonNode refreshed = refreshQuote(createdQuote.path("quoteId").asText());
         assertThat(refreshed.path("quoteId").asText()).isNotEqualTo(createdQuote.path("quoteId").asText());
@@ -194,10 +193,10 @@ class OrderQuoteApiIntegrationTest extends AbstractPostgresIntegrationTest {
     @Test
     void refreshQuoteCanDistinguishFxOnlyChangeVsOfferUpdate() throws Exception {
         User seller = createUser("quote-refresh-flags");
-        long offerId = createActiveOffer(seller, "sell", "USD", "2.50", "divine-orb", "Initial title");
-        JsonNode firstQuote = createQuote(offerId, "buy", "RUB", 1L, "238.09523810");
+        String offerCode = createActiveOffer(seller, "sell", "USD", "2.50", "divine-orb", "Initial title");
+        JsonNode firstQuote = createQuote(offerCode, "buy", "RUB", 1L, "238.09523810");
 
-        expireQuote(UUID.fromString(firstQuote.path("quoteId").asText()));
+        expireQuote(firstQuote.path("quoteId").asLong());
         jdbcTemplate.update(
             "update currency_rates set rate = ? where from_currency_code = ? and to_currency_code = ?",
             new BigDecimal("0.01000000"),
@@ -210,8 +209,8 @@ class OrderQuoteApiIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(secondQuote.path("offerUpdated").asBoolean()).isFalse();
         assertThat(secondQuote.path("price").path("amount").decimalValue()).isEqualByComparingTo("250.00000000");
 
-        expireQuote(UUID.fromString(secondQuote.path("quoteId").asText()));
-        mockMvc.perform(patch("/api/offers/{offerId}", offerId)
+        expireQuote(secondQuote.path("quoteId").asLong());
+        mockMvc.perform(patch("/api/offers/{offerCode}", offerCode)
                 .with(auth(seller))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -230,12 +229,12 @@ class OrderQuoteApiIntegrationTest extends AbstractPostgresIntegrationTest {
     @Test
     void refreshQuoteReturnsConflictWhenOfferBecameUnavailable() throws Exception {
         User seller = createUser("quote-refresh-unavailable");
-        long offerId = createActiveOffer(seller, "sell", "USD", "2.50", "divine-orb", "Unavailable later");
-        JsonNode createdQuote = createQuote(offerId, "buy", "RUB", 1L, "238.09523810");
-        UUID quoteId = UUID.fromString(createdQuote.path("quoteId").asText());
+        String offerCode = createActiveOffer(seller, "sell", "USD", "2.50", "divine-orb", "Unavailable later");
+        JsonNode createdQuote = createQuote(offerCode, "buy", "RUB", 1L, "238.09523810");
+        Long quoteId = createdQuote.path("quoteId").asLong();
 
         expireQuote(quoteId);
-        mockMvc.perform(patch("/api/offers/{offerId}", offerId)
+        mockMvc.perform(patch("/api/offers/{offerCode}", offerCode)
                 .with(auth(seller))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -250,7 +249,7 @@ class OrderQuoteApiIntegrationTest extends AbstractPostgresIntegrationTest {
             .andExpect(jsonPath("$.code").value("OFFER_UNAVAILABLE"));
 
         String storedStatus = jdbcTemplate.queryForObject(
-            "select status from order_quotes where public_id = ?",
+            "select status from order_quotes where id = ?",
             String.class,
             quoteId
         );
@@ -283,7 +282,7 @@ class OrderQuoteApiIntegrationTest extends AbstractPostgresIntegrationTest {
         ));
     }
 
-    private long createActiveOffer(
+    private String createActiveOffer(
         User owner,
         String side,
         String currencyCode,
@@ -309,7 +308,7 @@ class OrderQuoteApiIntegrationTest extends AbstractPostgresIntegrationTest {
                 )))
             .andExpect(status().isCreated())
             .andReturn();
-        return readBody(result).path("id").asLong();
+        return readBody(result).path("publicCode").asText();
     }
 
     private void fundWallet(User user, String currencyCode, String amount) {
@@ -328,13 +327,13 @@ class OrderQuoteApiIntegrationTest extends AbstractPostgresIntegrationTest {
     }
 
     private JsonNode createQuote(
-        long offerId,
+        String offerCode,
         String intent,
         String viewerCurrencyCode,
         long listedOfferVersion,
         String listedUnitPriceAmount
     ) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/market/offers/{offerId}/quote", offerId)
+        MvcResult result = mockMvc.perform(post("/api/market/offers/{offerCode}/quote", offerCode)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(createQuoteRequest(intent, viewerCurrencyCode, listedOfferVersion, listedUnitPriceAmount)))
             .andExpect(status().isOk())
@@ -349,9 +348,9 @@ class OrderQuoteApiIntegrationTest extends AbstractPostgresIntegrationTest {
         return readBody(result);
     }
 
-    private void expireQuote(UUID quoteId) {
+    private void expireQuote(Long quoteId) {
         jdbcTemplate.update(
-            "update order_quotes set expires_at = ? where public_id = ?",
+            "update order_quotes set expires_at = ? where id = ?",
             Timestamp.from(Instant.now().minusSeconds(1)),
             quoteId
         );

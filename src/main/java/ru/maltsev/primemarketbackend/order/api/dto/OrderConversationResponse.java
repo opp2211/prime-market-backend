@@ -1,10 +1,9 @@
 package ru.maltsev.primemarketbackend.order.api.dto;
 
 import java.time.Instant;
-import java.util.UUID;
 
 public record OrderConversationResponse(
-    UUID publicId,
+    Long id,
     String conversationType,
     String title,
     Instant lastMessageAt,

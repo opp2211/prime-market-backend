@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -183,14 +182,14 @@ public class UserAccountService {
     private WalletWorkItemResponse toHoldReserveItem(WalletReserveReadRow row) {
         String sourceType = normalizeSourceType(row.sourceType());
         String title = switch (sourceType) {
-            case "ORDER" -> "Заказ " + shortPublicId(row.refPublicId());
+            case "ORDER" -> "Заказ " + displayCode(row.refCode());
             case "OFFER" -> "Резерв по предложению";
             default -> prettify(row.title());
         };
 
         return new WalletWorkItemResponse(
             sourceType,
-            row.refPublicId(),
+            row.refCode(),
             row.refId(),
             title,
             firstNonBlank(row.title(), row.description()),
@@ -204,9 +203,9 @@ public class UserAccountService {
     private WalletWorkItemResponse toWithdrawalReserveItem(WithdrawalRequest request) {
         return new WalletWorkItemResponse(
             "WITHDRAWAL_REQUEST",
-            request.getPublicId(),
+            request.getPublicCode(),
             request.getId(),
-            "Заявка на вывод " + shortPublicId(request.getPublicId()),
+            "Заявка на вывод " + displayCode(request.getPublicCode()),
             firstNonBlank(request.getWithdrawalMethodTitleSnapshot(), request.getStatus().name()),
             request.getAmount(),
             request.getCurrencyCodeSnapshot(),
@@ -218,9 +217,9 @@ public class UserAccountService {
     private WalletWorkItemResponse toPendingDepositItem(DepositRequest request) {
         return new WalletWorkItemResponse(
             "DEPOSIT_REQUEST",
-            request.getPublicId(),
+            request.getPublicCode(),
             request.getId(),
-            "Пополнение " + shortPublicId(request.getPublicId()),
+            "Пополнение " + displayCode(request.getPublicCode()),
             firstNonBlank(request.getDepositMethodTitleSnapshot(), request.getStatus().name()),
             request.getAmount(),
             request.getCurrencyCodeSnapshot(),
@@ -268,13 +267,13 @@ public class UserAccountService {
         TransactionReferenceContext context
     ) {
         return new WalletTransactionResponse(
-            row.publicId(),
+            row.publicCode(),
             row.amount(),
             row.currencyCode(),
             row.txType(),
             resolveLabel(row, context),
             row.refType(),
-            resolveRefPublicId(row, context),
+            resolveRefCode(row, context),
             row.createdAt()
         );
     }
@@ -313,22 +312,22 @@ public class UserAccountService {
         };
     }
 
-    private UUID resolveRefPublicId(UserAccountTxReadRow row, TransactionReferenceContext context) {
+    private String resolveRefCode(UserAccountTxReadRow row, TransactionReferenceContext context) {
         if ("DEPOSIT_REQUEST".equals(row.refType())) {
             DepositRequest request = context.depositsById().get(row.refId());
-            return request == null ? null : request.getPublicId();
+            return request == null ? null : request.getPublicCode();
         }
         if ("WITHDRAWAL_REQUEST".equals(row.refType())) {
             WithdrawalRequest request = context.withdrawalsById().get(row.refId());
-            return request == null ? null : request.getPublicId();
+            return request == null ? null : request.getPublicCode();
         }
         if (row.refType() != null && row.refType().startsWith("ORDER_")) {
             Order order = context.ordersById().get(row.refId());
-            return order == null ? null : order.getPublicId();
+            return order == null ? null : order.getPublicCode();
         }
         if ("USER_CURRENCY_CONVERSION".equals(row.refType())) {
             UserCurrencyConversion conversion = context.conversionsById().get(row.refId());
-            return conversion == null ? null : conversion.getPublicId();
+            return conversion == null ? null : conversion.getPublicCode();
         }
         return null;
     }
@@ -358,11 +357,11 @@ public class UserAccountService {
         return sourceType.trim().toUpperCase(Locale.ROOT);
     }
 
-    private String shortPublicId(UUID publicId) {
-        if (publicId == null) {
+    private String displayCode(String publicCode) {
+        if (publicCode == null) {
             return "";
         }
-        return publicId.toString().substring(0, 8).toUpperCase(Locale.ROOT);
+        return publicCode;
     }
 
     private record TransactionReferenceContext(

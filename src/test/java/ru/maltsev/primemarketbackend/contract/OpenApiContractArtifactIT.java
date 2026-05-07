@@ -86,17 +86,17 @@ class OpenApiContractArtifactIT extends AbstractPostgresIntegrationTest {
         assertThat(paths.has("/api/notifications")).isTrue();
         assertThat(paths.has("/api/notifications/stream")).isTrue();
         assertThat(paths.has("/api/notifications/unread-count")).isTrue();
-        assertThat(paths.has("/api/notifications/{publicId}/read")).isTrue();
+        assertThat(paths.has("/api/notifications/{id}/read")).isTrue();
         assertThat(paths.has("/api/notifications/read-all")).isTrue();
         assertThat(paths.has("/api/offers")).isTrue();
         assertThat(paths.has("/api/market/offers")).isTrue();
-        assertThat(paths.has("/api/market/offers/{offerId}/quote")).isTrue();
+        assertThat(paths.has("/api/market/offers/{offerCode}/quote")).isTrue();
         assertThat(paths.has("/api/order-quotes/{quoteId}/refresh")).isTrue();
         assertThat(paths.has("/api/orders")).isTrue();
-        assertThat(paths.has("/api/orders/{orderId}")).isTrue();
+        assertThat(paths.has("/api/orders/{orderCode}")).isTrue();
         assertThat(paths.has("/api/order-requests/{requestId}/approve")).isTrue();
-        assertThat(paths.has("/api/orders/{orderId}/dispute")).isTrue();
-        assertThat(paths.has("/api/orders/{orderId}/conversations")).isTrue();
+        assertThat(paths.has("/api/orders/{orderCode}/dispute")).isTrue();
+        assertThat(paths.has("/api/orders/{orderCode}/conversations")).isTrue();
         assertThat(paths.has("/api/order-conversations/{conversationId}/messages")).isTrue();
         assertThat(paths.has("/api/backoffice/disputes")).isTrue();
         assertThat(paths.has("/test/public")).isFalse();
@@ -161,8 +161,8 @@ class OpenApiContractArtifactIT extends AbstractPostgresIntegrationTest {
         assertThat(queryParameter(contract, "/api/market/offers", "get", "categorySlug").path("required").asBoolean()).isTrue();
         assertThat(queryParameter(contract, "/api/market/offers", "get", "intent").path("required").asBoolean()).isTrue();
         assertThat(queryParameter(contract, "/api/market/offers", "get", "viewerCurrencyCode").path("required").asBoolean()).isTrue();
-        assertThat(queryParameter(contract, "/api/market/offers/{offerId}", "get", "intent").path("required").asBoolean()).isTrue();
-        assertThat(queryParameter(contract, "/api/market/offers/{offerId}", "get", "viewerCurrencyCode").path("required").asBoolean()).isTrue();
+        assertThat(queryParameter(contract, "/api/market/offers/{offerCode}", "get", "intent").path("required").asBoolean()).isTrue();
+        assertThat(queryParameter(contract, "/api/market/offers/{offerCode}", "get", "viewerCurrencyCode").path("required").asBoolean()).isTrue();
 
         assertThat(contract.path("paths").path("/api/withdrawal-requests").path("post").path("responses").has("201")).isTrue();
         assertThat(contract.path("paths").path("/api/withdrawal-requests").path("post").path("responses").has("200")).isFalse();
